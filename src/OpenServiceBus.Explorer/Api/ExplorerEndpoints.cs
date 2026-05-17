@@ -1,0 +1,168 @@
+using System.Net.Http.Json;
+using System.Text;
+using Azure.Messaging.ServiceBus;
+using OpenServiceBus.Explorer.Sessions;
+
+namespace OpenServiceBus.Explorer.Api;
+
+public static class ExplorerEndpoints
+{
+    public static IEndpointRouteBuilder MapExplorerEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        var api = endpoints.MapGroup("/api");
+
+        // --- Queue CRUD (proxied to broker's management REST API) ---
+        api.MapGet("/queues", async (string managementUrl, IHttpClientFactory httpFactory, CancellationToken ct) =>
+        {
+            var http = httpFactory.CreateClient();
+            var resp = await http.GetAsync(Combine(managementUrl, "/queues/"), ct);
+            return Results.Content(await resp.Content.ReadAsStringAsync(ct), "application/json", statusCode: (int)resp.StatusCode);
+        });
+
+        api.MapPut("/queues/{name}", async (string name, CreateQueueRequest body, IHttpClientFactory httpFactory, CancellationToken ct) =>
+        {
+            var http = httpFactory.CreateClient();
+            var payload = JsonContent.Create(body.Options);
+            var resp = await http.PutAsync(Combine(body.ManagementUrl, $"/queues/{name}"), payload, ct);
+            return Results.Content(await resp.Content.ReadAsStringAsync(ct), "application/json", statusCode: (int)resp.StatusCode);
+        });
+
+        api.MapDelete("/queues/{name}", async (string name, string managementUrl, IHttpClientFactory httpFactory, CancellationToken ct) =>
+        {
+            var http = httpFactory.CreateClient();
+            var resp = await http.DeleteAsync(Combine(managementUrl, $"/queues/{name}"), ct);
+            return Results.StatusCode((int)resp.StatusCode);
+        });
+
+        // --- Data plane (real Azure SDK against the broker) ---
+        api.MapPost("/send", async (SendRequest req, SessionManager sessions, CancellationToken ct) =>
+        {
+            var session = sessions.GetOrCreate(req.ConnectionString);
+            await using var sender = session.Sender(req.Queue);
+
+            var msg = new ServiceBusMessage(req.Body ?? string.Empty);
+            if (!string.IsNullOrWhiteSpace(req.MessageId)) msg.MessageId = req.MessageId;
+            if (!string.IsNullOrWhiteSpace(req.CorrelationId)) msg.CorrelationId = req.CorrelationId;
+            if (!string.IsNullOrWhiteSpace(req.Subject)) msg.Subject = req.Subject;
+            if (!string.IsNullOrWhiteSpace(req.ContentType)) msg.ContentType = req.ContentType;
+            if (req.Properties is { Count: > 0 })
+            {
+                foreach (var (k, v) in req.Properties) msg.ApplicationProperties[k] = v;
+            }
+
+            await sender.SendMessageAsync(msg, ct);
+            return Results.Ok(new { sent = true, messageId = msg.MessageId });
+        });
+
+        api.MapPost("/receive", async (ReceiveRequest req, SessionManager sessions, CancellationToken ct) =>
+        {
+            var session = sessions.GetOrCreate(req.ConnectionString);
+            var receiver = session.Receiver(req.Queue);
+            var msg = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(req.TimeoutSeconds ?? 5), ct);
+            if (msg is null)
+            {
+                return Results.Ok(new { received = false });
+            }
+            session.TrackLocked(msg);
+            return Results.Ok(ToDto(msg));
+        });
+
+        api.MapPost("/complete", async (DispositionRequest req, SessionManager sessions, CancellationToken ct) =>
+        {
+            var session = sessions.GetOrCreate(req.ConnectionString);
+            if (!session.TryTakeLocked(req.LockToken, out var msg) || msg is null)
+            {
+                return Results.NotFound(new { error = "Unknown lock token (already completed or never tracked by this explorer session)." });
+            }
+            await session.Receiver(req.Queue).CompleteMessageAsync(msg, ct);
+            return Results.Ok(new { completed = true });
+        });
+
+        api.MapPost("/abandon", async (DispositionRequest req, SessionManager sessions, CancellationToken ct) =>
+        {
+            var session = sessions.GetOrCreate(req.ConnectionString);
+            if (!session.TryTakeLocked(req.LockToken, out var msg) || msg is null)
+            {
+                return Results.NotFound(new { error = "Unknown lock token." });
+            }
+            await session.Receiver(req.Queue).AbandonMessageAsync(msg, cancellationToken: ct);
+            return Results.Ok(new { abandoned = true });
+        });
+
+        // --- Connectivity check ---
+        api.MapPost("/ping", async (PingRequest req, SessionManager sessions, IHttpClientFactory httpFactory, CancellationToken ct) =>
+        {
+            var http = httpFactory.CreateClient();
+            string? mgmtStatus = null;
+            string? sdkStatus = null;
+
+            try
+            {
+                var resp = await http.GetAsync(Combine(req.ManagementUrl, "/health"), ct);
+                mgmtStatus = $"{(int)resp.StatusCode} {resp.StatusCode}";
+            }
+            catch (Exception ex)
+            {
+                mgmtStatus = "error: " + ex.Message;
+            }
+
+            try
+            {
+                var session = sessions.GetOrCreate(req.ConnectionString);
+                // Cheap probe: open a sender then close it. ServiceBusClient opens on first send/receive.
+                await using var sender = session.Sender("__ping__probe__");
+                sdkStatus = "ok (client constructed; actual AMQP open happens on first send/receive)";
+            }
+            catch (Exception ex)
+            {
+                sdkStatus = "error: " + ex.Message;
+            }
+
+            return Results.Ok(new { management = mgmtStatus, serviceBus = sdkStatus });
+        });
+
+        return endpoints;
+    }
+
+    private static string Combine(string baseUrl, string suffix)
+        => baseUrl.TrimEnd('/') + suffix;
+
+    private static object ToDto(ServiceBusReceivedMessage msg) => new
+    {
+        received = true,
+        sequenceNumber = Safe(() => (long?)msg.SequenceNumber),
+        messageId = msg.MessageId,
+        correlationId = msg.CorrelationId,
+        subject = msg.Subject,
+        contentType = msg.ContentType,
+        enqueuedTime = Safe(() => (DateTimeOffset?)msg.EnqueuedTime),
+        lockedUntil = Safe(() => (DateTimeOffset?)msg.LockedUntil),
+        deliveryCount = Safe(() => (int?)msg.DeliveryCount),
+        lockToken = msg.LockToken,
+        body = SafeBody(msg.Body),
+        applicationProperties = msg.ApplicationProperties.ToDictionary(kv => kv.Key, kv => kv.Value?.ToString()),
+    };
+
+    /// <summary>
+    /// Several <see cref="ServiceBusReceivedMessage"/> properties dereference Nullable and NRE
+    /// if the broker hasn't stamped the corresponding AMQP header/annotation yet (e.g. delivery-count
+    /// before M4, x-opt-enqueued-time before M4). Wrap each in try/catch so the Explorer keeps
+    /// surfacing what IS available rather than failing the whole response.
+    /// </summary>
+    private static T? Safe<T>(Func<T?> get) where T : struct
+    {
+        try { return get(); } catch { return null; }
+    }
+
+    private static string SafeBody(BinaryData body)
+    {
+        try { return body.ToString(); }
+        catch { return $"<{body.ToMemory().Length} bytes>"; }
+    }
+}
+
+public sealed record CreateQueueRequest(string ManagementUrl, Dictionary<string, object>? Options);
+public sealed record SendRequest(string ConnectionString, string Queue, string? Body, string? MessageId, string? CorrelationId, string? Subject, string? ContentType, Dictionary<string, string>? Properties);
+public sealed record ReceiveRequest(string ConnectionString, string Queue, int? TimeoutSeconds);
+public sealed record DispositionRequest(string ConnectionString, string Queue, string LockToken);
+public sealed record PingRequest(string ConnectionString, string ManagementUrl);

@@ -15,6 +15,7 @@
     <PackageReference Include="Shouldly" />
     <PackageReference Include="Azure.Messaging.ServiceBus" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" />
   </ItemGroup>
 
   <ItemGroup>
@@ -23,6 +24,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\OpenServiceBus.Amqp\OpenServiceBus.Amqp.csproj" />
+    <ProjectReference Include="..\..\src\OpenServiceBus.Broker\OpenServiceBus.Broker.csproj" />
     <ProjectReference Include="..\..\src\OpenServiceBus.Testing\OpenServiceBus.Testing.csproj" />
   </ItemGroup>
 

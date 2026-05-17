@@ -11,11 +11,14 @@ namespace OpenServiceBus.Amqp.Management;
 /// and replies with statusCode=202 / statusDescription="Accepted". Real SAS validation
 /// is opt-in and arrives in M9.
 ///
-/// Critical wire contract (the Azure SDK is strict, fails silently otherwise):
+/// Critical wire contract (the Azure SDK / Microsoft.Azure.Amqp is strict and NREs on missing fields).
+/// Verified against Microsoft.Azure.Amqp's CbsConstants.cs and AmqpCbsLink.cs:
 /// <list type="bullet">
 ///   <item>Response <c>properties.correlation-id</c> must echo the request's <c>properties.message-id</c>.</item>
-///   <item>Response <c>application-properties</c> keys are <b>camelCase</b> (<c>statusCode</c>, <c>statusDescription</c>).</item>
-///   <item>Status 202 (Accepted) on success.</item>
+///   <item>Response <c>application-properties</c> keys are <b>kebab-case</b>
+///         (<c>status-code</c>, <c>status-description</c>) — NOT camelCase.</item>
+///   <item><c>status-code</c> is an <c>int32</c> (the SDK does <c>(int)</c> cast directly — wrong int width NREs).</item>
+///   <item>The message body is sent as an <c>AmqpValue</c>.</item>
 /// </list>
 /// </summary>
 public sealed class CbsRequestProcessor : IRequestProcessor
@@ -37,6 +40,7 @@ public sealed class CbsRequestProcessor : IRequestProcessor
         {
             Properties = new Properties(),
             ApplicationProperties = new ApplicationProperties(),
+            BodySection = new AmqpValue { Value = "Accepted" },
         };
 
         var requestMessageId = request.Properties?.GetMessageId();
@@ -45,8 +49,8 @@ public sealed class CbsRequestProcessor : IRequestProcessor
             response.Properties.SetCorrelationId(requestMessageId);
         }
 
-        response.ApplicationProperties["statusCode"] = 202;
-        response.ApplicationProperties["statusDescription"] = "Accepted";
+        response.ApplicationProperties["status-code"] = (int)202;
+        response.ApplicationProperties["status-description"] = "Accepted";
 
         return response;
     }

@@ -12,24 +12,33 @@ namespace OpenServiceBus.Amqp.WireTests;
 /// Spins up an <see cref="AmqpListenerHost"/> bound to a random free TCP port on 127.0.0.1
 /// with an in-memory broker behind it. Intended for wire-level tests until the full
 /// <c>OpenServiceBusTestHost</c> lands in M10.
+///
+/// Tests needing deterministic time control (e.g. lock expiration) can pass a custom
+/// <see cref="TimeProvider"/> (typically <c>FakeTimeProvider</c>) and drive expiration
+/// directly via <see cref="IMessageStore.ExpireLocks"/> — the harness does not run the
+/// production <c>LockManager</c> sweep loop, so behavior is fully test-controlled.
 /// </summary>
 internal sealed class TestListenerHarness : IAsyncDisposable
 {
     public AmqpListenerHost Host { get; }
     public IQueueRegistry Queues { get; }
     public IMessageStore Store { get; }
+    public TimeProvider TimeProvider { get; }
     public int Port { get; }
     public string AmqpUri => $"amqp://127.0.0.1:{Port}";
 
-    private TestListenerHarness(AmqpListenerHost host, IQueueRegistry queues, IMessageStore store, int port)
+    private TestListenerHarness(AmqpListenerHost host, IQueueRegistry queues, IMessageStore store, TimeProvider timeProvider, int port)
     {
         Host = host;
         Queues = queues;
         Store = store;
+        TimeProvider = timeProvider;
         Port = port;
     }
 
-    public static async Task<TestListenerHarness> StartAsync(Action<AmqpListenerOptions>? configure = null)
+    public static async Task<TestListenerHarness> StartAsync(
+        Action<AmqpListenerOptions>? configure = null,
+        TimeProvider? timeProvider = null)
     {
         var port = GetFreePort();
         var options = new AmqpListenerOptions
@@ -42,7 +51,8 @@ internal sealed class TestListenerHarness : IAsyncDisposable
         };
         configure?.Invoke(options);
 
-        var store = new InMemoryMessageStore();
+        var tp = timeProvider ?? TimeProvider.System;
+        var store = new InMemoryMessageStore(tp);
         IMessageStore storeAsIface = store;
         var queues = new QueueManager(storeAsIface);
 
@@ -53,7 +63,7 @@ internal sealed class TestListenerHarness : IAsyncDisposable
             NullLoggerFactory.Instance);
 
         await host.StartAsync(CancellationToken.None);
-        return new TestListenerHarness(host, queues, storeAsIface, options.Port);
+        return new TestListenerHarness(host, queues, storeAsIface, tp, options.Port);
     }
 
     private static int GetFreePort()

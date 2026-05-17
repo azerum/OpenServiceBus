@@ -16,10 +16,16 @@ public static class QueueEndpoints
     {
         var group = endpoints.MapGroup("/queues");
 
-        group.MapGet("/", async (IQueueRegistry registry, CancellationToken ct) =>
+        group.MapGet("/", async (IQueueRegistry registry, IMessageStore store, CancellationToken ct) =>
         {
             var queues = await registry.ListAsync(ct);
-            return Results.Ok(queues.Select(q => QueueResponse.From(q)));
+            var withCounts = new List<QueueResponse>(queues.Count);
+            foreach (var q in queues)
+            {
+                var count = await store.CountAsync(q.Name, ct);
+                withCounts.Add(QueueResponse.From(q, count));
+            }
+            return Results.Ok(withCounts);
         });
 
         group.MapGet("/{name}", async (string name, IQueueRegistry registry, IMessageStore store, CancellationToken ct) =>

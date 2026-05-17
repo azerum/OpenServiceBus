@@ -66,15 +66,15 @@ public class CbsTests
             response.Properties.ShouldNotBeNull();
             response.Properties.CorrelationId.ShouldBe(requestId);
 
-            // camelCase keys (NOT kebab-case). application-properties keys are strings.
+            // kebab-case keys (NOT camelCase). Microsoft.Azure.Amqp's CbsConstants uses status-code / status-description.
             response.ApplicationProperties.ShouldNotBeNull();
-            response.ApplicationProperties.Map.ContainsKey("statusCode").ShouldBeTrue("response must use camelCase 'statusCode'");
-            response.ApplicationProperties.Map.ContainsKey("statusDescription").ShouldBeTrue("response must use camelCase 'statusDescription'");
-            response.ApplicationProperties.Map.ContainsKey("status-code").ShouldBeFalse("response must NOT use kebab-case 'status-code'");
+            response.ApplicationProperties.Map.ContainsKey("status-code").ShouldBeTrue("response must use kebab-case 'status-code'");
+            response.ApplicationProperties.Map.ContainsKey("status-description").ShouldBeTrue("response must use kebab-case 'status-description'");
+            response.ApplicationProperties.Map.ContainsKey("statusCode").ShouldBeFalse("response must NOT use camelCase 'statusCode' for CBS");
 
-            // 202 Accepted.
-            Convert.ToInt32(response.ApplicationProperties["statusCode"]).ShouldBe(202);
-            ((string)response.ApplicationProperties["statusDescription"]).ShouldBe("Accepted");
+            // 202 Accepted, statusCode encoded as int32.
+            ((int)response.ApplicationProperties["status-code"]).ShouldBe(202);
+            ((string)response.ApplicationProperties["status-description"]).ShouldBe("Accepted");
 
             await sender.CloseAsync();
             await receiver.CloseAsync();

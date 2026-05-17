@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenServiceBus Explorer</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f8f9fa; }
+    .navbar-brand { font-weight: 600; letter-spacing: -0.01em; }
+    .pill { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8em; }
+    pre.body { white-space: pre-wrap; word-break: break-all; background: #f1f3f5; padding: 0.6em; border-radius: 6px; max-height: 12em; overflow: auto; }
+    .queue-item.active { background: #0d6efd; color: white; }
+    .queue-item { cursor: pointer; }
+    .toast-stack { position: fixed; top: 1rem; right: 1rem; z-index: 1080; max-width: 28rem; }
+    code { color: #6f42c1; }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-dark bg-dark">
+    <div class="container-fluid">
+      <span class="navbar-brand">OpenServiceBus Explorer</span>
+      <span class="text-muted small" id="status">disconnected</span>
+    </div>
+  </nav>
+
+  <div class="container-fluid py-3">
+    <!-- Connection panel -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <h6 class="card-title mb-3">Connection</h6>
+        <div class="row g-2">
+          <div class="col-md-7">
+            <label class="form-label small text-muted">Service Bus connection string</label>
+            <input id="connStr" type="text" class="form-control font-monospace small" />
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small text-muted">Broker management URL</label>
+            <input id="mgmtUrl" type="text" class="form-control font-monospace small" />
+          </div>
+          <div class="col-md-2 d-flex align-items-end gap-2">
+            <button id="btnPing" class="btn btn-primary flex-grow-1">Connect</button>
+          </div>
+        </div>
+        <div id="pingResult" class="mt-2 small text-muted"></div>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <!-- Queues sidebar -->
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Queues</span>
+            <button class="btn btn-sm btn-outline-secondary" id="btnRefresh">↻</button>
+          </div>
+          <ul id="queueList" class="list-group list-group-flush"></ul>
+          <div class="card-body">
+            <div class="input-group input-group-sm">
+              <input id="newQueueName" type="text" class="form-control" placeholder="queue name">
+              <button class="btn btn-success" id="btnCreate">+ Create</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main panel -->
+      <div class="col-md-9">
+        <div class="card">
+          <div class="card-header">
+            <span class="text-muted">Selected:</span>
+            <span id="selectedQueue" class="fw-semibold">— pick a queue —</span>
+          </div>
+          <div class="card-body">
+            <ul class="nav nav-tabs mb-3">
+              <li class="nav-item"><a class="nav-link active" data-tab="send" href="#">Send</a></li>
+              <li class="nav-item"><a class="nav-link" data-tab="receive" href="#">Receive (peek-lock)</a></li>
+            </ul>
+
+            <!-- Send tab -->
+            <div class="tab-pane" id="tab-send">
+              <div class="row g-2 mb-2">
+                <div class="col-md-4"><input id="msgId" class="form-control form-control-sm" placeholder="MessageId (optional)"></div>
+                <div class="col-md-4"><input id="msgCorr" class="form-control form-control-sm" placeholder="CorrelationId (optional)"></div>
+                <div class="col-md-4"><input id="msgSubj" class="form-control form-control-sm" placeholder="Subject (optional)"></div>
+              </div>
+              <textarea id="msgBody" class="form-control mb-2" rows="6" placeholder="Message body…"></textarea>
+              <div class="d-flex justify-content-between align-items-center">
+                <small class="text-muted">Sent via <code>Azure.Messaging.ServiceBus</code> SDK.</small>
+                <button id="btnSend" class="btn btn-primary" disabled>Send</button>
+              </div>
+            </div>
+
+            <!-- Receive tab -->
+            <div class="tab-pane d-none" id="tab-receive">
+              <div class="d-flex gap-2 align-items-center mb-3">
+                <button id="btnReceive" class="btn btn-primary" disabled>Receive next</button>
+                <div class="form-check ms-3">
+                  <input class="form-check-input" type="checkbox" id="autoReceive">
+                  <label class="form-check-label small" for="autoReceive">Keep receiving</label>
+                </div>
+                <small class="text-muted ms-auto">Locked messages stay locked until you Complete or Abandon them.</small>
+              </div>
+              <div id="receivedList"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-stack" id="toasts"></div>
+
+  <script>
+    const DEFAULT_CONN = "Endpoint=sb://127.0.0.1:5672;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true";
+    const DEFAULT_MGMT = "http://127.0.0.1:5300";
+
+    const $ = sel => document.querySelector(sel);
+    const $$ = sel => Array.from(document.querySelectorAll(sel));
+
+    // ── State ──
+    const state = {
+      selectedQueue: null,
+      lockedMessages: new Map(), // lockToken → message dto
+    };
+
+    // ── Bootstrap inputs ──
+    $("#connStr").value = localStorage.getItem("osb_conn") || DEFAULT_CONN;
+    $("#mgmtUrl").value = localStorage.getItem("osb_mgmt") || DEFAULT_MGMT;
+    [["connStr", "osb_conn"], ["mgmtUrl", "osb_mgmt"]].forEach(([id, key]) =>
+      $("#" + id).addEventListener("input", e => localStorage.setItem(key, e.target.value)));
+
+    // ── Toast helper ──
+    function toast(message, kind = "info") {
+      const colors = { ok: "text-bg-success", err: "text-bg-danger", info: "text-bg-secondary" };
+      const wrap = document.createElement("div");
+      wrap.className = `toast align-items-center ${colors[kind] || colors.info} border-0 show mb-2`;
+      wrap.innerHTML = `<div class="d-flex"><div class="toast-body small">${message}</div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" onclick="this.closest('.toast').remove()"></button></div>`;
+      $("#toasts").appendChild(wrap);
+      setTimeout(() => wrap.remove(), 4000);
+    }
+
+    async function api(method, path, body) {
+      const init = { method, headers: { "Content-Type": "application/json" } };
+      if (body !== undefined) init.body = JSON.stringify(body);
+      const r = await fetch(path, init);
+      const text = await r.text();
+      const json = text ? JSON.parse(text) : null;
+      if (!r.ok) {
+        throw new Error((json && (json.error || json.title)) || `${r.status} ${r.statusText}`);
+      }
+      return json;
+    }
+
+    // ── Tabs ──
+    $$('.nav-link[data-tab]').forEach(a => a.addEventListener("click", e => {
+      e.preventDefault();
+      $$('.nav-link[data-tab]').forEach(x => x.classList.remove("active"));
+      a.classList.add("active");
+      const t = a.dataset.tab;
+      $("#tab-send").classList.toggle("d-none", t !== "send");
+      $("#tab-receive").classList.toggle("d-none", t !== "receive");
+    }));
+
+    // ── Ping ──
+    $("#btnPing").addEventListener("click", async () => {
+      $("#status").textContent = "connecting…";
+      try {
+        const r = await api("POST", "/api/ping", {
+          connectionString: $("#connStr").value,
+          managementUrl: $("#mgmtUrl").value,
+        });
+        $("#status").textContent = "connected";
+        $("#status").className = "text-success small";
+        $("#pingResult").innerHTML =
+          `<span class="badge text-bg-light">mgmt</span> ${escapeHtml(r.management)} &nbsp; <span class="badge text-bg-light">amqp</span> ${escapeHtml(r.serviceBus)}`;
+        await loadQueues();
+      } catch (e) {
+        $("#status").textContent = "error";
+        $("#status").className = "text-danger small";
+        $("#pingResult").innerHTML = `<span class="text-danger">${escapeHtml(e.message)}</span>`;
+      }
+    });
+
+    // ── Queues ──
+    async function loadQueues() {
+      const mgmtUrl = encodeURIComponent($("#mgmtUrl").value);
+      try {
+        const queues = await api("GET", `/api/queues?managementUrl=${mgmtUrl}`);
+        renderQueueList(queues || []);
+      } catch (e) {
+        toast(`Loading queues failed: ${e.message}`, "err");
+      }
+    }
+
+    function renderQueueList(queues) {
+      const list = $("#queueList");
+      list.innerHTML = "";
+      if (!queues.length) {
+        list.innerHTML = '<li class="list-group-item text-muted small">no queues yet</li>';
+        return;
+      }
+      for (const q of queues) {
+        const li = document.createElement("li");
+        li.className = "list-group-item queue-item d-flex justify-content-between align-items-center";
+        if (q.name === state.selectedQueue) li.classList.add("active");
+        li.innerHTML = `<span><strong>${escapeHtml(q.name)}</strong> <span class="pill">${q.activeMessageCount ?? "?"}</span></span>
+          <button class="btn btn-sm btn-link text-danger p-0" data-del="${escapeHtml(q.name)}">×</button>`;
+        li.addEventListener("click", e => {
+          if (e.target.matches("[data-del]")) return;
+          selectQueue(q.name);
+        });
+        list.appendChild(li);
+      }
+      list.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", async e => {
+        const name = e.target.dataset.del;
+        if (!confirm(`Delete queue '${name}'?`)) return;
+        const mgmtUrl = encodeURIComponent($("#mgmtUrl").value);
+        try {
+          await api("DELETE", `/api/queues/${name}?managementUrl=${mgmtUrl}`);
+          toast(`Deleted ${name}`, "ok");
+          if (state.selectedQueue === name) selectQueue(null);
+          await loadQueues();
+        } catch (err) { toast(err.message, "err"); }
+      }));
+    }
+
+    function selectQueue(name) {
+      state.selectedQueue = name;
+      $("#selectedQueue").textContent = name || "— pick a queue —";
+      $("#btnSend").disabled = !name;
+      $("#btnReceive").disabled = !name;
+      // re-render to highlight
+      const items = $$(".queue-item");
+      items.forEach(li => li.classList.remove("active"));
+      const match = items.find(li => li.querySelector("strong")?.textContent === name);
+      if (match) match.classList.add("active");
+    }
+
+    $("#btnRefresh").addEventListener("click", loadQueues);
+
+    $("#btnCreate").addEventListener("click", async () => {
+      const name = $("#newQueueName").value.trim();
+      if (!name) return;
+      try {
+        await api("PUT", `/api/queues/${encodeURIComponent(name)}`, {
+          managementUrl: $("#mgmtUrl").value,
+          options: {},
+        });
+        $("#newQueueName").value = "";
+        toast(`Created ${name}`, "ok");
+        await loadQueues();
+        selectQueue(name);
+      } catch (e) { toast(e.message, "err"); }
+    });
+
+    // ── Send ──
+    $("#btnSend").addEventListener("click", async () => {
+      if (!state.selectedQueue) return;
+      try {
+        const r = await api("POST", "/api/send", {
+          connectionString: $("#connStr").value,
+          queue: state.selectedQueue,
+          body: $("#msgBody").value,
+          messageId: $("#msgId").value || null,
+          correlationId: $("#msgCorr").value || null,
+          subject: $("#msgSubj").value || null,
+        });
+        toast(`Sent (id=${r.messageId || "auto"})`, "ok");
+        loadQueues();
+      } catch (e) { toast(e.message, "err"); }
+    });
+
+    // ── Receive ──
+    $("#btnReceive").addEventListener("click", receiveOne);
+    $("#autoReceive").addEventListener("change", () => {
+      if ($("#autoReceive").checked) receiveLoop();
+    });
+
+    async function receiveLoop() {
+      while ($("#autoReceive").checked && state.selectedQueue) {
+        const more = await receiveOne();
+        if (!more) await sleep(400);
+      }
+    }
+
+    async function receiveOne() {
+      if (!state.selectedQueue) return false;
+      try {
+        const r = await api("POST", "/api/receive", {
+          connectionString: $("#connStr").value,
+          queue: state.selectedQueue,
+          timeoutSeconds: 2,
+        });
+        if (!r.received) {
+          if (!$("#autoReceive").checked) toast("No messages", "info");
+          return false;
+        }
+        state.lockedMessages.set(r.lockToken, r);
+        renderReceived();
+        loadQueues();
+        return true;
+      } catch (e) { toast(e.message, "err"); return false; }
+    }
+
+    function renderReceived() {
+      const out = $("#receivedList");
+      out.innerHTML = "";
+      if (state.lockedMessages.size === 0) {
+        out.innerHTML = '<p class="text-muted small">No locked messages — click <em>Receive next</em> to pull one.</p>';
+        return;
+      }
+      for (const [tok, m] of [...state.lockedMessages.entries()].reverse()) {
+        const card = document.createElement("div");
+        card.className = "card mb-2";
+        card.innerHTML = `<div class="card-body">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <div>
+              <strong>${escapeHtml(m.messageId || "(no id)")}</strong>
+              <span class="pill text-muted ms-2">seq=${m.sequenceNumber} · delivery=${m.deliveryCount} · locked-until=${m.lockedUntil}</span>
+            </div>
+            <div class="btn-group btn-group-sm">
+              <button class="btn btn-success" data-complete="${escapeHtml(tok)}">Complete</button>
+              <button class="btn btn-warning" data-abandon="${escapeHtml(tok)}">Abandon</button>
+            </div>
+          </div>
+          ${m.correlationId ? `<div class="small text-muted">CorrelationId: ${escapeHtml(m.correlationId)}</div>` : ""}
+          ${m.subject ? `<div class="small text-muted">Subject: ${escapeHtml(m.subject)}</div>` : ""}
+          ${Object.keys(m.applicationProperties || {}).length ? `<details class="small mt-1"><summary>Application properties</summary><pre class="body">${escapeHtml(JSON.stringify(m.applicationProperties, null, 2))}</pre></details>` : ""}
+          <pre class="body mb-0 mt-2">${escapeHtml(m.body)}</pre>
+        </div>`;
+        out.appendChild(card);
+      }
+      out.querySelectorAll("[data-complete]").forEach(b => b.addEventListener("click", () => disposeMessage(b.dataset.complete, "complete")));
+      out.querySelectorAll("[data-abandon]").forEach(b => b.addEventListener("click", () => disposeMessage(b.dataset.abandon, "abandon")));
+    }
+
+    async function disposeMessage(lockToken, action) {
+      try {
+        await api("POST", `/api/${action}`, {
+          connectionString: $("#connStr").value,
+          queue: state.selectedQueue,
+          lockToken,
+        });
+        state.lockedMessages.delete(lockToken);
+        renderReceived();
+        toast(`${action[0].toUpperCase() + action.slice(1)}d`, "ok");
+        loadQueues();
+      } catch (e) { toast(e.message, "err"); }
+    }
+
+    // ── Utils ──
+    function escapeHtml(s) {
+      return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    // auto-ping on load
+    $("#btnPing").click();
+  </script>
+</body>
+</html>

@@ -5,6 +5,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenServiceBus.Abstractions;
 using OpenServiceBus.Amqp.Management;
+using Trace = Amqp.Trace;
+using TraceLevel = Amqp.TraceLevel;
 
 namespace OpenServiceBus.Amqp;
 
@@ -33,14 +35,21 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
     /// <summary>The address the listener was actually opened on.</summary>
     public Address? Address { get; private set; }
 
-    public async Task StartAsync(CancellationToken cancellationToken)
+    public Task StartAsync(CancellationToken cancellationToken)
     {
+        if (_options.EnableFrameTracing)
+        {
+            Trace.TraceLevel = TraceLevel.Frame;
+            Trace.TraceListener = (level, fmt, args) =>
+                _logger.LogDebug("[amqp] " + fmt, args ?? Array.Empty<object?>());
+        }
+
         var address = new Address(_options.Host, _options.Port, user: null, password: null, path: "/", scheme: "amqp");
         var host = new ContainerHost(address);
 
         foreach (var listener in host.Listeners)
         {
-            listener.SASL.EnableAnonymousMechanism = true;
+            ServiceBusSasl.ConfigureListenerMechanisms(listener);
 
             var handler = new ListenerOpenHandler(_options.ContainerId, _options.IdleTimeoutMs, _options.MaxFrameSize);
             listener.HandlerFactory = _ => handler;
@@ -48,31 +57,22 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
 
         host.RegisterRequestProcessor("$cbs", new CbsRequestProcessor());
 
-        host.Open();
+        var linkProcessor = new EntityLinkProcessor(_queueRegistry, _messageStore, Options.Create(_options), _loggerFactory);
+        host.RegisterLinkProcessor(linkProcessor);
 
+        host.Open();
         _host = host;
         Address = address;
-
-        // Hook queue lifecycle BEFORE listing existing queues so we don't miss concurrent creates.
-        _queueRegistry.QueueCreated += OnQueueCreated;
-        _queueRegistry.QueueDeleted += OnQueueDeleted;
-
-        // Register processors for queues that already exist (e.g. when listener starts after the broker is warm).
-        foreach (var existing in await _queueRegistry.ListAsync(cancellationToken).ConfigureAwait(false))
-        {
-            RegisterQueueProcessors(existing);
-        }
 
         _logger.LogInformation(
             "AMQP listener opened on amqp://{Host}:{Port} (containerId={ContainerId}, idleTimeoutMs={Idle}, maxFrameSize={Frame})",
             _options.Host, _options.Port, _options.ContainerId, _options.IdleTimeoutMs, _options.MaxFrameSize);
+
+        return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
-        _queueRegistry.QueueCreated -= OnQueueCreated;
-        _queueRegistry.QueueDeleted -= OnQueueDeleted;
-
         if (_host is null)
         {
             return Task.CompletedTask;
@@ -96,31 +96,4 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
     }
 
     public ValueTask DisposeAsync() => new(StopAsync(CancellationToken.None));
-
-    private void OnQueueCreated(object? sender, QueueDescriptor descriptor) => RegisterQueueProcessors(descriptor);
-
-    private void OnQueueDeleted(object? sender, QueueDescriptor descriptor)
-    {
-        try
-        {
-            _host?.UnregisterMessageProcessor(descriptor.Name);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Error while unregistering processor for queue {Queue}", descriptor.Name);
-        }
-    }
-
-    private void RegisterQueueProcessors(QueueDescriptor descriptor)
-    {
-        if (_host is null) return;
-
-        var processor = new QueueSenderProcessor(
-            descriptor.Name,
-            _messageStore,
-            _loggerFactory.CreateLogger<QueueSenderProcessor>());
-
-        _host.RegisterMessageProcessor(descriptor.Name, processor);
-        _logger.LogInformation("Registered AMQP sender processor for queue {Queue}", descriptor.Name);
-    }
 }

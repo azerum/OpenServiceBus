@@ -4,6 +4,7 @@
     <Project Path="src/OpenServiceBus.Amqp/OpenServiceBus.Amqp.csproj" />
     <Project Path="src/OpenServiceBus.Broker/OpenServiceBus.Broker.csproj" />
     <Project Path="src/OpenServiceBus.Core/OpenServiceBus.Core.csproj" />
+    <Project Path="src/OpenServiceBus.Explorer/OpenServiceBus.Explorer.csproj" />
     <Project Path="src/OpenServiceBus.Host/OpenServiceBus.Host.csproj" />
     <Project Path="src/OpenServiceBus.Management/OpenServiceBus.Management.csproj" />
     <Project Path="src/OpenServiceBus.Testing/OpenServiceBus.Testing.csproj" />

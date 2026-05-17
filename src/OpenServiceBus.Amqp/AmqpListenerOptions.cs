@@ -16,4 +16,17 @@ public sealed class AmqpListenerOptions
     public uint IdleTimeoutMs { get; set; } = 30_000;
 
     public uint MaxFrameSize { get; set; } = 256 * 1024;
+
+    /// <summary>
+    /// Maximum message size advertised on link attach, in bytes. The Azure SDK reads this on
+    /// link attach and rejects sends if it remains 0/unset (interprets as -1, refusing every message).
+    /// Default 256 KB matches Azure Service Bus Standard tier.
+    /// </summary>
+    public ulong MaxMessageSize { get; set; } = 256 * 1024;
+
+    /// <summary>
+    /// Enable AMQPNetLite frame-level tracing routed through our logger at Debug level.
+    /// Off by default — useful when diagnosing wire-protocol interop issues with new clients.
+    /// </summary>
+    public bool EnableFrameTracing { get; set; }
 }

@@ -59,6 +59,18 @@ The `UseDevelopmentEmulator=true` flag tells the Azure SDK to skip TLS and accep
 - `OpenServiceBus.Management` — REST API for entity CRUD.
 - `OpenServiceBus.Host` — executable hosting the AMQP listener and management API.
 - `OpenServiceBus.Testing` — embeddable test fixture (`OpenServiceBusTestHost`).
+- `OpenServiceBus.Explorer` — browser-based UI for testing the broker end-to-end with the real `Azure.Messaging.ServiceBus` SDK. Connect, create queues, send and receive messages, complete or abandon under peek-lock. Run with:
+
+  ```bash
+  # Terminal 1: broker
+  dotnet run --project src/OpenServiceBus.Host
+
+  # Terminal 2: explorer
+  dotnet run --project src/OpenServiceBus.Explorer
+  # → http://localhost:5400
+  ```
+
+  The Explorer grows with each milestone — M4 will surface annotations, M5 adds DLQ + lock-renewal buttons, M7 a scheduling form, etc.
 
 ## Status
 
