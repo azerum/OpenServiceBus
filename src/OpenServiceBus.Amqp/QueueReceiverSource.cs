@@ -1,6 +1,7 @@
 using Amqp;
 using Amqp.Framing;
 using Amqp.Listener;
+using Amqp.Types;
 using Microsoft.Extensions.Logging;
 using OpenServiceBus.Abstractions;
 
@@ -8,11 +9,17 @@ namespace OpenServiceBus.Amqp;
 
 /// <summary>
 /// Implements the broker-side of a receive link: pulls the next available message from
-/// the store under peek-lock and translates client dispositions back into store operations.
+/// the store under peek-lock, stamps Service Bus system properties (M4), and translates
+/// client dispositions back into store operations.
 /// One instance per (queue, sub-resource) — multiple client receivers can share it safely.
 /// </summary>
 public sealed class QueueReceiverSource : IMessageSource
 {
+    // Annotation symbols match Azure.Messaging.ServiceBus's AmqpMessageConstants exactly.
+    private static readonly Symbol EnqueuedTimeUtcSymbol = new("x-opt-enqueued-time");
+    private static readonly Symbol SequenceNumberSymbol = new("x-opt-sequence-number");
+    private static readonly Symbol LockedUntilSymbol = new("x-opt-locked-until");
+
     private readonly string _entityName;
     private readonly QueueDescriptor _descriptor;
     private readonly IMessageStore _store;
@@ -42,6 +49,7 @@ public sealed class QueueReceiverSource : IMessageSource
         }
 
         var amqp = DecodeMessage(locked.Message.EncodedMessage);
+        StampSystemProperties(amqp, locked);
 
         // For M3 the AMQP disposition flow (Accept/Release/Modify) settles via delivery-id,
         // not lock-token, so the auto-generated delivery-tag is fine and the framework maps
@@ -73,7 +81,7 @@ public sealed class QueueReceiverSource : IMessageSource
                     break;
 
                 case Rejected:
-                    // For M3: treat as abandon (true reject + DLQ lands in M5).
+                    // For M3 treat as abandon (true reject + DLQ lands in M5).
                     _store.TryAbandonAsync(_entityName, lockToken).GetAwaiter().GetResult();
                     break;
 
@@ -89,6 +97,27 @@ public sealed class QueueReceiverSource : IMessageSource
         {
             dispositionContext.Complete();
         }
+    }
+
+    /// <summary>
+    /// Stamp broker-authoritative fields onto the outgoing message:
+    ///   <list type="bullet">
+    ///     <item><c>header.delivery-count</c> — incremented per redelivery, read by the SDK as <c>ServiceBusReceivedMessage.DeliveryCount</c>.</item>
+    ///     <item><c>x-opt-sequence-number</c> — long, the broker-assigned monotonic sequence.</item>
+    ///     <item><c>x-opt-enqueued-time</c> — UTC DateTime of when the broker accepted the message.</item>
+    ///     <item><c>x-opt-locked-until</c> — UTC DateTime of when this specific lock expires.</item>
+    ///   </list>
+    /// Existing client-set fields on Header/MessageAnnotations are preserved.
+    /// </summary>
+    private static void StampSystemProperties(Message amqp, LockedMessage locked)
+    {
+        amqp.Header ??= new Header();
+        amqp.Header.DeliveryCount = (uint)locked.Message.DeliveryCount;
+
+        amqp.MessageAnnotations ??= new MessageAnnotations();
+        amqp.MessageAnnotations.Map[SequenceNumberSymbol] = locked.Message.SequenceNumber;
+        amqp.MessageAnnotations.Map[EnqueuedTimeUtcSymbol] = locked.Message.EnqueuedAt.UtcDateTime;
+        amqp.MessageAnnotations.Map[LockedUntilSymbol] = locked.LockedUntil.UtcDateTime;
     }
 
     private static Message DecodeMessage(byte[] encoded)

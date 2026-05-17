@@ -13,4 +13,10 @@ public sealed record StoredMessage
 
     /// <summary>The raw AMQP-encoded message bytes (an opaque <c>Message.Encode()</c> payload).</summary>
     public required byte[] EncodedMessage { get; init; }
+
+    /// <summary>
+    /// Number of unsuccessful previous delivery attempts. Stamped onto the outgoing AMQP
+    /// <c>header.delivery-count</c> on each delivery. Starts at 0, incremented on abandon / lock expiry.
+    /// </summary>
+    public int DeliveryCount { get; init; }
 }

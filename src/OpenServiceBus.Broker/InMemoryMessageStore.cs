@@ -139,9 +139,7 @@ public sealed class InMemoryMessageStore : IMessageStore
             return Task.FromResult(false);
         }
 
-        // Make it available again. The encoded body and sequence number remain unchanged;
-        // the next delivery attempt will get a fresh lock token.
-        state.Available.Writer.TryWrite(entry.SequenceNumber);
+        ReturnToAvailableWithIncrementedDeliveryCount(state, entry.SequenceNumber);
         return Task.FromResult(true);
     }
 
@@ -155,11 +153,25 @@ public sealed class InMemoryMessageStore : IMessageStore
             if (entry.LockedUntil > now) continue;
             if (state.Locks.TryRemove(token, out _))
             {
-                state.Available.Writer.TryWrite(entry.SequenceNumber);
+                ReturnToAvailableWithIncrementedDeliveryCount(state, entry.SequenceNumber);
                 expired++;
             }
         }
         return expired;
+    }
+
+    /// <summary>
+    /// Bump <see cref="StoredMessage.DeliveryCount"/> and re-queue. Because <c>StoredMessage</c>
+    /// is immutable we write a new record with <c>DeliveryCount + 1</c>; the next delivery attempt
+    /// will stamp it onto the AMQP header.
+    /// </summary>
+    private static void ReturnToAvailableWithIncrementedDeliveryCount(QueueState state, long sequenceNumber)
+    {
+        if (state.Messages.TryGetValue(sequenceNumber, out var existing))
+        {
+            state.Messages[sequenceNumber] = existing with { DeliveryCount = existing.DeliveryCount + 1 };
+        }
+        state.Available.Writer.TryWrite(sequenceNumber);
     }
 
     private QueueState GetQueue(string queueName)

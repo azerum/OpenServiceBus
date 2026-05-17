@@ -135,8 +135,8 @@ public static class ExplorerEndpoints
         correlationId = msg.CorrelationId,
         subject = msg.Subject,
         contentType = msg.ContentType,
-        enqueuedTime = Safe(() => (DateTimeOffset?)msg.EnqueuedTime),
-        lockedUntil = Safe(() => (DateTimeOffset?)msg.LockedUntil),
+        enqueuedTime = SafeTime(() => msg.EnqueuedTime),
+        lockedUntil = SafeTime(() => msg.LockedUntil),
         deliveryCount = Safe(() => (int?)msg.DeliveryCount),
         lockToken = msg.LockToken,
         body = SafeBody(msg.Body),
@@ -145,13 +145,26 @@ public static class ExplorerEndpoints
 
     /// <summary>
     /// Several <see cref="ServiceBusReceivedMessage"/> properties dereference Nullable and NRE
-    /// if the broker hasn't stamped the corresponding AMQP header/annotation yet (e.g. delivery-count
-    /// before M4, x-opt-enqueued-time before M4). Wrap each in try/catch so the Explorer keeps
-    /// surfacing what IS available rather than failing the whole response.
+    /// if the broker hasn't stamped the corresponding AMQP header/annotation. Wrap to return null
+    /// rather than fail the whole response.
     /// </summary>
     private static T? Safe<T>(Func<T?> get) where T : struct
     {
         try { return get(); } catch { return null; }
+    }
+
+    /// <summary>
+    /// Like <see cref="Safe"/> but also filters out <c>default(DateTimeOffset)</c> (0001-01-01),
+    /// which the SDK returns when an annotation is absent. Returning null keeps the UI clean.
+    /// </summary>
+    private static DateTimeOffset? SafeTime(Func<DateTimeOffset> get)
+    {
+        try
+        {
+            var value = get();
+            return value == default ? null : value;
+        }
+        catch { return null; }
     }
 
     private static string SafeBody(BinaryData body)
