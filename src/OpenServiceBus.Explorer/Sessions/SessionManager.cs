@@ -61,6 +61,14 @@ public sealed class Session : IAsyncDisposable
         return found;
     }
 
+    /// <summary>Look up a tracked locked message without removing it (used for RenewLock).</summary>
+    public bool TryPeekLocked(string lockToken, out ServiceBusReceivedMessage? message)
+    {
+        var found = _lockedMessages.TryGetValue(lockToken, out var msg);
+        message = msg;
+        return found;
+    }
+
     public async ValueTask DisposeAsync()
     {
         foreach (var receiver in _receivers.Values)

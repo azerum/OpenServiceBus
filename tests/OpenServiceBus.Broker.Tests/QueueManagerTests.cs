@@ -11,16 +11,16 @@ public class QueueManagerTests
         var store = new InMemoryMessageStore();
         var manager = new QueueManager(store);
 
-        QueueDescriptor? raised = null;
-        manager.QueueCreated += (_, q) => raised = q;
+        var raised = new List<string>();
+        manager.QueueCreated += (_, q) => raised.Add(q.Name);
 
         var created = await manager.CreateAsync(new QueueDescriptor { Name = "orders", MaxDeliveryCount = 5 });
         var fetched = await manager.GetAsync("orders");
 
         created.MaxDeliveryCount.ShouldBe(5);
         fetched.ShouldBe(created);
-        raised.ShouldNotBeNull();
-        raised!.Name.ShouldBe("orders");
+        raised.ShouldContain("orders");
+        raised.ShouldContain("orders/$DeadLetterQueue", "creating a main queue also raises QueueCreated for its DLQ sibling");
     }
 
     [Fact]
@@ -39,23 +39,58 @@ public class QueueManagerTests
         var manager = new QueueManager(new InMemoryMessageStore());
         await manager.CreateAsync(new QueueDescriptor { Name = "gone" });
 
-        QueueDescriptor? raised = null;
-        manager.QueueDeleted += (_, q) => raised = q;
+        var raised = new List<string>();
+        manager.QueueDeleted += (_, q) => raised.Add(q.Name);
 
         (await manager.DeleteAsync("gone")).ShouldBeTrue();
         (await manager.DeleteAsync("gone")).ShouldBeFalse();
-        raised?.Name.ShouldBe("gone");
+        raised.ShouldContain("gone");
+        raised.ShouldContain("gone/$DeadLetterQueue", "deleting a main queue cascades to its DLQ sibling");
     }
 
     [Fact]
-    public async Task List_returns_all_created_queues()
+    public async Task List_returns_main_queues_and_their_DLQ_siblings()
     {
         var manager = new QueueManager(new InMemoryMessageStore());
         await manager.CreateAsync(new QueueDescriptor { Name = "a" });
         await manager.CreateAsync(new QueueDescriptor { Name = "b" });
-        await manager.CreateAsync(new QueueDescriptor { Name = "c" });
 
         var all = await manager.ListAsync();
-        all.Select(q => q.Name).OrderBy(n => n).ShouldBe(new[] { "a", "b", "c" });
+        all.Select(q => q.Name).OrderBy(n => n).ShouldBe(new[]
+        {
+            "a", "a/$DeadLetterQueue",
+            "b", "b/$DeadLetterQueue",
+        });
+    }
+
+    [Fact]
+    public async Task Creating_a_main_queue_implicitly_creates_its_DLQ_sibling()
+    {
+        var manager = new QueueManager(new InMemoryMessageStore());
+        await manager.CreateAsync(new QueueDescriptor { Name = "orders", MaxDeliveryCount = 3 });
+
+        var dlq = await manager.GetAsync("orders/$DeadLetterQueue");
+        dlq.ShouldNotBeNull();
+        dlq!.MaxDeliveryCount.ShouldBe(int.MaxValue, "the DLQ should not itself dead-letter further");
+    }
+
+    [Fact]
+    public async Task Creating_a_DLQ_directly_does_not_create_a_DLQ_for_the_DLQ()
+    {
+        var manager = new QueueManager(new InMemoryMessageStore());
+        await manager.CreateAsync(new QueueDescriptor { Name = "raw/$DeadLetterQueue" });
+
+        (await manager.GetAsync("raw/$DeadLetterQueue/$DeadLetterQueue")).ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Deleting_a_main_queue_also_deletes_its_DLQ()
+    {
+        var manager = new QueueManager(new InMemoryMessageStore());
+        await manager.CreateAsync(new QueueDescriptor { Name = "ephemeral" });
+        (await manager.GetAsync("ephemeral/$DeadLetterQueue")).ShouldNotBeNull();
+
+        (await manager.DeleteAsync("ephemeral")).ShouldBeTrue();
+        (await manager.GetAsync("ephemeral/$DeadLetterQueue")).ShouldBeNull();
     }
 }

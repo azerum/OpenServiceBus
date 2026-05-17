@@ -60,18 +60,33 @@ public sealed class EntityLinkProcessor : ILinkProcessor
                 return;
             }
 
-            // M2.5 + M3 only resolve the Main sub-resource. DLQ and $management land in M5.
-            if (entityAddress.SubResource != EntitySubResource.Main)
+            // $management is served via per-queue IRequestProcessor registrations done by AmqpListenerHost
+            // when each queue is created. ContainerHost routes those attaches before reaching this LinkProcessor,
+            // so seeing $management here means an attach to a queue that doesn't have a management endpoint yet.
+            if (entityAddress.SubResource == EntitySubResource.Management)
+            {
+                Reject(attachContext, ErrorCode.NotFound,
+                    $"No $management endpoint for entity '{entityAddress.Entity}'.");
+                return;
+            }
+
+            var routingEntity = entityAddress.SubResource switch
+            {
+                EntitySubResource.Main => entityAddress.Entity,
+                EntitySubResource.DeadLetterQueue => entityAddress.Entity + "/$DeadLetterQueue",
+                _ => null,
+            };
+            if (routingEntity is null)
             {
                 Reject(attachContext, ErrorCode.NotImplemented,
                     $"Address sub-resource '{entityAddress.SubResource}' is not implemented yet.");
                 return;
             }
 
-            var descriptor = _registry.GetAsync(entityAddress.Entity).GetAwaiter().GetResult();
+            var descriptor = _registry.GetAsync(routingEntity).GetAwaiter().GetResult();
             if (descriptor is null)
             {
-                Reject(attachContext, ErrorCode.NotFound, $"Entity '{entityAddress.Entity}' does not exist.");
+                Reject(attachContext, ErrorCode.NotFound, $"Entity '{routingEntity}' does not exist.");
                 return;
             }
 

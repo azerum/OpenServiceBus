@@ -5,6 +5,9 @@ namespace OpenServiceBus.Broker;
 
 public sealed class QueueManager : IQueueRegistry
 {
+    /// <summary>The suffix Service Bus uses for the dead-letter sub-entity of a queue.</summary>
+    public const string DeadLetterSuffix = "/$DeadLetterQueue";
+
     private readonly IMessageStore _store;
     private readonly ConcurrentDictionary<string, QueueDescriptor> _queues = new(StringComparer.OrdinalIgnoreCase);
 
@@ -28,6 +31,13 @@ public sealed class QueueManager : IQueueRegistry
         remove => QueueDeleted -= value;
     }
 
+    /// <summary>
+    /// Returns true when <paramref name="name"/> identifies a dead-letter sub-entity (e.g. <c>orders/$DeadLetterQueue</c>).
+    /// DLQ entities do not themselves get DLQ siblings and have effectively unbounded redelivery to prevent loops.
+    /// </summary>
+    public static bool IsDeadLetterQueue(string name) =>
+        name.EndsWith(DeadLetterSuffix, StringComparison.Ordinal);
+
     public async Task<QueueDescriptor> CreateAsync(QueueDescriptor descriptor, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
@@ -42,6 +52,20 @@ public sealed class QueueManager : IQueueRegistry
 
         await _store.CreateQueueAsync(descriptor.Name, cancellationToken).ConfigureAwait(false);
         QueueCreated?.Invoke(this, descriptor);
+
+        // Every main queue gets an implicit dead-letter sibling — Azure Service Bus's contract.
+        // DLQs themselves do NOT get DLQ siblings (no recursion).
+        if (!IsDeadLetterQueue(descriptor.Name))
+        {
+            var dlq = new QueueDescriptor
+            {
+                Name = descriptor.Name + DeadLetterSuffix,
+                LockDuration = descriptor.LockDuration,
+                MaxDeliveryCount = int.MaxValue,
+            };
+            await CreateAsync(dlq, cancellationToken).ConfigureAwait(false);
+        }
+
         return descriptor;
     }
 
@@ -65,6 +89,13 @@ public sealed class QueueManager : IQueueRegistry
         }
         await _store.DeleteQueueAsync(name, cancellationToken).ConfigureAwait(false);
         QueueDeleted?.Invoke(this, descriptor);
+
+        // Tear down the DLQ sibling alongside the main queue.
+        if (!IsDeadLetterQueue(name))
+        {
+            await DeleteAsync(name + DeadLetterSuffix, cancellationToken).ConfigureAwait(false);
+        }
+
         return true;
     }
 }

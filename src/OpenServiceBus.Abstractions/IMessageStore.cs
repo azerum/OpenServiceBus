@@ -48,4 +48,25 @@ public interface IMessageStore
     /// Called periodically by <c>LockManager</c>; tests can call this directly to drive expiration deterministically.
     /// </summary>
     int ExpireLocks(string queueName, DateTimeOffset now);
+
+    /// <summary>
+    /// Extend a peek-lock by another <paramref name="lockDuration"/> from now.
+    /// Returns the new locked-until timestamp, or <c>null</c> if the lock token is unknown
+    /// (e.g. already completed or expired).
+    /// </summary>
+    Task<DateTimeOffset?> TryRenewLockAsync(
+        string queueName,
+        Guid lockToken,
+        TimeSpan lockDuration,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Atomically remove a locked message — releases the lock AND removes the stored message,
+    /// returning what was stored so the caller can re-enqueue it elsewhere (e.g. to the DLQ).
+    /// Returns <c>null</c> if the lock token is unknown.
+    /// </summary>
+    Task<StoredMessage?> TryRemoveLockedAsync(
+        string queueName,
+        Guid lockToken,
+        CancellationToken cancellationToken = default);
 }

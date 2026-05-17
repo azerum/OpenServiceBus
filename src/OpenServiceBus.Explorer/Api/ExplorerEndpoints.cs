@@ -41,10 +41,20 @@ public static class ExplorerEndpoints
             await using var sender = session.Sender(req.Queue);
 
             var msg = new ServiceBusMessage(req.Body ?? string.Empty);
-            if (!string.IsNullOrWhiteSpace(req.MessageId)) msg.MessageId = req.MessageId;
+            // Every message gets a MessageId — either the user-supplied one or an auto-generated
+            // Guid — so the Explorer can always show a stable identifier in the received list.
+            // The Service Bus SDK does NOT auto-generate this; without it the field is null on the wire.
+            msg.MessageId = string.IsNullOrWhiteSpace(req.MessageId)
+                ? Guid.NewGuid().ToString("N")
+                : req.MessageId;
             if (!string.IsNullOrWhiteSpace(req.CorrelationId)) msg.CorrelationId = req.CorrelationId;
             if (!string.IsNullOrWhiteSpace(req.Subject)) msg.Subject = req.Subject;
             if (!string.IsNullOrWhiteSpace(req.ContentType)) msg.ContentType = req.ContentType;
+            if (!string.IsNullOrWhiteSpace(req.ReplyTo)) msg.ReplyTo = req.ReplyTo;
+            if (!string.IsNullOrWhiteSpace(req.To)) msg.To = req.To;
+            if (!string.IsNullOrWhiteSpace(req.SessionId)) msg.SessionId = req.SessionId;
+            if (!string.IsNullOrWhiteSpace(req.PartitionKey)) msg.PartitionKey = req.PartitionKey;
+            if (req.TimeToLiveSeconds is > 0) msg.TimeToLive = TimeSpan.FromSeconds(req.TimeToLiveSeconds.Value);
             if (req.Properties is { Count: > 0 })
             {
                 foreach (var (k, v) in req.Properties) msg.ApplicationProperties[k] = v;
@@ -87,6 +97,30 @@ public static class ExplorerEndpoints
             }
             await session.Receiver(req.Queue).AbandonMessageAsync(msg, cancellationToken: ct);
             return Results.Ok(new { abandoned = true });
+        });
+
+        api.MapPost("/deadletter", async (DeadLetterRequest req, SessionManager sessions, CancellationToken ct) =>
+        {
+            var session = sessions.GetOrCreate(req.ConnectionString);
+            if (!session.TryTakeLocked(req.LockToken, out var msg) || msg is null)
+            {
+                return Results.NotFound(new { error = "Unknown lock token." });
+            }
+            await session.Receiver(req.Queue).DeadLetterMessageAsync(msg, req.Reason, req.Description, ct);
+            return Results.Ok(new { deadLettered = true });
+        });
+
+        api.MapPost("/renew", async (DispositionRequest req, SessionManager sessions, CancellationToken ct) =>
+        {
+            var session = sessions.GetOrCreate(req.ConnectionString);
+            // Renew uses the AMQP $management endpoint - does NOT consume the locked message,
+            // so we look up but do NOT remove from the tracking dict.
+            if (!session.TryPeekLocked(req.LockToken, out var msg) || msg is null)
+            {
+                return Results.NotFound(new { error = "Unknown lock token." });
+            }
+            await session.Receiver(req.Queue).RenewMessageLockAsync(msg, ct);
+            return Results.Ok(new { renewedUntil = msg.LockedUntil });
         });
 
         // --- Connectivity check ---
@@ -141,6 +175,10 @@ public static class ExplorerEndpoints
         lockToken = msg.LockToken,
         body = SafeBody(msg.Body),
         applicationProperties = msg.ApplicationProperties.ToDictionary(kv => kv.Key, kv => kv.Value?.ToString()),
+        // M5: dead-letter metadata — populated only on messages received from a DLQ.
+        deadLetterReason = msg.DeadLetterReason,
+        deadLetterErrorDescription = msg.DeadLetterErrorDescription,
+        deadLetterSource = msg.DeadLetterSource,
     };
 
     /// <summary>
@@ -175,7 +213,21 @@ public static class ExplorerEndpoints
 }
 
 public sealed record CreateQueueRequest(string ManagementUrl, Dictionary<string, object>? Options);
-public sealed record SendRequest(string ConnectionString, string Queue, string? Body, string? MessageId, string? CorrelationId, string? Subject, string? ContentType, Dictionary<string, string>? Properties);
+public sealed record SendRequest(
+    string ConnectionString,
+    string Queue,
+    string? Body,
+    string? MessageId,
+    string? CorrelationId,
+    string? Subject,
+    string? ContentType,
+    string? ReplyTo,
+    string? To,
+    string? SessionId,
+    string? PartitionKey,
+    int? TimeToLiveSeconds,
+    Dictionary<string, string>? Properties);
 public sealed record ReceiveRequest(string ConnectionString, string Queue, int? TimeoutSeconds);
 public sealed record DispositionRequest(string ConnectionString, string Queue, string LockToken);
+public sealed record DeadLetterRequest(string ConnectionString, string Queue, string LockToken, string? Reason, string? Description);
 public sealed record PingRequest(string ConnectionString, string ManagementUrl);

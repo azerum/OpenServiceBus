@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenServiceBus.Abstractions;
 using OpenServiceBus.Amqp.Management;
+using OpenServiceBus.Broker;
 using Trace = Amqp.Trace;
 using TraceLevel = Amqp.TraceLevel;
 
@@ -35,7 +36,7 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
     /// <summary>The address the listener was actually opened on.</summary>
     public Address? Address { get; private set; }
 
-    public Task StartAsync(CancellationToken cancellationToken)
+    public async Task StartAsync(CancellationToken cancellationToken)
     {
         if (_options.EnableFrameTracing)
         {
@@ -64,15 +65,25 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
         _host = host;
         Address = address;
 
+        // Per-queue $management endpoint registration. Subscribe BEFORE listing so we don't
+        // miss any queues created concurrently with startup.
+        _queueRegistry.QueueCreated += OnQueueCreated;
+        _queueRegistry.QueueDeleted += OnQueueDeleted;
+        foreach (var existing in await _queueRegistry.ListAsync(cancellationToken).ConfigureAwait(false))
+        {
+            RegisterManagementEndpoint(existing);
+        }
+
         _logger.LogInformation(
             "AMQP listener opened on amqp://{Host}:{Port} (containerId={ContainerId}, idleTimeoutMs={Idle}, maxFrameSize={Frame})",
             _options.Host, _options.Port, _options.ContainerId, _options.IdleTimeoutMs, _options.MaxFrameSize);
-
-        return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
+        _queueRegistry.QueueCreated -= OnQueueCreated;
+        _queueRegistry.QueueDeleted -= OnQueueDeleted;
+
         if (_host is null)
         {
             return Task.CompletedTask;
@@ -96,4 +107,37 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
     }
 
     public ValueTask DisposeAsync() => new(StopAsync(CancellationToken.None));
+
+    private void OnQueueCreated(object? sender, QueueDescriptor descriptor) => RegisterManagementEndpoint(descriptor);
+
+    private void OnQueueDeleted(object? sender, QueueDescriptor descriptor)
+    {
+        if (_host is null) return;
+        if (QueueManager.IsDeadLetterQueue(descriptor.Name)) return;
+
+        try
+        {
+            _host.UnregisterRequestProcessor(descriptor.Name + "/$management");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to unregister $management for queue {Queue}", descriptor.Name);
+        }
+    }
+
+    private void RegisterManagementEndpoint(QueueDescriptor descriptor)
+    {
+        if (_host is null) return;
+        // DLQ siblings don't get their own $management endpoint - all management ops target the parent queue.
+        if (QueueManager.IsDeadLetterQueue(descriptor.Name)) return;
+
+        var processor = new ManagementRequestProcessor(
+            descriptor.Name,
+            descriptor,
+            _messageStore,
+            _loggerFactory.CreateLogger<ManagementRequestProcessor>());
+
+        _host.RegisterRequestProcessor(descriptor.Name + "/$management", processor);
+        _logger.LogDebug("Registered $management endpoint for queue {Queue}", descriptor.Name);
+    }
 }

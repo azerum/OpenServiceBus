@@ -73,26 +73,25 @@ public class EntityRoutingTests
     }
 
     [Fact]
-    public async Task Attach_to_dead_letter_subresource_is_rejected_until_M5()
+    public async Task Attach_to_dead_letter_subresource_resolves_to_the_DLQ_sibling()
     {
         await using var harness = await TestListenerHarness.StartAsync();
         await harness.Queues.CreateAsync(new QueueDescriptor { Name = "orders" });
+
+        // The DLQ sibling exists from M5 onward.
+        (await harness.Queues.GetAsync("orders/$DeadLetterQueue")).ShouldNotBeNull();
 
         var factory = CreateClientFactory();
         var conn = await factory.CreateAsync(new Address(harness.AmqpUri));
         try
         {
             var session = new Session(conn);
-
-            var ex = await Should.ThrowAsync<AmqpException>(async () =>
-            {
-                var receiver = new ReceiverLink(session, "dlq-receiver", "orders/$DeadLetterQueue");
-                await receiver.ReceiveAsync(TimeSpan.FromSeconds(1));
-            });
-
-            ex.Error.ShouldNotBeNull();
-            ex.Error.Condition.ToString().ShouldBe(ErrorCode.NotImplemented);
-
+            // Receiver attach to orders/$DeadLetterQueue should succeed (no exception)
+            // and return null only because the DLQ is empty.
+            var receiver = new ReceiverLink(session, "dlq-receiver", "orders/$DeadLetterQueue");
+            var msg = await receiver.ReceiveAsync(TimeSpan.FromSeconds(1));
+            msg.ShouldBeNull();
+            await receiver.CloseAsync();
             await session.CloseAsync();
         }
         finally

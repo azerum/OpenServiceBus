@@ -174,6 +174,37 @@ public sealed class InMemoryMessageStore : IMessageStore
         state.Available.Writer.TryWrite(sequenceNumber);
     }
 
+    public Task<DateTimeOffset?> TryRenewLockAsync(
+        string queueName,
+        Guid lockToken,
+        TimeSpan lockDuration,
+        CancellationToken cancellationToken = default)
+    {
+        var state = GetQueue(queueName);
+        if (!state.Locks.TryGetValue(lockToken, out var entry))
+        {
+            return Task.FromResult<DateTimeOffset?>(null);
+        }
+
+        var newUntil = _timeProvider.GetUtcNow() + lockDuration;
+        entry.LockedUntil = newUntil;
+        return Task.FromResult<DateTimeOffset?>(newUntil);
+    }
+
+    public Task<StoredMessage?> TryRemoveLockedAsync(
+        string queueName,
+        Guid lockToken,
+        CancellationToken cancellationToken = default)
+    {
+        var state = GetQueue(queueName);
+        if (!state.Locks.TryRemove(lockToken, out var entry))
+        {
+            return Task.FromResult<StoredMessage?>(null);
+        }
+        state.Messages.TryRemove(entry.SequenceNumber, out var msg);
+        return Task.FromResult<StoredMessage?>(msg);
+    }
+
     private QueueState GetQueue(string queueName)
     {
         if (!_queues.TryGetValue(queueName, out var state))

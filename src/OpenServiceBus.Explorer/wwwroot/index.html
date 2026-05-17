@@ -12,8 +12,15 @@
     pre.body { white-space: pre-wrap; word-break: break-all; background: #f1f3f5; padding: 0.6em; border-radius: 6px; max-height: 12em; overflow: auto; }
     .queue-item.active { background: #0d6efd; color: white; }
     .queue-item { cursor: pointer; }
+    .queue-item.dlq { padding-left: 2.2rem; font-style: italic; color: #6c757d; }
+    .queue-item.dlq.active { color: white; }
+    .dlq-info { background: #fff3cd; border-left: 3px solid #ffc107; padding: 0.5em 0.7em; border-radius: 4px; font-size: 0.85em; margin: 0.5em 0; }
     .toast-stack { position: fixed; top: 1rem; right: 1rem; z-index: 1080; max-width: 28rem; }
     code { color: #6f42c1; }
+    .settings-row { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; }
+    .settings-row dt { color: #6c757d; font-weight: 400; }
+    .settings-row dd { margin-bottom: 0.2rem; }
+    .app-prop-row input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; }
   </style>
 </head>
 <body>
@@ -52,25 +59,29 @@
         <div class="card">
           <div class="card-header d-flex justify-content-between align-items-center">
             <span>Queues</span>
-            <button class="btn btn-sm btn-outline-secondary" id="btnRefresh">↻</button>
-          </div>
-          <ul id="queueList" class="list-group list-group-flush"></ul>
-          <div class="card-body">
-            <div class="input-group input-group-sm">
-              <input id="newQueueName" type="text" class="form-control" placeholder="queue name">
-              <button class="btn btn-success" id="btnCreate">+ Create</button>
+            <div class="d-flex gap-1">
+              <button class="btn btn-sm btn-outline-secondary" id="btnRefresh" title="Refresh">↻</button>
+              <button class="btn btn-sm btn-success" id="btnOpenCreate">+ Create</button>
             </div>
           </div>
+          <ul id="queueList" class="list-group list-group-flush"></ul>
         </div>
       </div>
 
       <!-- Main panel -->
       <div class="col-md-9">
-        <div class="card">
-          <div class="card-header">
-            <span class="text-muted">Selected:</span>
-            <span id="selectedQueue" class="fw-semibold">— pick a queue —</span>
+        <!-- Queue settings card -->
+        <div class="card mb-3" id="queueSettingsCard" style="display:none">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span><span class="text-muted">Selected:</span> <span id="selectedQueue" class="fw-semibold">—</span></span>
+            <span id="queueSettingsBadges"></span>
           </div>
+          <div class="card-body py-2">
+            <dl class="row settings-row mb-0" id="queueSettings"></dl>
+          </div>
+        </div>
+
+        <div class="card">
           <div class="card-body">
             <ul class="nav nav-tabs mb-3">
               <li class="nav-item"><a class="nav-link active" data-tab="send" href="#">Send</a></li>
@@ -80,11 +91,32 @@
             <!-- Send tab -->
             <div class="tab-pane" id="tab-send">
               <div class="row g-2 mb-2">
-                <div class="col-md-4"><input id="msgId" class="form-control form-control-sm" placeholder="MessageId (optional)"></div>
-                <div class="col-md-4"><input id="msgCorr" class="form-control form-control-sm" placeholder="CorrelationId (optional)"></div>
-                <div class="col-md-4"><input id="msgSubj" class="form-control form-control-sm" placeholder="Subject (optional)"></div>
+                <div class="col-md-4"><label class="form-label small text-muted mb-1">MessageId</label><input id="msgId" class="form-control form-control-sm" placeholder="(auto)"></div>
+                <div class="col-md-4"><label class="form-label small text-muted mb-1">CorrelationId</label><input id="msgCorr" class="form-control form-control-sm" placeholder=""></div>
+                <div class="col-md-4"><label class="form-label small text-muted mb-1">Subject</label><input id="msgSubj" class="form-control form-control-sm" placeholder=""></div>
               </div>
+              <label class="form-label small text-muted mb-1">Body</label>
               <textarea id="msgBody" class="form-control mb-2" rows="6" placeholder="Message body…"></textarea>
+
+              <details class="mb-3">
+                <summary class="small text-muted user-select-none" style="cursor:pointer">Advanced fields & application properties</summary>
+                <div class="row g-2 mt-2">
+                  <div class="col-md-3"><label class="form-label small text-muted mb-1">ContentType</label><input id="msgContentType" class="form-control form-control-sm" placeholder="application/json"></div>
+                  <div class="col-md-3"><label class="form-label small text-muted mb-1">ReplyTo</label><input id="msgReplyTo" class="form-control form-control-sm"></div>
+                  <div class="col-md-3"><label class="form-label small text-muted mb-1">To</label><input id="msgTo" class="form-control form-control-sm"></div>
+                  <div class="col-md-3"><label class="form-label small text-muted mb-1">SessionId</label><input id="msgSessionId" class="form-control form-control-sm" placeholder="(post-MVP)"></div>
+                  <div class="col-md-3"><label class="form-label small text-muted mb-1">PartitionKey</label><input id="msgPartitionKey" class="form-control form-control-sm"></div>
+                  <div class="col-md-3"><label class="form-label small text-muted mb-1">TimeToLive (seconds)</label><input id="msgTtl" type="number" class="form-control form-control-sm" min="1" placeholder="∞ — M6 will enforce"></div>
+                </div>
+                <div class="mt-3">
+                  <div class="d-flex justify-content-between align-items-center mb-1">
+                    <label class="form-label small text-muted mb-0">Application properties (custom key/value)</label>
+                    <button id="btnAddProp" class="btn btn-sm btn-outline-secondary">+ Add row</button>
+                  </div>
+                  <div id="appProps"></div>
+                </div>
+              </details>
+
               <div class="d-flex justify-content-between align-items-center">
                 <small class="text-muted">Sent via <code>Azure.Messaging.ServiceBus</code> SDK.</small>
                 <button id="btnSend" class="btn btn-primary" disabled>Send</button>
@@ -95,11 +127,7 @@
             <div class="tab-pane d-none" id="tab-receive">
               <div class="d-flex gap-2 align-items-center mb-3">
                 <button id="btnReceive" class="btn btn-primary" disabled>Receive next</button>
-                <div class="form-check ms-3">
-                  <input class="form-check-input" type="checkbox" id="autoReceive">
-                  <label class="form-check-label small" for="autoReceive">Keep receiving</label>
-                </div>
-                <small class="text-muted ms-auto">Locked messages stay locked until you Complete or Abandon them.</small>
+                <small class="text-muted ms-auto">Locked messages stay locked until you settle them.</small>
               </div>
               <div id="receivedList"></div>
             </div>
@@ -109,8 +137,61 @@
     </div>
   </div>
 
+  <!-- Create-queue modal -->
+  <div class="modal fade" id="createQueueModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Create Queue</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Queue name</label>
+            <input id="cqName" class="form-control" autofocus>
+            <div class="form-text">A sibling <code>&lt;name&gt;/$DeadLetterQueue</code> is created automatically.</div>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Max delivery count</label>
+              <input id="cqMaxDelivery" type="number" class="form-control" min="1" value="10">
+              <div class="form-text">Messages auto-dead-letter after this many delivery attempts.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Lock duration (seconds)</label>
+              <input id="cqLockDuration" type="number" class="form-control" min="1" value="60">
+              <div class="form-text">Peek-lock timeout per delivery (renewable).</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Default message TTL (seconds)</label>
+              <input id="cqDefaultTtl" type="number" class="form-control" min="1" placeholder="(unlimited)">
+              <div class="form-text">Per-message TTL still wins if shorter. Enforcement lands in M6.</div>
+            </div>
+            <div class="col-md-6 d-flex align-items-end">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="cqDleOnExpiration">
+                <label class="form-check-label" for="cqDleOnExpiration">Dead-letter on message expiration</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="alert alert-light border mt-3 mb-0 small">
+            <strong>Currently enforced by the broker:</strong> name, max-delivery-count (M5), lock-duration (M3/M5).<br>
+            <strong>Stored but not yet enforced:</strong> default-ttl, dead-letter-on-expiration (M6).
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-success" id="btnCreate">Create</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="toast-stack" id="toasts"></div>
 
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     const DEFAULT_CONN = "Endpoint=sb://127.0.0.1:5672;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true";
     const DEFAULT_MGMT = "http://127.0.0.1:5300";
@@ -119,16 +200,43 @@
     const $$ = sel => Array.from(document.querySelectorAll(sel));
 
     // ── State ──
+    // lockedMessages is keyed by queue, then by SEQUENCE NUMBER (not lock token).
+    // Each message in a queue has a stable broker-assigned sequence number. When the
+    // lock expires and the same message is redelivered, we get a NEW lock token but the
+    // SAME sequence number — so we replace the existing row in place instead of stacking
+    // a duplicate. This also keeps the delivery-count display honest: it always reflects
+    // the latest delivery attempt rather than the first one we happened to see.
     const state = {
       selectedQueue: null,
-      lockedMessages: new Map(), // lockToken → message dto
+      selectedDescriptor: null,
+      lockedMessages: new Map(), // queueName → Map<sequenceNumber, dto>
+      createModal: null,
     };
+
+    function lockedFor(queue) {
+      if (!queue) return new Map();
+      let inner = state.lockedMessages.get(queue);
+      if (!inner) {
+        inner = new Map();
+        state.lockedMessages.set(queue, inner);
+      }
+      return inner;
+    }
+
+    /** Key used to dedupe locked messages — sequence number, with a lock-token fallback. */
+    function msgKey(m) {
+      return (m.sequenceNumber !== null && m.sequenceNumber !== undefined)
+        ? `seq:${m.sequenceNumber}`
+        : `lock:${m.lockToken}`;
+    }
 
     // ── Bootstrap inputs ──
     $("#connStr").value = localStorage.getItem("osb_conn") || DEFAULT_CONN;
     $("#mgmtUrl").value = localStorage.getItem("osb_mgmt") || DEFAULT_MGMT;
     [["connStr", "osb_conn"], ["mgmtUrl", "osb_mgmt"]].forEach(([id, key]) =>
       $("#" + id).addEventListener("input", e => localStorage.setItem(key, e.target.value)));
+
+    state.createModal = new bootstrap.Modal($("#createQueueModal"));
 
     // ── Toast helper ──
     function toast(message, kind = "info") {
@@ -189,6 +297,14 @@
       try {
         const queues = await api("GET", `/api/queues?managementUrl=${mgmtUrl}`);
         renderQueueList(queues || []);
+        // If a queue is currently selected, refresh its settings card too.
+        if (state.selectedQueue) {
+          const found = (queues || []).find(q => q.name === state.selectedQueue);
+          if (found) {
+            state.selectedDescriptor = found;
+            renderQueueSettings();
+          }
+        }
       } catch (e) {
         toast(`Loading queues failed: ${e.message}`, "err");
       }
@@ -201,12 +317,26 @@
         list.innerHTML = '<li class="list-group-item text-muted small">no queues yet</li>';
         return;
       }
-      for (const q of queues) {
+      const sorted = [...queues].sort((a, b) => {
+        const aBase = a.name.replace(/\/\$DeadLetterQueue$/, "");
+        const bBase = b.name.replace(/\/\$DeadLetterQueue$/, "");
+        if (aBase !== bBase) return aBase.localeCompare(bBase);
+        return a.name.length - b.name.length;
+      });
+      for (const q of sorted) {
+        const isDlq = q.name.endsWith("/$DeadLetterQueue");
+        const displayName = isDlq ? "$DeadLetterQueue" : q.name;
         const li = document.createElement("li");
-        li.className = "list-group-item queue-item d-flex justify-content-between align-items-center";
+        li.className = "list-group-item queue-item d-flex justify-content-between align-items-center" + (isDlq ? " dlq" : "");
+        // Use a data-name attribute (not the visible text) for matching — DLQ display names
+        // all read "$DeadLetterQueue" so a textContent lookup would collide across queues.
+        li.dataset.name = q.name;
         if (q.name === state.selectedQueue) li.classList.add("active");
-        li.innerHTML = `<span><strong>${escapeHtml(q.name)}</strong> <span class="pill">${q.activeMessageCount ?? "?"}</span></span>
-          <button class="btn btn-sm btn-link text-danger p-0" data-del="${escapeHtml(q.name)}">×</button>`;
+        const lockedCount = lockedFor(q.name).size;
+        const lockedBadge = lockedCount > 0
+          ? ` <span class="badge text-bg-info ms-1" title="locally locked">${lockedCount}</span>` : "";
+        const deleteBtn = isDlq ? "" : `<button class="btn btn-sm btn-link text-danger p-0" data-del="${escapeHtml(q.name)}">×</button>`;
+        li.innerHTML = `<span><strong>${escapeHtml(displayName)}</strong> <span class="pill">${q.activeMessageCount ?? "?"}</span>${lockedBadge}</span>${deleteBtn}`;
         li.addEventListener("click", e => {
           if (e.target.matches("[data-del]")) return;
           selectQueue(q.name);
@@ -220,7 +350,12 @@
         try {
           await api("DELETE", `/api/queues/${name}?managementUrl=${mgmtUrl}`);
           toast(`Deleted ${name}`, "ok");
-          if (state.selectedQueue === name) selectQueue(null);
+          // Cascade: drop locally tracked locks for the deleted queue AND its DLQ sibling.
+          state.lockedMessages.delete(name);
+          state.lockedMessages.delete(name + "/$DeadLetterQueue");
+          if (state.selectedQueue === name || state.selectedQueue === name + "/$DeadLetterQueue") {
+            selectQueue(null);
+          }
           await loadQueues();
         } catch (err) { toast(err.message, "err"); }
       }));
@@ -228,32 +363,132 @@
 
     function selectQueue(name) {
       state.selectedQueue = name;
-      $("#selectedQueue").textContent = name || "— pick a queue —";
+      $("#selectedQueue").textContent = name || "—";
       $("#btnSend").disabled = !name;
       $("#btnReceive").disabled = !name;
-      // re-render to highlight
-      const items = $$(".queue-item");
-      items.forEach(li => li.classList.remove("active"));
-      const match = items.find(li => li.querySelector("strong")?.textContent === name);
-      if (match) match.classList.add("active");
+
+      // Highlight by data-name (not textContent — DLQ display names collide).
+      $$(".queue-item").forEach(li => li.classList.toggle("active", li.dataset.name === name));
+
+      if (name) {
+        fetchAndRenderSettings(name);
+      } else {
+        state.selectedDescriptor = null;
+        $("#queueSettingsCard").style.display = "none";
+      }
+
+      // Always re-render the locked-messages panel for the newly selected queue (or empty).
+      renderReceived();
+    }
+
+    async function fetchAndRenderSettings(name) {
+      try {
+        const mgmtUrl = encodeURIComponent($("#mgmtUrl").value);
+        const list = await api("GET", `/api/queues?managementUrl=${mgmtUrl}`);
+        const d = (list || []).find(q => q.name === name);
+        if (!d) return;
+        state.selectedDescriptor = d;
+        renderQueueSettings();
+      } catch (e) { /* swallow - settings card is best-effort */ }
+    }
+
+    function renderQueueSettings() {
+      const d = state.selectedDescriptor;
+      if (!d) return;
+      $("#queueSettingsCard").style.display = "";
+      const isDlq = d.name.endsWith("/$DeadLetterQueue");
+      const ttl = d.defaultMessageTimeToLive ? humanTime(d.defaultMessageTimeToLive) : "(unlimited)";
+      const dle = d.deadLetteringOnMessageExpiration ? "yes" : "no";
+      $("#queueSettings").innerHTML = `
+        <dt class="col-sm-3">Active messages</dt><dd class="col-sm-3">${d.activeMessageCount ?? "?"}</dd>
+        <dt class="col-sm-3">Lock duration</dt><dd class="col-sm-3">${humanTime(d.lockDuration)}</dd>
+        <dt class="col-sm-3">Max delivery count</dt><dd class="col-sm-3">${d.maxDeliveryCount}</dd>
+        <dt class="col-sm-3">Default TTL</dt><dd class="col-sm-3">${ttl}</dd>
+        <dt class="col-sm-3">DLQ on expiration</dt><dd class="col-sm-3">${dle}</dd>`;
+      $("#queueSettingsBadges").innerHTML = isDlq
+        ? '<span class="badge text-bg-warning">DLQ</span>'
+        : '<span class="badge text-bg-primary">queue</span>';
+    }
+
+    function humanTime(ts) {
+      // ts comes back as "HH:MM:SS" or "D.HH:MM:SS" from JSON serialization of TimeSpan.
+      if (!ts) return "—";
+      const m = ts.match(/(\d+\.)?(\d{2}):(\d{2}):(\d{2})/);
+      if (!m) return ts;
+      const days = m[1] ? parseInt(m[1]) : 0;
+      const h = parseInt(m[2]), min = parseInt(m[3]), s = parseInt(m[4]);
+      const total = days * 86400 + h * 3600 + min * 60 + s;
+      if (total < 60) return `${total}s`;
+      if (total < 3600) return `${(total/60).toFixed(total%60===0?0:1)}m`;
+      if (total < 86400) return `${(total/3600).toFixed(1)}h`;
+      return `${(total/86400).toFixed(1)}d`;
     }
 
     $("#btnRefresh").addEventListener("click", loadQueues);
 
+    // ── Create modal ──
+    $("#btnOpenCreate").addEventListener("click", () => {
+      $("#cqName").value = "";
+      $("#cqMaxDelivery").value = "10";
+      $("#cqLockDuration").value = "60";
+      $("#cqDefaultTtl").value = "";
+      $("#cqDleOnExpiration").checked = false;
+      state.createModal.show();
+    });
+
     $("#btnCreate").addEventListener("click", async () => {
-      const name = $("#newQueueName").value.trim();
-      if (!name) return;
+      const name = $("#cqName").value.trim();
+      if (!name) { toast("Queue name is required", "err"); return; }
+
+      const options = {
+        maxDeliveryCount: parseInt($("#cqMaxDelivery").value) || 10,
+        lockDuration: secondsToTimeSpan(parseInt($("#cqLockDuration").value) || 60),
+        deadLetteringOnMessageExpiration: $("#cqDleOnExpiration").checked,
+      };
+      const ttl = parseInt($("#cqDefaultTtl").value);
+      if (ttl > 0) options.defaultMessageTimeToLive = secondsToTimeSpan(ttl);
+
       try {
         await api("PUT", `/api/queues/${encodeURIComponent(name)}`, {
           managementUrl: $("#mgmtUrl").value,
-          options: {},
+          options,
         });
-        $("#newQueueName").value = "";
+        state.createModal.hide();
         toast(`Created ${name}`, "ok");
         await loadQueues();
         selectQueue(name);
       } catch (e) { toast(e.message, "err"); }
     });
+
+    function secondsToTimeSpan(seconds) {
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = seconds % 60;
+      return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+    }
+
+    // ── Application properties editor ──
+    function addAppPropRow(key = "", value = "") {
+      const row = document.createElement("div");
+      row.className = "app-prop-row d-flex gap-2 mb-1";
+      row.innerHTML = `
+        <input class="form-control form-control-sm" placeholder="key" value="${escapeHtml(key)}">
+        <input class="form-control form-control-sm" placeholder="value" value="${escapeHtml(value)}">
+        <button class="btn btn-sm btn-outline-danger" title="Remove">×</button>`;
+      row.querySelector("button").addEventListener("click", () => row.remove());
+      $("#appProps").appendChild(row);
+    }
+    $("#btnAddProp").addEventListener("click", () => addAppPropRow());
+
+    function collectAppProps() {
+      const rows = $$(".app-prop-row");
+      const out = {};
+      for (const r of rows) {
+        const [k, v] = r.querySelectorAll("input");
+        if (k.value.trim()) out[k.value.trim()] = v.value;
+      }
+      return Object.keys(out).length ? out : null;
+    }
 
     // ── Send ──
     $("#btnSend").addEventListener("click", async () => {
@@ -266,6 +501,13 @@
           messageId: $("#msgId").value || null,
           correlationId: $("#msgCorr").value || null,
           subject: $("#msgSubj").value || null,
+          contentType: $("#msgContentType").value || null,
+          replyTo: $("#msgReplyTo").value || null,
+          to: $("#msgTo").value || null,
+          sessionId: $("#msgSessionId").value || null,
+          partitionKey: $("#msgPartitionKey").value || null,
+          timeToLiveSeconds: $("#msgTtl").value ? parseInt($("#msgTtl").value) : null,
+          properties: collectAppProps(),
         });
         toast(`Sent (id=${r.messageId || "auto"})`, "ok");
         loadQueues();
@@ -274,31 +516,30 @@
 
     // ── Receive ──
     $("#btnReceive").addEventListener("click", receiveOne);
-    $("#autoReceive").addEventListener("change", () => {
-      if ($("#autoReceive").checked) receiveLoop();
-    });
-
-    async function receiveLoop() {
-      while ($("#autoReceive").checked && state.selectedQueue) {
-        const more = await receiveOne();
-        if (!more) await sleep(400);
-      }
-    }
 
     async function receiveOne() {
-      if (!state.selectedQueue) return false;
+      // Pin the queue at call time — if the user switches mid-request we still attribute
+      // the result to the queue the receive was issued against.
+      const queueAtCall = state.selectedQueue;
+      if (!queueAtCall) return false;
       try {
         const r = await api("POST", "/api/receive", {
           connectionString: $("#connStr").value,
-          queue: state.selectedQueue,
+          queue: queueAtCall,
           timeoutSeconds: 2,
         });
         if (!r.received) {
-          if (!$("#autoReceive").checked) toast("No messages", "info");
+          toast("No messages", "info");
           return false;
         }
-        state.lockedMessages.set(r.lockToken, r);
-        renderReceived();
+        // Stamp the source queue on the dto so disposition calls can target it later
+        // even if the user has switched to a different queue in the sidebar.
+        r.__queue = queueAtCall;
+        // Key by sequence number so redeliveries replace the existing row rather than
+        // creating a new one each time the lock expires and the broker re-hands-out the
+        // same message with a fresh lock token.
+        lockedFor(queueAtCall).set(msgKey(r), r);
+        if (queueAtCall === state.selectedQueue) renderReceived();
         loadQueues();
         return true;
       } catch (e) { toast(e.message, "err"); return false; }
@@ -307,24 +548,40 @@
     function renderReceived() {
       const out = $("#receivedList");
       out.innerHTML = "";
-      if (state.lockedMessages.size === 0) {
-        out.innerHTML = '<p class="text-muted small">No locked messages — click <em>Receive next</em> to pull one.</p>';
+      const queueLocks = lockedFor(state.selectedQueue);
+      if (!state.selectedQueue || queueLocks.size === 0) {
+        out.innerHTML = state.selectedQueue
+          ? '<p class="text-muted small">No locked messages on this queue — click <em>Receive next</em> to pull one.</p>'
+          : '<p class="text-muted small">Pick a queue first.</p>';
         return;
       }
-      for (const [tok, m] of [...state.lockedMessages.entries()].reverse()) {
+      // Iterate the Map values — the key is sequenceNumber but the lockToken (used in data attrs)
+      // lives on the dto and is the current/latest token for that message.
+      for (const m of [...queueLocks.values()].reverse()) {
+        const tok = m.lockToken;
         const card = document.createElement("div");
         card.className = "card mb-2";
+        const dlqInfo = (m.deadLetterReason || m.deadLetterSource) ? `
+          <div class="dlq-info">
+            <strong>Dead-letter info</strong>
+            ${m.deadLetterSource ? `<div>Source queue: <code>${escapeHtml(m.deadLetterSource)}</code></div>` : ""}
+            ${m.deadLetterReason ? `<div>Reason: ${escapeHtml(m.deadLetterReason)}</div>` : ""}
+            ${m.deadLetterErrorDescription ? `<div>Description: ${escapeHtml(m.deadLetterErrorDescription)}</div>` : ""}
+          </div>` : "";
         card.innerHTML = `<div class="card-body">
           <div class="d-flex justify-content-between align-items-start mb-2">
             <div>
               <strong>${escapeHtml(m.messageId || "(no id)")}</strong>
-              <span class="pill text-muted ms-2">seq=${m.sequenceNumber} · delivery=${m.deliveryCount} · locked-until=${m.lockedUntil}</span>
+              <span class="pill text-muted ms-2">seq=${m.sequenceNumber} · delivery=${m.deliveryCount} · locked-until=${escapeHtml(m.lockedUntil || "—")}</span>
             </div>
             <div class="btn-group btn-group-sm">
               <button class="btn btn-success" data-complete="${escapeHtml(tok)}">Complete</button>
               <button class="btn btn-warning" data-abandon="${escapeHtml(tok)}">Abandon</button>
+              <button class="btn btn-outline-secondary" data-renew="${escapeHtml(tok)}" title="Renew lock">⟳ Renew</button>
+              <button class="btn btn-danger" data-deadletter="${escapeHtml(tok)}">DLQ</button>
             </div>
           </div>
+          ${dlqInfo}
           ${m.correlationId ? `<div class="small text-muted">CorrelationId: ${escapeHtml(m.correlationId)}</div>` : ""}
           ${m.subject ? `<div class="small text-muted">Subject: ${escapeHtml(m.subject)}</div>` : ""}
           ${Object.keys(m.applicationProperties || {}).length ? `<details class="small mt-1"><summary>Application properties</summary><pre class="body">${escapeHtml(JSON.stringify(m.applicationProperties, null, 2))}</pre></details>` : ""}
@@ -334,19 +591,76 @@
       }
       out.querySelectorAll("[data-complete]").forEach(b => b.addEventListener("click", () => disposeMessage(b.dataset.complete, "complete")));
       out.querySelectorAll("[data-abandon]").forEach(b => b.addEventListener("click", () => disposeMessage(b.dataset.abandon, "abandon")));
+      out.querySelectorAll("[data-deadletter]").forEach(b => b.addEventListener("click", () => deadLetterMessage(b.dataset.deadletter)));
+      out.querySelectorAll("[data-renew]").forEach(b => b.addEventListener("click", () => renewLock(b.dataset.renew)));
+    }
+
+    /**
+     * Look up where the lock came from (the message dto remembers its source queue in __queue),
+     * not whatever the user has currently selected. Without this you'd ack/abandon against the
+     * wrong receiver and the SDK would surface a confusing "lock not held" error.
+     *
+     * The map is keyed by sequence number for dedupe, so this scans values to find the matching
+     * lock token. Also returns the entry's key so callers can delete the right entry.
+     */
+    function findLocked(lockToken) {
+      for (const [queue, inner] of state.lockedMessages) {
+        for (const [key, msg] of inner) {
+          if (msg.lockToken === lockToken) return { queue, key, msg };
+        }
+      }
+      return null;
     }
 
     async function disposeMessage(lockToken, action) {
+      const found = findLocked(lockToken);
+      if (!found) { toast("Lock token no longer tracked locally", "err"); return; }
       try {
         await api("POST", `/api/${action}`, {
           connectionString: $("#connStr").value,
-          queue: state.selectedQueue,
+          queue: found.queue,
           lockToken,
         });
-        state.lockedMessages.delete(lockToken);
+        lockedFor(found.queue).delete(found.key);
         renderReceived();
         toast(`${action[0].toUpperCase() + action.slice(1)}d`, "ok");
         loadQueues();
+      } catch (e) { toast(e.message, "err"); }
+    }
+
+    async function deadLetterMessage(lockToken) {
+      const found = findLocked(lockToken);
+      if (!found) { toast("Lock token no longer tracked locally", "err"); return; }
+      const reason = prompt("Dead-letter reason (optional)", "");
+      if (reason === null) return;
+      const description = prompt("Dead-letter description (optional)", "") || null;
+      try {
+        await api("POST", "/api/deadletter", {
+          connectionString: $("#connStr").value,
+          queue: found.queue,
+          lockToken,
+          reason: reason || null,
+          description,
+        });
+        lockedFor(found.queue).delete(found.key);
+        renderReceived();
+        toast("Dead-lettered", "ok");
+        loadQueues();
+      } catch (e) { toast(e.message, "err"); }
+    }
+
+    async function renewLock(lockToken) {
+      const found = findLocked(lockToken);
+      if (!found) { toast("Lock token no longer tracked locally", "err"); return; }
+      try {
+        const r = await api("POST", "/api/renew", {
+          connectionString: $("#connStr").value,
+          queue: found.queue,
+          lockToken,
+        });
+        found.msg.lockedUntil = r.renewedUntil;
+        renderReceived();
+        toast(`Renewed until ${r.renewedUntil}`, "ok");
       } catch (e) { toast(e.message, "err"); }
     }
 
@@ -354,7 +668,6 @@
     function escapeHtml(s) {
       return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     }
-    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
     // auto-ping on load
     $("#btnPing").click();
