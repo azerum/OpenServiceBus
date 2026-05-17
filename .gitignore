@@ -1,0 +1,33 @@
+## .NET
+bin/
+obj/
+out/
+*.user
+*.suo
+*.userprefs
+*.vsidx
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+## Build output
+artifacts/
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+## NuGet
+*.nupkg
+*.snupkg
+.nuget/
+
+## Rider / Visual Studio
+*.sln.iml
+.idea/
+
+## Tooling
+.tools/

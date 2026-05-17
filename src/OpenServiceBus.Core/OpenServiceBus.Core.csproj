@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <Description>Domain types and options for OpenServiceBus (StoredMessage, QueueDescriptor, LockToken).</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenServiceBus.Abstractions\OpenServiceBus.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

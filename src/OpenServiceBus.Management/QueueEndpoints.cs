@@ -1,0 +1,82 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using OpenServiceBus.Abstractions;
+
+namespace OpenServiceBus.Management;
+
+public static class QueueEndpoints
+{
+    /// <summary>
+    /// Maps the REST surface for queue entity CRUD under <c>/queues</c>.
+    /// Shape is kept close to the official emulator's HTTP management surface where it overlaps;
+    /// full config.json compatibility lands in M12.
+    /// </summary>
+    public static IEndpointRouteBuilder MapQueueEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        var group = endpoints.MapGroup("/queues");
+
+        group.MapGet("/", async (IQueueRegistry registry, CancellationToken ct) =>
+        {
+            var queues = await registry.ListAsync(ct);
+            return Results.Ok(queues.Select(q => QueueResponse.From(q)));
+        });
+
+        group.MapGet("/{name}", async (string name, IQueueRegistry registry, IMessageStore store, CancellationToken ct) =>
+        {
+            var queue = await registry.GetAsync(name, ct);
+            if (queue is null) return Results.NotFound();
+            var count = await store.CountAsync(name, ct);
+            return Results.Ok(QueueResponse.From(queue, count));
+        });
+
+        group.MapPut("/{name}", async (string name, CreateQueueRequest? body, IQueueRegistry registry, CancellationToken ct) =>
+        {
+            var descriptor = (body ?? new CreateQueueRequest()).ToDescriptor(name);
+            var created = await registry.CreateAsync(descriptor, ct);
+            return Results.Ok(QueueResponse.From(created));
+        });
+
+        group.MapDelete("/{name}", async (string name, IQueueRegistry registry, CancellationToken ct) =>
+        {
+            var deleted = await registry.DeleteAsync(name, ct);
+            return deleted ? Results.NoContent() : Results.NotFound();
+        });
+
+        return endpoints;
+    }
+}
+
+public sealed record CreateQueueRequest
+{
+    public int MaxDeliveryCount { get; init; } = 10;
+    public TimeSpan LockDuration { get; init; } = TimeSpan.FromSeconds(60);
+    public bool DeadLetteringOnMessageExpiration { get; init; }
+    public TimeSpan? DefaultMessageTimeToLive { get; init; }
+
+    public QueueDescriptor ToDescriptor(string name) => new()
+    {
+        Name = name,
+        MaxDeliveryCount = MaxDeliveryCount,
+        LockDuration = LockDuration,
+        DeadLetteringOnMessageExpiration = DeadLetteringOnMessageExpiration,
+        DefaultMessageTimeToLive = DefaultMessageTimeToLive,
+    };
+}
+
+public sealed record QueueResponse(
+    string Name,
+    int MaxDeliveryCount,
+    TimeSpan LockDuration,
+    bool DeadLetteringOnMessageExpiration,
+    TimeSpan? DefaultMessageTimeToLive,
+    long? ActiveMessageCount)
+{
+    public static QueueResponse From(QueueDescriptor d, long? count = null) => new(
+        d.Name,
+        d.MaxDeliveryCount,
+        d.LockDuration,
+        d.DeadLetteringOnMessageExpiration,
+        d.DefaultMessageTimeToLive,
+        count);
+}

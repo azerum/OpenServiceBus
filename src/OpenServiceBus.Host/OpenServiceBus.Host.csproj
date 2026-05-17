@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>OpenServiceBus.Host</RootNamespace>
+    <Description>OpenServiceBus executable host: AMQP listener + REST management API.</Description>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenServiceBus.Amqp\OpenServiceBus.Amqp.csproj" />
+    <ProjectReference Include="..\OpenServiceBus.Management\OpenServiceBus.Management.csproj" />
+  </ItemGroup>
+
+</Project>
