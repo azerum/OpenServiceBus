@@ -82,6 +82,21 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
             RegisterManagementEndpoint(existing);
         }
 
+        // Per-subscription $management endpoint registration (M13.5). Subscription backing
+        // queues route here so rule-management ops can resolve through the topic registry.
+        if (_topicRegistry is not null)
+        {
+            _topicRegistry.SubscriptionCreated += OnSubscriptionCreated;
+            _topicRegistry.SubscriptionDeleted += OnSubscriptionDeleted;
+            foreach (var topic in await _topicRegistry.ListTopicsAsync(cancellationToken).ConfigureAwait(false))
+            {
+                foreach (var sub in await _topicRegistry.ListSubscriptionsAsync(topic.Name, cancellationToken).ConfigureAwait(false))
+                {
+                    RegisterSubscriptionManagementEndpoint(sub);
+                }
+            }
+        }
+
         _logger.LogInformation(
             "AMQP listener opened on amqp://{Host}:{Port} (containerId={ContainerId}, idleTimeoutMs={Idle}, maxFrameSize={Frame})",
             _options.Host, _options.Port, _options.ContainerId, _options.IdleTimeoutMs, _options.MaxFrameSize);
@@ -91,6 +106,11 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
     {
         _queueRegistry.QueueCreated -= OnQueueCreated;
         _queueRegistry.QueueDeleted -= OnQueueDeleted;
+        if (_topicRegistry is not null)
+        {
+            _topicRegistry.SubscriptionCreated -= OnSubscriptionCreated;
+            _topicRegistry.SubscriptionDeleted -= OnSubscriptionDeleted;
+        }
 
         if (_host is null)
         {
@@ -138,6 +158,8 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
         if (_host is null) return;
         // DLQ siblings don't get their own $management endpoint - all management ops target the parent queue.
         if (EntityNames.IsDeadLetterQueue(descriptor.Name)) return;
+        // Subscription backing queues are registered with subscription context separately (M13.5).
+        if (IsSubscriptionBackingQueue(descriptor.Name)) return;
 
         var processor = new ManagementRequestProcessor(
             descriptor.Name,
@@ -149,4 +171,50 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
         _host.RegisterRequestProcessor(descriptor.Name + "/$management", processor);
         _logger.LogDebug("Registered $management endpoint for queue {Queue}", descriptor.Name);
     }
+
+    private void OnSubscriptionCreated(object? sender, SubscriptionDescriptor descriptor) =>
+        RegisterSubscriptionManagementEndpoint(descriptor);
+
+    private void OnSubscriptionDeleted(object? sender, SubscriptionDescriptor descriptor)
+    {
+        if (_host is null) return;
+        try
+        {
+            _host.UnregisterRequestProcessor(descriptor.BackingQueueName + "/$management");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to unregister $management for subscription {Sub}", descriptor.BackingQueueName);
+        }
+    }
+
+    private void RegisterSubscriptionManagementEndpoint(SubscriptionDescriptor descriptor)
+    {
+        if (_host is null || _topicRegistry is null) return;
+
+        // The processor needs the subscription's QueueDescriptor (for lock duration etc.) —
+        // pull it from the queue registry where TopicManager registered it on create.
+        var queue = _queueRegistry.GetAsync(descriptor.BackingQueueName).GetAwaiter().GetResult();
+        if (queue is null)
+        {
+            _logger.LogWarning("Backing queue {Name} not found when registering subscription $management — skipping.", descriptor.BackingQueueName);
+            return;
+        }
+
+        var processor = new ManagementRequestProcessor(
+            descriptor.BackingQueueName,
+            queue,
+            _messageStore,
+            _timeProvider,
+            _loggerFactory.CreateLogger<ManagementRequestProcessor>(),
+            _topicRegistry,
+            descriptor.TopicName,
+            descriptor.Name);
+
+        _host.RegisterRequestProcessor(descriptor.BackingQueueName + "/$management", processor);
+        _logger.LogDebug("Registered $management endpoint for subscription {Sub}", descriptor.BackingQueueName);
+    }
+
+    private static bool IsSubscriptionBackingQueue(string queueName) =>
+        queueName.Contains("/Subscriptions/", StringComparison.OrdinalIgnoreCase);
 }

@@ -3,7 +3,9 @@ using Amqp.Framing;
 using Amqp.Listener;
 using Amqp.Types;
 using Microsoft.Extensions.Logging;
+using OpenServiceBus.Amqp.Topics;
 using OpenServiceBus.Core.Entities;
+using OpenServiceBus.Core.Filters;
 using OpenServiceBus.Core.Messaging;
 using OpenServiceBus.Core.Storage;
 
@@ -37,6 +39,16 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
     private const string PeekMessageOperation = "com.microsoft:peek-message";
     private const string ReceiveBySequenceNumberOperation = "com.microsoft:receive-by-sequence-number";
     private const string UpdateDispositionOperation = "com.microsoft:update-disposition";
+
+    // M13.5 — rule management ops, scoped to a subscription's $management endpoint.
+    private const string AddRuleOperation = "com.microsoft:add-rule";
+    private const string RemoveRuleOperation = "com.microsoft:remove-rule";
+    private const string EnumerateRulesOperation = "com.microsoft:enumerate-rules";
+    private const string RuleNameBodyKey = "rule-name";
+    private const string RuleDescriptionBodyKey = "rule-description";
+    private const string RulesResponseKey = "rules";
+    private const string EnumerateTopKey = "top";
+    private const string EnumerateSkipKey = "skip";
 
     private const string LockTokensBodyKey = "lock-tokens";
     private const string LockTokenBodyKey = "lock-token";
@@ -72,6 +84,12 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<ManagementRequestProcessor> _logger;
 
+    // Set only when this processor sits in front of a subscription. Enables add-rule /
+    // remove-rule / enumerate-rules ops; null for queue endpoints.
+    private readonly ITopicRegistry? _topics;
+    private readonly string? _topicName;
+    private readonly string? _subscriptionName;
+
     public ManagementRequestProcessor(
         string entityName,
         QueueDescriptor descriptor,
@@ -84,6 +102,28 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
         _store = store;
         _timeProvider = timeProvider;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Overload that adds subscription context — enables the M13.5 rule-management operations.
+    /// <paramref name="entityName"/> is still the storage entity (the subscription's backing
+    /// queue, e.g. <c>events/Subscriptions/eu</c>) so peek-lock and disposition ops continue to
+    /// land on the right messages.
+    /// </summary>
+    public ManagementRequestProcessor(
+        string entityName,
+        QueueDescriptor descriptor,
+        IMessageStore store,
+        TimeProvider timeProvider,
+        ILogger<ManagementRequestProcessor> logger,
+        ITopicRegistry topics,
+        string topicName,
+        string subscriptionName)
+        : this(entityName, descriptor, store, timeProvider, logger)
+    {
+        _topics = topics;
+        _topicName = topicName;
+        _subscriptionName = subscriptionName;
     }
 
     public int Credit => 100;
@@ -104,6 +144,11 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
                 PeekMessageOperation => HandlePeekMessage(request),
                 ReceiveBySequenceNumberOperation => HandleReceiveBySequenceNumber(request),
                 UpdateDispositionOperation => HandleUpdateDisposition(request),
+                AddRuleOperation when _topics is not null => HandleAddRule(request),
+                RemoveRuleOperation when _topics is not null => HandleRemoveRule(request),
+                EnumerateRulesOperation when _topics is not null => HandleEnumerateRules(request),
+                AddRuleOperation or RemoveRuleOperation or EnumerateRulesOperation =>
+                    BuildResponse(request, 404, "NotFound: rule operations are only available on subscription $management endpoints."),
                 _ => BuildResponse(request, statusCode: 501, statusDescription: $"NotImplemented: {operation}"),
             };
         }
@@ -384,6 +429,102 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
         var dlqBytes = DeadLettering.DeadLetterEncoder.AppendDeadLetterHeaders(removed.EncodedMessage, _entityName, reason, description);
         var dlqName = _entityName + EntityNames.DeadLetterSuffix;
         await _store.EnqueueAsync(dlqName, dlqBytes).ConfigureAwait(false);
+    }
+
+    private Message HandleAddRule(Message request)
+    {
+        if (request.Body is not Map body || !body.TryGetValue(RuleNameBodyKey, out var nameObj) || nameObj is not string ruleName || string.IsNullOrWhiteSpace(ruleName))
+        {
+            return BuildResponse(request, 400, "BadRequest: missing or empty 'rule-name'");
+        }
+        if (!body.TryGetValue(RuleDescriptionBodyKey, out var descObj))
+        {
+            return BuildResponse(request, 400, "BadRequest: missing 'rule-description'");
+        }
+
+        RuleFilter filter;
+        try
+        {
+            filter = RuleWireCodec.DecodeFilter(descObj!);
+        }
+        catch (ArgumentException ex)
+        {
+            return BuildResponse(request, 400, "BadRequest: " + ex.Message);
+        }
+        catch (FormatException ex)
+        {
+            // SqlFilter parse errors surface here.
+            return BuildResponse(request, 400, "BadRequest: " + ex.Message);
+        }
+
+        // Service Bus's add-rule is upsert-style — if the rule already exists with the same
+        // name and same definition it's a no-op; if the name exists with a different
+        // definition that's a conflict. We treat any same-name call as a replace, which
+        // matches how the in-memory TopicManager already behaves and avoids ambiguity.
+        try
+        {
+            _topics!.CreateOrReplaceRuleAsync(new RuleDescriptor
+            {
+                TopicName = _topicName!,
+                SubscriptionName = _subscriptionName!,
+                Name = ruleName,
+                Filter = filter,
+            }).GetAwaiter().GetResult();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BuildResponse(request, 404, "NotFound: " + ex.Message);
+        }
+
+        return BuildResponse(request, 200, "OK");
+    }
+
+    private Message HandleRemoveRule(Message request)
+    {
+        if (request.Body is not Map body || !body.TryGetValue(RuleNameBodyKey, out var nameObj) || nameObj is not string ruleName || string.IsNullOrWhiteSpace(ruleName))
+        {
+            return BuildResponse(request, 400, "BadRequest: missing or empty 'rule-name'");
+        }
+        var deleted = _topics!.DeleteRuleAsync(_topicName!, _subscriptionName!, ruleName).GetAwaiter().GetResult();
+        return deleted
+            ? BuildResponse(request, 200, "OK")
+            : BuildResponse(request, 404, $"NotFound: no rule '{ruleName}' on {_topicName}/{_subscriptionName}");
+    }
+
+    private Message HandleEnumerateRules(Message request)
+    {
+        var top = 100;
+        var skip = 0;
+        if (request.Body is Map body)
+        {
+            if (body.TryGetValue(EnumerateTopKey, out var t)) top = Convert.ToInt32(t);
+            if (body.TryGetValue(EnumerateSkipKey, out var s)) skip = Convert.ToInt32(s);
+        }
+        if (top <= 0) top = 100;
+        if (skip < 0) skip = 0;
+
+        var rules = _topics!.ListRulesAsync(_topicName!, _subscriptionName!).GetAwaiter().GetResult();
+        var page = rules.Skip(skip).Take(top).ToArray();
+
+        var entries = new List<Map>(page.Length);
+        foreach (var rule in page)
+        {
+            entries.Add(new Map
+            {
+                [RuleNameBodyKey] = rule.Name,
+                [RuleDescriptionBodyKey] = RuleWireCodec.EncodeRuleDescription(rule.Name, rule.Filter),
+            });
+        }
+
+        if (entries.Count == 0)
+        {
+            return BuildResponse(request, 204, "NoContent");
+        }
+
+        var responseBody = new Map { [RulesResponseKey] = entries };
+        var response = BuildResponse(request, 200, "OK");
+        response.BodySection = new AmqpValue { Value = responseBody };
+        return response;
     }
 
     private Message HandleCancelScheduledMessage(Message request)
