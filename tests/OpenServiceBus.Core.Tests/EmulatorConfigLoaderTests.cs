@@ -103,12 +103,14 @@ public class EmulatorConfigLoaderTests
         var result = EmulatorConfigLoader.LoadFromJson(json);
 
         // Assert
+        // RequiresSession (M14) and RequiresDuplicateDetection (M15) are now honored, no warning.
+        // Forwarding still warns until M16 lands.
         result.Queues.Count.ShouldBe(1);
-        result.Warnings.Count.ShouldBe(4);
-        result.Warnings.ShouldContain(w => w.Contains("RequiresSession"));
-        result.Warnings.ShouldContain(w => w.Contains("RequiresDuplicateDetection"));
+        result.Queues[0].RequiresSession.ShouldBeTrue();
+        result.Queues[0].RequiresDuplicateDetection.ShouldBeTrue();
         result.Warnings.ShouldContain(w => w.Contains("ForwardTo"));
         result.Warnings.ShouldContain(w => w.Contains("ForwardDeadLetteredMessagesTo"));
+        result.Warnings.Count.ShouldBe(2);
     }
 
     [Fact]

@@ -38,4 +38,19 @@ public sealed record QueueDescriptor
     /// (AMQP <c>group-id</c>) and receivers must attach with a session filter. Enforced in M14.
     /// </summary>
     public bool RequiresSession { get; init; }
+
+    /// <summary>
+    /// When true, the broker silently drops repeat sends within
+    /// <see cref="DuplicateDetectionHistoryTimeWindow"/> based on the message's
+    /// <c>MessageId</c>. Mirrors Azure Service Bus — duplicates are not surfaced to the
+    /// sender; the SDK still gets an "accepted" disposition. Enforced in M15.
+    /// </summary>
+    public bool RequiresDuplicateDetection { get; init; }
+
+    /// <summary>
+    /// Sliding-window duration during which two sends with the same <c>MessageId</c> are
+    /// treated as duplicates. Only honoured when <see cref="RequiresDuplicateDetection"/>
+    /// is true. Defaults to 10 minutes when null — matches Azure Service Bus.
+    /// </summary>
+    public TimeSpan? DuplicateDetectionHistoryTimeWindow { get; init; }
 }

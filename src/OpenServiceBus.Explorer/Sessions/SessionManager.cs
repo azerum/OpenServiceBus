@@ -32,7 +32,7 @@ public sealed class Session : IAsyncDisposable
 {
     private readonly ServiceBusClient _client;
     private readonly ConcurrentDictionary<string, ServiceBusReceiver> _receivers = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, ServiceBusReceivedMessage> _lockedMessages = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, (ServiceBusReceivedMessage Message, ServiceBusReceiver Receiver)> _lockedMessages = new(StringComparer.OrdinalIgnoreCase);
 
     internal Session(string connectionString)
     {
@@ -72,24 +72,59 @@ public sealed class Session : IAsyncDisposable
         return _client.CreateReceiver(q, options);
     });
 
-    /// <summary>Stash a received message so a later Complete/Abandon call can find it by lock-token.</summary>
-    public void TrackLocked(ServiceBusReceivedMessage message)
+    /// <summary>
+    /// Get (or create) a session-locked receiver for a specific session id on a queue or
+    /// subscription. Same address shape as <see cref="Receiver(string)"/>; the session lock
+    /// stays alive across HTTP requests for the duration of this Explorer Session.
+    /// </summary>
+    public async Task<ServiceBusSessionReceiver> SessionReceiverAsync(string queueOrSubscription, string sessionId)
     {
-        _lockedMessages[message.LockToken] = message;
+        var key = $"{queueOrSubscription}|session={sessionId}";
+        if (_receivers.TryGetValue(key, out var existing) && existing is ServiceBusSessionReceiver sessionReceiver)
+        {
+            return sessionReceiver;
+        }
+        ServiceBusSessionReceiver created;
+        const string segment = "/Subscriptions/";
+        var idx = queueOrSubscription.IndexOf(segment, StringComparison.OrdinalIgnoreCase);
+        if (idx > 0)
+        {
+            var topic = queueOrSubscription[..idx];
+            var sub = queueOrSubscription[(idx + segment.Length)..];
+            created = await _client.AcceptSessionAsync(topic, sub, sessionId);
+        }
+        else
+        {
+            created = await _client.AcceptSessionAsync(queueOrSubscription, sessionId);
+        }
+        _receivers[key] = created;
+        return created;
     }
 
-    public bool TryTakeLocked(string lockToken, out ServiceBusReceivedMessage? message)
+    /// <summary>
+    /// Stash a received message so a later Complete/Abandon call can find it by lock-token.
+    /// Remembers the receiver instance — for session messages the same session-receiver must
+    /// be used to settle the message; using a plain receiver would surface a lock-lost error.
+    /// </summary>
+    public void TrackLocked(ServiceBusReceivedMessage message, ServiceBusReceiver receiver)
     {
-        var found = _lockedMessages.TryRemove(lockToken, out var msg);
-        message = msg;
+        _lockedMessages[message.LockToken] = (message, receiver);
+    }
+
+    public bool TryTakeLocked(string lockToken, out ServiceBusReceivedMessage? message, out ServiceBusReceiver? receiver)
+    {
+        var found = _lockedMessages.TryRemove(lockToken, out var entry);
+        message = entry.Message;
+        receiver = entry.Receiver;
         return found;
     }
 
     /// <summary>Look up a tracked locked message without removing it (used for RenewLock).</summary>
-    public bool TryPeekLocked(string lockToken, out ServiceBusReceivedMessage? message)
+    public bool TryPeekLocked(string lockToken, out ServiceBusReceivedMessage? message, out ServiceBusReceiver? receiver)
     {
-        var found = _lockedMessages.TryGetValue(lockToken, out var msg);
-        message = msg;
+        var found = _lockedMessages.TryGetValue(lockToken, out var entry);
+        message = entry.Message;
+        receiver = entry.Receiver;
         return found;
     }
 

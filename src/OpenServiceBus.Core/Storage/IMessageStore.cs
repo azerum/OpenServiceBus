@@ -27,12 +27,21 @@ public interface IMessageStore
     /// past = available immediately. The store assigns a sequence number even for scheduled
     /// messages so callers (and the SDK) can reference them for cancellation.
     /// </param>
+    /// <param name="messageId">The send-side message id. Required for duplicate detection (M15).</param>
+    /// <param name="duplicateDetectionWindow">
+    /// When non-null, the broker checks whether the same <paramref name="messageId"/> was
+    /// enqueued within this sliding window and silently drops the duplicate. The returned
+    /// <see cref="StoredMessage"/> in that case is the *original* one. Null disables dedup
+    /// for this send regardless of any queue configuration.
+    /// </param>
     Task<StoredMessage> EnqueueAsync(
         string queueName,
         byte[] encodedMessage,
         DateTimeOffset? expiresAt = null,
         DateTimeOffset? scheduledEnqueueTime = null,
         string? sessionId = null,
+        string? messageId = null,
+        TimeSpan? duplicateDetectionWindow = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>

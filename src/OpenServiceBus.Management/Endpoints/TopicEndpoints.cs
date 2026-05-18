@@ -81,6 +81,7 @@ public static class TopicEndpoints
                 LockDuration = b.LockDuration,
                 DeadLetteringOnMessageExpiration = b.DeadLetteringOnMessageExpiration,
                 DefaultMessageTimeToLive = b.DefaultMessageTimeToLive,
+                RequiresSession = b.RequiresSession,
             };
             try
             {
@@ -156,6 +157,7 @@ public sealed record CreateSubscriptionRequest
     public TimeSpan LockDuration { get; init; } = TimeSpan.FromSeconds(60);
     public bool DeadLetteringOnMessageExpiration { get; init; }
     public TimeSpan? DefaultMessageTimeToLive { get; init; }
+    public bool RequiresSession { get; init; }
 }
 
 /// <summary>
@@ -231,6 +233,7 @@ public sealed record SubscriptionResponse(
     TimeSpan LockDuration,
     bool DeadLetteringOnMessageExpiration,
     TimeSpan? DefaultMessageTimeToLive,
+    bool RequiresSession,
     string BackingQueueName,
     long? ActiveMessageCount)
 {
@@ -241,6 +244,7 @@ public sealed record SubscriptionResponse(
         d.LockDuration,
         d.DeadLetteringOnMessageExpiration,
         d.DefaultMessageTimeToLive,
+        d.RequiresSession,
         d.BackingQueueName,
         count);
 }

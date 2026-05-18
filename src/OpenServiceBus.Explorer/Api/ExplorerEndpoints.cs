@@ -68,46 +68,50 @@ public static class ExplorerEndpoints
         api.MapPost("/receive", async (ReceiveRequest req, SessionManager sessions, CancellationToken ct) =>
         {
             var session = sessions.GetOrCreate(req.ConnectionString);
-            var receiver = session.Receiver(req.Queue);
+            // When SessionId is provided we open (or reuse) a session-locked receiver via
+            // AcceptSessionAsync — required for session-enabled queues and subscriptions.
+            ServiceBusReceiver receiver = string.IsNullOrEmpty(req.SessionId)
+                ? session.Receiver(req.Queue)
+                : await session.SessionReceiverAsync(req.Queue, req.SessionId);
             var msg = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(req.TimeoutSeconds ?? 5), ct);
             if (msg is null)
             {
                 return Results.Ok(new { received = false });
             }
-            session.TrackLocked(msg);
+            session.TrackLocked(msg, receiver);
             return Results.Ok(ToDto(msg));
         });
 
         api.MapPost("/complete", async (DispositionRequest req, SessionManager sessions, CancellationToken ct) =>
         {
             var session = sessions.GetOrCreate(req.ConnectionString);
-            if (!session.TryTakeLocked(req.LockToken, out var msg) || msg is null)
+            if (!session.TryTakeLocked(req.LockToken, out var msg, out var receiver) || msg is null || receiver is null)
             {
                 return Results.NotFound(new { error = "Unknown lock token (already completed or never tracked by this explorer session)." });
             }
-            await session.Receiver(req.Queue).CompleteMessageAsync(msg, ct);
+            await receiver.CompleteMessageAsync(msg, ct);
             return Results.Ok(new { completed = true });
         });
 
         api.MapPost("/abandon", async (DispositionRequest req, SessionManager sessions, CancellationToken ct) =>
         {
             var session = sessions.GetOrCreate(req.ConnectionString);
-            if (!session.TryTakeLocked(req.LockToken, out var msg) || msg is null)
+            if (!session.TryTakeLocked(req.LockToken, out var msg, out var receiver) || msg is null || receiver is null)
             {
                 return Results.NotFound(new { error = "Unknown lock token." });
             }
-            await session.Receiver(req.Queue).AbandonMessageAsync(msg, cancellationToken: ct);
+            await receiver.AbandonMessageAsync(msg, cancellationToken: ct);
             return Results.Ok(new { abandoned = true });
         });
 
         api.MapPost("/deadletter", async (DeadLetterRequest req, SessionManager sessions, CancellationToken ct) =>
         {
             var session = sessions.GetOrCreate(req.ConnectionString);
-            if (!session.TryTakeLocked(req.LockToken, out var msg) || msg is null)
+            if (!session.TryTakeLocked(req.LockToken, out var msg, out var receiver) || msg is null || receiver is null)
             {
                 return Results.NotFound(new { error = "Unknown lock token." });
             }
-            await session.Receiver(req.Queue).DeadLetterMessageAsync(msg, req.Reason, req.Description, ct);
+            await receiver.DeadLetterMessageAsync(msg, req.Reason, req.Description, ct);
             return Results.Ok(new { deadLettered = true });
         });
 
@@ -116,22 +120,22 @@ public static class ExplorerEndpoints
             var session = sessions.GetOrCreate(req.ConnectionString);
             // Renew uses the AMQP $management endpoint - does NOT consume the locked message,
             // so we look up but do NOT remove from the tracking dict.
-            if (!session.TryPeekLocked(req.LockToken, out var msg) || msg is null)
+            if (!session.TryPeekLocked(req.LockToken, out var msg, out var receiver) || msg is null || receiver is null)
             {
                 return Results.NotFound(new { error = "Unknown lock token." });
             }
-            await session.Receiver(req.Queue).RenewMessageLockAsync(msg, ct);
+            await receiver.RenewMessageLockAsync(msg, ct);
             return Results.Ok(new { renewedUntil = msg.LockedUntil });
         });
 
         api.MapPost("/defer", async (DispositionRequest req, SessionManager sessions, CancellationToken ct) =>
         {
             var session = sessions.GetOrCreate(req.ConnectionString);
-            if (!session.TryTakeLocked(req.LockToken, out var msg) || msg is null)
+            if (!session.TryTakeLocked(req.LockToken, out var msg, out var receiver) || msg is null || receiver is null)
             {
                 return Results.NotFound(new { error = "Unknown lock token." });
             }
-            await session.Receiver(req.Queue).DeferMessageAsync(msg, cancellationToken: ct);
+            await receiver.DeferMessageAsync(msg, cancellationToken: ct);
             return Results.Ok(new { deferred = true, sequenceNumber = msg.SequenceNumber });
         });
 
@@ -314,7 +318,7 @@ public sealed record SendRequest(
     int? TimeToLiveSeconds,
     DateTimeOffset? ScheduledEnqueueTime,
     Dictionary<string, string>? Properties);
-public sealed record ReceiveRequest(string ConnectionString, string Queue, int? TimeoutSeconds);
+public sealed record ReceiveRequest(string ConnectionString, string Queue, int? TimeoutSeconds, string? SessionId);
 public sealed record DispositionRequest(string ConnectionString, string Queue, string LockToken);
 public sealed record DeadLetterRequest(string ConnectionString, string Queue, string LockToken, string? Reason, string? Description);
 public sealed record PingRequest(string ConnectionString, string ManagementUrl);

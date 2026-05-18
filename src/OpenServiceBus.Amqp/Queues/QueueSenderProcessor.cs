@@ -71,7 +71,12 @@ public sealed class QueueSenderProcessor : IMessageProcessor
             // when the queue is session-enabled; on a plain queue the GroupId is preserved as
             // metadata via the encoded bytes and the message stays on the regular delivery path.
             var sessionId = _descriptor.RequiresSession ? msg.Properties?.GroupId : null;
-            _ = EnqueueAndCompleteAsync(messageContext, encoded, expiresAt, scheduledFor, sessionId);
+            // M15: when dedup is required, pass messageId + window to the store so repeats are dropped.
+            var messageId = _descriptor.RequiresDuplicateDetection ? msg.Properties?.MessageId?.ToString() : null;
+            var dedupWindow = _descriptor.RequiresDuplicateDetection
+                ? _descriptor.DuplicateDetectionHistoryTimeWindow ?? TimeSpan.FromMinutes(10)
+                : (TimeSpan?)null;
+            _ = EnqueueAndCompleteAsync(messageContext, encoded, expiresAt, scheduledFor, sessionId, messageId, dedupWindow);
         }
         catch (Exception ex)
         {
@@ -99,8 +104,12 @@ public sealed class QueueSenderProcessor : IMessageProcessor
                 var expiresAt = ComputeExpiresAt(inner);
                 var scheduledFor = ReadScheduledEnqueueTime(inner);
                 var sessionId = _descriptor.RequiresSession ? inner.Properties?.GroupId : null;
+                var messageId = _descriptor.RequiresDuplicateDetection ? inner.Properties?.MessageId?.ToString() : null;
+                var dedupWindow = _descriptor.RequiresDuplicateDetection
+                    ? _descriptor.DuplicateDetectionHistoryTimeWindow ?? TimeSpan.FromMinutes(10)
+                    : (TimeSpan?)null;
 
-                await _store.EnqueueAsync(_queueName, innerBytes, expiresAt, scheduledFor, sessionId).ConfigureAwait(false);
+                await _store.EnqueueAsync(_queueName, innerBytes, expiresAt, scheduledFor, sessionId, messageId, dedupWindow).ConfigureAwait(false);
             }
             _logger.LogDebug("Split batched envelope into {Count} message(s) on {Queue}", dataList.Count, _queueName);
             context.Complete();
@@ -118,11 +127,11 @@ public sealed class QueueSenderProcessor : IMessageProcessor
         return Message.Decode(buf);
     }
 
-    private async Task EnqueueAndCompleteAsync(MessageContext context, byte[] encoded, DateTimeOffset? expiresAt, DateTimeOffset? scheduledFor, string? sessionId)
+    private async Task EnqueueAndCompleteAsync(MessageContext context, byte[] encoded, DateTimeOffset? expiresAt, DateTimeOffset? scheduledFor, string? sessionId, string? messageId, TimeSpan? duplicateDetectionWindow)
     {
         try
         {
-            var stored = await _store.EnqueueAsync(_queueName, encoded, expiresAt, scheduledFor, sessionId).ConfigureAwait(false);
+            var stored = await _store.EnqueueAsync(_queueName, encoded, expiresAt, scheduledFor, sessionId, messageId, duplicateDetectionWindow).ConfigureAwait(false);
             _logger.LogDebug("Enqueued message #{Seq} ({Bytes} bytes) to {Queue} (expiresAt={Expires}, scheduledFor={Scheduled})",
                 stored.SequenceNumber, encoded.Length, _queueName,
                 expiresAt?.ToString("O") ?? "never",

@@ -50,11 +50,31 @@ public sealed class InMemoryMessageStore : IMessageStore
         DateTimeOffset? expiresAt = null,
         DateTimeOffset? scheduledEnqueueTime = null,
         string? sessionId = null,
+        string? messageId = null,
+        TimeSpan? duplicateDetectionWindow = null,
         CancellationToken cancellationToken = default)
     {
         var state = GetQueue(queueName);
-        var seq = Interlocked.Increment(ref state.NextSequenceNumber);
         var now = _timeProvider.GetUtcNow();
+
+        // M15: silent-drop duplicate sends. Azure SB does not surface the dup to the sender —
+        // the SDK gets an "accepted" disposition either way. We return the *original*
+        // StoredMessage so callers that propagate sequence numbers stay consistent.
+        if (duplicateDetectionWindow is not null && !string.IsNullOrEmpty(messageId))
+        {
+            // Lazy sweep of expired entries on each check; cheap because the map is small.
+            foreach (var (key, expiresAtUtc) in state.SeenMessageIds)
+            {
+                if (expiresAtUtc <= now) state.SeenMessageIds.TryRemove(key, out _);
+            }
+            if (state.SeenMessageIds.TryGetValue(messageId, out var existingDeadline) && existingDeadline > now
+                && state.OriginalsByMessageId.TryGetValue(messageId, out var original))
+            {
+                return Task.FromResult(original);
+            }
+        }
+
+        var seq = Interlocked.Increment(ref state.NextSequenceNumber);
         // A scheduled time in the past is meaningless — treat it as available immediately.
         var effectiveSchedule = scheduledEnqueueTime is { } sched && sched > now ? scheduledEnqueueTime : null;
         var message = new StoredMessage
@@ -68,6 +88,11 @@ public sealed class InMemoryMessageStore : IMessageStore
         };
 
         state.Messages[seq] = message;
+        if (duplicateDetectionWindow is not null && !string.IsNullOrEmpty(messageId))
+        {
+            state.SeenMessageIds[messageId] = now + duplicateDetectionWindow.Value;
+            state.OriginalsByMessageId[messageId] = message;
+        }
         if (effectiveSchedule is null)
         {
             if (sessionId is not null)
@@ -608,6 +633,12 @@ public sealed class InMemoryMessageStore : IMessageStore
 
         public SessionState GetOrAddSession(string sessionId) =>
             Sessions.GetOrAdd(sessionId, _ => new SessionState());
+
+        // M15 — duplicate detection sliding window keyed on MessageId. Two parallel maps:
+        // SeenMessageIds tracks expiry (for the cheap eviction sweep), OriginalsByMessageId
+        // gives us back the StoredMessage so a duplicate send returns the same sequence number.
+        public readonly ConcurrentDictionary<string, DateTimeOffset> SeenMessageIds = new(StringComparer.Ordinal);
+        public readonly ConcurrentDictionary<string, StoredMessage> OriginalsByMessageId = new(StringComparer.Ordinal);
     }
 
     private sealed class LockEntry

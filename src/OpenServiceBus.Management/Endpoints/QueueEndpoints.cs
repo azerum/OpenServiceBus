@@ -61,6 +61,9 @@ public sealed record CreateQueueRequest
     public TimeSpan LockDuration { get; init; } = TimeSpan.FromSeconds(60);
     public bool DeadLetteringOnMessageExpiration { get; init; }
     public TimeSpan? DefaultMessageTimeToLive { get; init; }
+    public bool RequiresSession { get; init; }
+    public bool RequiresDuplicateDetection { get; init; }
+    public TimeSpan? DuplicateDetectionHistoryTimeWindow { get; init; }
 
     public QueueDescriptor ToDescriptor(string name) => new()
     {
@@ -69,6 +72,9 @@ public sealed record CreateQueueRequest
         LockDuration = LockDuration,
         DeadLetteringOnMessageExpiration = DeadLetteringOnMessageExpiration,
         DefaultMessageTimeToLive = DefaultMessageTimeToLive,
+        RequiresSession = RequiresSession,
+        RequiresDuplicateDetection = RequiresDuplicateDetection,
+        DuplicateDetectionHistoryTimeWindow = DuplicateDetectionHistoryTimeWindow,
     };
 }
 
@@ -78,6 +84,9 @@ public sealed record QueueResponse(
     TimeSpan LockDuration,
     bool DeadLetteringOnMessageExpiration,
     TimeSpan? DefaultMessageTimeToLive,
+    bool RequiresSession,
+    bool RequiresDuplicateDetection,
+    TimeSpan? DuplicateDetectionHistoryTimeWindow,
     long? ActiveMessageCount)
 {
     public static QueueResponse From(QueueDescriptor d, long? count = null) => new(
@@ -86,5 +95,8 @@ public sealed record QueueResponse(
         d.LockDuration,
         d.DeadLetteringOnMessageExpiration,
         d.DefaultMessageTimeToLive,
+        d.RequiresSession,
+        d.RequiresDuplicateDetection,
+        d.DuplicateDetectionHistoryTimeWindow,
         count);
 }

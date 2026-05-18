@@ -63,10 +63,6 @@ public static class EmulatorConfigLoader
     {
         var props = q.Properties ?? new QueueProperties();
 
-        if (props.RequiresSession is true)
-            warnings.Add($"Queue '{q.Name}': RequiresSession=true is not yet supported and will be treated as false.");
-        if (props.RequiresDuplicateDetection is true)
-            warnings.Add($"Queue '{q.Name}': RequiresDuplicateDetection=true is not yet supported and will be treated as false.");
         if (!string.IsNullOrEmpty(props.ForwardTo))
             warnings.Add($"Queue '{q.Name}': ForwardTo='{props.ForwardTo}' is not yet supported.");
         if (!string.IsNullOrEmpty(props.ForwardDeadLetteredMessagesTo))
@@ -80,6 +76,9 @@ public static class EmulatorConfigLoader
                            ?? new QueueDescriptor { Name = q.Name }.LockDuration,
             DefaultMessageTimeToLive = ParseDuration(props.DefaultMessageTimeToLive, $"Queue '{q.Name}'.DefaultMessageTimeToLive", warnings),
             DeadLetteringOnMessageExpiration = props.DeadLetteringOnMessageExpiration ?? false,
+            RequiresSession = props.RequiresSession ?? false,
+            RequiresDuplicateDetection = props.RequiresDuplicateDetection ?? false,
+            DuplicateDetectionHistoryTimeWindow = ParseDuration(props.DuplicateDetectionHistoryTimeWindow, $"Queue '{q.Name}'.DuplicateDetectionHistoryTimeWindow", warnings),
         };
 
         return descriptor;
