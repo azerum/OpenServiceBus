@@ -48,25 +48,78 @@ public sealed class InMemoryMessageStore : IMessageStore
         string queueName,
         byte[] encodedMessage,
         DateTimeOffset? expiresAt = null,
+        DateTimeOffset? scheduledEnqueueTime = null,
         CancellationToken cancellationToken = default)
     {
         var state = GetQueue(queueName);
         var seq = Interlocked.Increment(ref state.NextSequenceNumber);
+        var now = _timeProvider.GetUtcNow();
+        // A scheduled time in the past is meaningless — treat it as available immediately.
+        var effectiveSchedule = scheduledEnqueueTime is { } sched && sched > now ? scheduledEnqueueTime : null;
         var message = new StoredMessage
         {
             SequenceNumber = seq,
-            EnqueuedAt = _timeProvider.GetUtcNow(),
+            EnqueuedAt = now,
             EncodedMessage = encodedMessage,
             ExpiresAt = expiresAt,
+            ScheduledEnqueueTime = effectiveSchedule,
         };
 
         state.Messages[seq] = message;
-        if (!state.Available.Writer.TryWrite(seq))
+        if (effectiveSchedule is null)
         {
-            throw new InvalidOperationException($"Queue '{queueName}' is closed.");
+            // Immediately available for delivery.
+            if (!state.Available.Writer.TryWrite(seq))
+            {
+                throw new InvalidOperationException($"Queue '{queueName}' is closed.");
+            }
         }
+        // else: scheduled — waits in Messages until ActivateScheduled promotes it.
 
         return Task.FromResult(message);
+    }
+
+    public int ActivateScheduled(string queueName, DateTimeOffset now)
+    {
+        if (!_queues.TryGetValue(queueName, out var state)) return 0;
+
+        var activated = 0;
+        foreach (var (seq, msg) in state.Messages)
+        {
+            if (msg.ScheduledEnqueueTime is null) continue;       // not scheduled
+            if (msg.ScheduledEnqueueTime > now) continue;          // not yet
+            // Clear the scheduled marker atomically; only the winner of TryUpdate pushes to Available.
+            var activated_ = msg with { ScheduledEnqueueTime = null };
+            if (state.Messages.TryUpdate(seq, activated_, msg))
+            {
+                state.Available.Writer.TryWrite(seq);
+                activated++;
+            }
+        }
+        return activated;
+    }
+
+    public Task<bool> TryCancelScheduledAsync(
+        string queueName,
+        long sequenceNumber,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_queues.TryGetValue(queueName, out var state))
+        {
+            return Task.FromResult(false);
+        }
+        if (!state.Messages.TryGetValue(sequenceNumber, out var msg))
+        {
+            return Task.FromResult(false);
+        }
+        if (msg.ScheduledEnqueueTime is null)
+        {
+            // Already activated — caller should use normal disposition / lock-cancel paths.
+            return Task.FromResult(false);
+        }
+        // TryRemove with comparison so we don't race with ActivateScheduled.
+        return Task.FromResult(((ICollection<KeyValuePair<long, StoredMessage>>)state.Messages)
+            .Remove(new KeyValuePair<long, StoredMessage>(sequenceNumber, msg)));
     }
 
     public IReadOnlyList<StoredMessage> ExpireMessages(string queueName, DateTimeOffset now)
@@ -100,6 +153,7 @@ public sealed class InMemoryMessageStore : IMessageStore
     public async Task<LockedMessage?> TryDequeueAsync(
         string queueName,
         TimeSpan lockDuration,
+        string? associatedLinkName = null,
         CancellationToken cancellationToken = default)
     {
         var state = GetQueue(queueName);
@@ -121,7 +175,7 @@ public sealed class InMemoryMessageStore : IMessageStore
         if (!state.Messages.TryGetValue(seq, out var stored))
         {
             // The message was completed/deleted out-of-band - skip and try the next.
-            return await TryDequeueAsync(queueName, lockDuration, cancellationToken).ConfigureAwait(false);
+            return await TryDequeueAsync(queueName, lockDuration, associatedLinkName, cancellationToken).ConfigureAwait(false);
         }
 
         var lockToken = Guid.NewGuid();
@@ -130,6 +184,7 @@ public sealed class InMemoryMessageStore : IMessageStore
         {
             SequenceNumber = seq,
             LockedUntil = lockedUntil,
+            AssociatedLink = associatedLinkName,
         };
 
         return new LockedMessage
@@ -204,10 +259,21 @@ public sealed class InMemoryMessageStore : IMessageStore
         string queueName,
         Guid lockToken,
         TimeSpan lockDuration,
+        string? requestingLinkName = null,
         CancellationToken cancellationToken = default)
     {
         var state = GetQueue(queueName);
         if (!state.Locks.TryGetValue(lockToken, out var entry))
+        {
+            return Task.FromResult<DateTimeOffset?>(null);
+        }
+
+        // Link-affinity check: if the lock was taken from a specific link, only that link
+        // can renew it. Matches Service Bus's lock-link scoping — a sneaky cross-link renew
+        // attempt returns Gone.
+        if (entry.AssociatedLink is not null
+            && requestingLinkName is not null
+            && !string.Equals(entry.AssociatedLink, requestingLinkName, StringComparison.Ordinal))
         {
             return Task.FromResult<DateTimeOffset?>(null);
         }
@@ -229,6 +295,24 @@ public sealed class InMemoryMessageStore : IMessageStore
         }
         state.Messages.TryRemove(entry.SequenceNumber, out var msg);
         return Task.FromResult<StoredMessage?>(msg);
+    }
+
+    public IReadOnlyList<StoredMessage> Peek(string queueName, long fromSequenceNumber, int maxCount)
+    {
+        if (maxCount <= 0 || !_queues.TryGetValue(queueName, out var state))
+        {
+            return Array.Empty<StoredMessage>();
+        }
+
+        // Snapshot, filter by lower bound, sort, take.
+        var result = new List<StoredMessage>(Math.Min(maxCount, state.Messages.Count));
+        foreach (var (_, msg) in state.Messages)
+        {
+            if (msg.SequenceNumber >= fromSequenceNumber) result.Add(msg);
+        }
+        result.Sort((a, b) => a.SequenceNumber.CompareTo(b.SequenceNumber));
+        if (result.Count > maxCount) result.RemoveRange(maxCount, result.Count - maxCount);
+        return result;
     }
 
     private QueueState GetQueue(string queueName)
@@ -256,5 +340,6 @@ public sealed class InMemoryMessageStore : IMessageStore
     {
         public required long SequenceNumber { get; init; }
         public required DateTimeOffset LockedUntil { get; set; }
+        public string? AssociatedLink { get; init; }
     }
 }

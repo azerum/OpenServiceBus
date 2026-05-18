@@ -28,4 +28,13 @@ public sealed record StoredMessage
 
     /// <summary>True when this message has passed its TTL deadline.</summary>
     public bool IsExpired(DateTimeOffset now) => ExpiresAt is not null && ExpiresAt.Value <= now;
+
+    /// <summary>
+    /// Absolute UTC time at which this scheduled message becomes available for delivery (M7).
+    /// Null means the message is not scheduled (available immediately on enqueue).
+    /// </summary>
+    public DateTimeOffset? ScheduledEnqueueTime { get; init; }
+
+    /// <summary>True when this message is scheduled and its activation time has not yet arrived.</summary>
+    public bool IsScheduled(DateTimeOffset now) => ScheduledEnqueueTime is not null && ScheduledEnqueueTime.Value > now;
 }

@@ -72,7 +72,7 @@ public sealed class TtlExpirationService : BackgroundService
                             queue.Name,
                             QueueReceiverSource.TtlExpiredReason,
                             QueueReceiverSource.TtlExpiredDescription);
-                        await _store.EnqueueAsync(dlqName, dlqBytes, expiresAt: null, cancellationToken).ConfigureAwait(false);
+                        await _store.EnqueueAsync(dlqName, dlqBytes, expiresAt: null, cancellationToken: cancellationToken).ConfigureAwait(false);
                     }
                     _logger.LogDebug("TTL-expired {Count} message(s) from {Queue} → {Dlq}", expired.Count, queue.Name, dlqName);
                 }

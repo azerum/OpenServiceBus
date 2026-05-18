@@ -140,6 +140,7 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
             descriptor.Name,
             descriptor,
             _messageStore,
+            _timeProvider,
             _loggerFactory.CreateLogger<ManagementRequestProcessor>());
 
         _host.RegisterRequestProcessor(descriptor.Name + "/$management", processor);

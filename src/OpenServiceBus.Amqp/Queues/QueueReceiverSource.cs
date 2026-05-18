@@ -63,7 +63,9 @@ public sealed class QueueReceiverSource : IMessageSource
     {
         while (true)
         {
-            var locked = await _store.TryDequeueAsync(_entityName, _descriptor.LockDuration).ConfigureAwait(false);
+            // Pass the receiver link name so the lock is scoped to this link — only this
+            // link's $management session can renew it (matches Service Bus's lock-link affinity).
+            var locked = await _store.TryDequeueAsync(_entityName, _descriptor.LockDuration, link.Name).ConfigureAwait(false);
             if (locked is null) return null!;
 
             // M6: messages that crossed their TTL deadline while waiting in the queue get
@@ -88,6 +90,16 @@ public sealed class QueueReceiverSource : IMessageSource
 
             var amqp = DecodeMessage(locked.Message.EncodedMessage);
             StampSystemProperties(amqp, locked);
+
+            // ReceiveAndDelete: the client opened the link with snd-settle-mode=settled, meaning
+            // we send the message as settled and NO disposition will arrive. The peek-lock we just
+            // took would otherwise expire → ghost redelivery. Settle (delete) it now so the message
+            // is gone the moment we hand it to the framework. This is at-most-once semantics — a
+            // wire-level send failure loses the message, matching real Service Bus.
+            if (link.SettleOnSend)
+            {
+                await _store.TryCompleteAsync(_entityName, locked.LockToken).ConfigureAwait(false);
+            }
 
             var ctx = new ReceiveContext(link, amqp) { UserToken = locked.LockToken };
             return ctx;
@@ -165,7 +177,7 @@ public sealed class QueueReceiverSource : IMessageSource
 
         var dlqBytes = DeadLetterEncoder.AppendDeadLetterHeaders(removed.EncodedMessage, _entityName, reason, description);
         var dlqName = _entityName + EntityNames.DeadLetterSuffix;
-        await _store.EnqueueAsync(dlqName, dlqBytes, expiresAt: null, cancellationToken).ConfigureAwait(false);
+        await _store.EnqueueAsync(dlqName, dlqBytes, expiresAt: null, cancellationToken: cancellationToken).ConfigureAwait(false);
 
         _logger.LogDebug("Dead-lettered seq#{Seq} from {Entity} to {Dlq} (reason={Reason})",
             removed.SequenceNumber, _entityName, dlqName, reason ?? "(unspecified)");

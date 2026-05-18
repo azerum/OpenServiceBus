@@ -27,6 +27,7 @@ internal sealed class IntegrationHarness : IAsyncDisposable
 {
     public AmqpListenerHost Host { get; }
     public TtlExpirationService TtlSweeper { get; }
+    public ScheduledMessageActivator ScheduledActivator { get; }
     public IQueueRegistry Queues { get; }
     public IMessageStore Store { get; }
     public int Port { get; }
@@ -36,10 +37,11 @@ internal sealed class IntegrationHarness : IAsyncDisposable
     public string ConnectionString =>
         $"Endpoint=sb://127.0.0.1:{Port};SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true";
 
-    private IntegrationHarness(AmqpListenerHost host, TtlExpirationService ttlSweeper, IQueueRegistry queues, IMessageStore store, int port)
+    private IntegrationHarness(AmqpListenerHost host, TtlExpirationService ttlSweeper, ScheduledMessageActivator scheduledActivator, IQueueRegistry queues, IMessageStore store, int port)
     {
         Host = host;
         TtlSweeper = ttlSweeper;
+        ScheduledActivator = scheduledActivator;
         Queues = queues;
         Store = store;
         Port = port;
@@ -81,9 +83,16 @@ internal sealed class IntegrationHarness : IAsyncDisposable
             TimeProvider.System,
             loggerFactory.CreateLogger<TtlExpirationService>());
 
+        var scheduledActivator = new ScheduledMessageActivator(
+            storeAsIface,
+            queues,
+            TimeProvider.System,
+            loggerFactory.CreateLogger<ScheduledMessageActivator>());
+
         await host.StartAsync(CancellationToken.None);
         await ttlSweeper.StartAsync(CancellationToken.None);
-        return new IntegrationHarness(host, ttlSweeper, queues, storeAsIface, port);
+        await scheduledActivator.StartAsync(CancellationToken.None);
+        return new IntegrationHarness(host, ttlSweeper, scheduledActivator, queues, storeAsIface, port);
     }
 
     private static int GetFreePort()
@@ -96,6 +105,8 @@ internal sealed class IntegrationHarness : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        await ScheduledActivator.StopAsync(CancellationToken.None);
+        ScheduledActivator.Dispose();
         await TtlSweeper.StopAsync(CancellationToken.None);
         TtlSweeper.Dispose();
         await Host.StopAsync(CancellationToken.None);

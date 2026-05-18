@@ -22,10 +22,33 @@ public interface IMessageStore
     /// Absolute UTC deadline after which the message is considered expired (M6). Null = no TTL.
     /// The caller is responsible for computing this from per-message TTL and queue-default TTL.
     /// </param>
+    /// <param name="scheduledEnqueueTime">
+    /// Absolute UTC time at which the message becomes available for delivery (M7). Null or
+    /// past = available immediately. The store assigns a sequence number even for scheduled
+    /// messages so callers (and the SDK) can reference them for cancellation.
+    /// </param>
     Task<StoredMessage> EnqueueAsync(
         string queueName,
         byte[] encodedMessage,
         DateTimeOffset? expiresAt = null,
+        DateTimeOffset? scheduledEnqueueTime = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Move any scheduled messages whose <see cref="StoredMessage.ScheduledEnqueueTime"/>
+    /// has arrived into the available pool. Returns the number activated.
+    /// </summary>
+    int ActivateScheduled(string queueName, DateTimeOffset now);
+
+    /// <summary>
+    /// Cancel a scheduled message before it activates. Returns true if a scheduled message
+    /// with that sequence number was found and removed. Returns false for unknown sequence
+    /// numbers OR for messages that have already activated (the caller should use the normal
+    /// disposition path to remove them).
+    /// </summary>
+    Task<bool> TryCancelScheduledAsync(
+        string queueName,
+        long sequenceNumber,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -42,9 +65,15 @@ public interface IMessageStore
     /// Wait for and lock the next available message under peek-lock for <paramref name="lockDuration"/>.
     /// Returns <c>null</c> only on cancellation.
     /// </summary>
+    /// <param name="associatedLinkName">
+    /// Optional: the receiver link name that's taking the lock. When set, renew-lock requests
+    /// for this token must declare the same link name in <c>associated-link-name</c> — matches
+    /// Service Bus's lock-link affinity.
+    /// </param>
     Task<LockedMessage?> TryDequeueAsync(
         string queueName,
         TimeSpan lockDuration,
+        string? associatedLinkName = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>Complete a locked message. Returns false if the lock token is unknown (e.g. already expired or completed).</summary>
@@ -68,12 +97,14 @@ public interface IMessageStore
     /// <summary>
     /// Extend a peek-lock by another <paramref name="lockDuration"/> from now.
     /// Returns the new locked-until timestamp, or <c>null</c> if the lock token is unknown
-    /// (e.g. already completed or expired).
+    /// (e.g. already completed or expired) — or if <paramref name="requestingLinkName"/>
+    /// doesn't match the link that originally took the lock.
     /// </summary>
     Task<DateTimeOffset?> TryRenewLockAsync(
         string queueName,
         Guid lockToken,
         TimeSpan lockDuration,
+        string? requestingLinkName = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -85,4 +116,12 @@ public interface IMessageStore
         string queueName,
         Guid lockToken,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Read messages without locking or removing them. Returns up to <paramref name="maxCount"/>
+    /// messages with <c>SequenceNumber &gt;= fromSequenceNumber</c>, ordered by sequence number.
+    /// Includes both Active and Scheduled messages — callers (the peek handler) flag the state
+    /// to consumers. Locked messages ARE visible to Peek.
+    /// </summary>
+    IReadOnlyList<StoredMessage> Peek(string queueName, long fromSequenceNumber, int maxCount);
 }

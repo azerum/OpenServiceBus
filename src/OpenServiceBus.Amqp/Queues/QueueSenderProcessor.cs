@@ -15,6 +15,16 @@ namespace OpenServiceBus.Amqp.Queues;
 /// </summary>
 public sealed class QueueSenderProcessor : IMessageProcessor
 {
+    private static readonly Symbol ScheduledEnqueueTimeSymbol = new("x-opt-scheduled-enqueue-time");
+
+    /// <summary>
+    /// Microsoft.Azure.Amqp's batched-message-format marker. When this is set on the outer
+    /// transfer, the body is one or more <c>Data</c> sections (a <see cref="DataList"/> in
+    /// AMQPNetLite terms) each holding a fully-encoded inner message. Real Service Bus splits
+    /// these on the broker side so each inner message gets its own sequence number — we do the same.
+    /// </summary>
+    private const uint AmqpBatchedMessageFormat = 0x80013700u;
+
     private readonly string _queueName;
     private readonly QueueDescriptor _descriptor;
     private readonly IMessageStore _store;
@@ -41,11 +51,23 @@ public sealed class QueueSenderProcessor : IMessageProcessor
     {
         try
         {
-            var encoded = CopyEncoded(messageContext.Message);
-            var expiresAt = ComputeExpiresAt(messageContext.Message);
-            // Fire-and-forget the enqueue; the in-memory store completes synchronously
-            // but the IMessageStore contract is async so we don't block the listener thread.
-            _ = EnqueueAndCompleteAsync(messageContext, encoded, expiresAt);
+            var msg = messageContext.Message;
+
+            // Batched envelope from SendMessagesAsync / ServiceBusMessageBatch — split into N individual
+            // enqueues so each inner message gets its own sequence number and lifecycle.
+            if (msg.Format == AmqpBatchedMessageFormat && msg.BodySection is DataList dataList)
+            {
+                _ = EnqueueBatchAsync(messageContext, dataList);
+                return;
+            }
+
+            var encoded = CopyEncoded(msg);
+            var expiresAt = ComputeExpiresAt(msg);
+            // M7: clients can schedule via SendMessageAsync (this path) by stamping the
+            // x-opt-scheduled-enqueue-time annotation; or via the dedicated ScheduleMessageAsync
+            // which goes through $management. Both end up at IMessageStore.EnqueueAsync(..., scheduledEnqueueTime).
+            var scheduledFor = ReadScheduledEnqueueTime(msg);
+            _ = EnqueueAndCompleteAsync(messageContext, encoded, expiresAt, scheduledFor);
         }
         catch (Exception ex)
         {
@@ -57,13 +79,49 @@ public sealed class QueueSenderProcessor : IMessageProcessor
         }
     }
 
-    private async Task EnqueueAndCompleteAsync(MessageContext context, byte[] encoded, DateTimeOffset? expiresAt)
+    private async Task EnqueueBatchAsync(MessageContext context, DataList dataList)
     {
         try
         {
-            var stored = await _store.EnqueueAsync(_queueName, encoded, expiresAt).ConfigureAwait(false);
-            _logger.LogDebug("Enqueued message #{Seq} ({Bytes} bytes) to {Queue} (expiresAt={Expires})",
-                stored.SequenceNumber, encoded.Length, _queueName, expiresAt?.ToString("O") ?? "never");
+            for (var i = 0; i < dataList.Count; i++)
+            {
+                var innerBinary = dataList[i].Binary;
+                // Copy: AMQPNetLite may pool the underlying buffer; we need an independent byte[].
+                var innerBytes = new byte[innerBinary.Length];
+                Array.Copy(innerBinary, innerBytes, innerBinary.Length);
+
+                // Each inner message has its own header (TTL) and annotations (scheduled-enqueue-time).
+                var inner = DecodeMessage(innerBytes);
+                var expiresAt = ComputeExpiresAt(inner);
+                var scheduledFor = ReadScheduledEnqueueTime(inner);
+
+                await _store.EnqueueAsync(_queueName, innerBytes, expiresAt, scheduledFor).ConfigureAwait(false);
+            }
+            _logger.LogDebug("Split batched envelope into {Count} message(s) on {Queue}", dataList.Count, _queueName);
+            context.Complete();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to enqueue batched messages on queue {Queue}", _queueName);
+            context.Complete(new Error(new Symbol(ErrorCode.InternalError)) { Description = ex.Message });
+        }
+    }
+
+    private static Message DecodeMessage(byte[] bytes)
+    {
+        var buf = new ByteBuffer(bytes, 0, bytes.Length, bytes.Length);
+        return Message.Decode(buf);
+    }
+
+    private async Task EnqueueAndCompleteAsync(MessageContext context, byte[] encoded, DateTimeOffset? expiresAt, DateTimeOffset? scheduledFor)
+    {
+        try
+        {
+            var stored = await _store.EnqueueAsync(_queueName, encoded, expiresAt, scheduledFor).ConfigureAwait(false);
+            _logger.LogDebug("Enqueued message #{Seq} ({Bytes} bytes) to {Queue} (expiresAt={Expires}, scheduledFor={Scheduled})",
+                stored.SequenceNumber, encoded.Length, _queueName,
+                expiresAt?.ToString("O") ?? "never",
+                scheduledFor?.ToString("O") ?? "immediate");
             context.Complete();
         }
         catch (Exception ex)
@@ -74,6 +132,18 @@ public sealed class QueueSenderProcessor : IMessageProcessor
                 Description = ex.Message,
             });
         }
+    }
+
+    private static DateTimeOffset? ReadScheduledEnqueueTime(Message msg)
+    {
+        if (msg.MessageAnnotations is null) return null;
+        if (!msg.MessageAnnotations.Map.TryGetValue(ScheduledEnqueueTimeSymbol, out var value)) return null;
+        return value switch
+        {
+            DateTime dt => new DateTimeOffset(DateTime.SpecifyKind(dt, dt.Kind == DateTimeKind.Unspecified ? DateTimeKind.Utc : dt.Kind).ToUniversalTime()),
+            DateTimeOffset dto => dto,
+            _ => null,
+        };
     }
 
     /// <summary>

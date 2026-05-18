@@ -107,6 +107,7 @@
                   <div class="col-md-3"><label class="form-label small text-muted mb-1">SessionId</label><input id="msgSessionId" class="form-control form-control-sm" placeholder="(post-MVP)"></div>
                   <div class="col-md-3"><label class="form-label small text-muted mb-1">PartitionKey</label><input id="msgPartitionKey" class="form-control form-control-sm"></div>
                   <div class="col-md-3"><label class="form-label small text-muted mb-1">TimeToLive (seconds)</label><input id="msgTtl" type="number" class="form-control form-control-sm" min="1" placeholder="∞ — sets header.ttl"></div>
+                  <div class="col-md-3"><label class="form-label small text-muted mb-1">Scheduled for (seconds from now)</label><input id="msgScheduledSecs" type="number" class="form-control form-control-sm" min="1" placeholder="now"></div>
                 </div>
                 <div class="mt-3">
                   <div class="d-flex justify-content-between align-items-center mb-1">
@@ -506,9 +507,14 @@
           sessionId: $("#msgSessionId").value || null,
           partitionKey: $("#msgPartitionKey").value || null,
           timeToLiveSeconds: $("#msgTtl").value ? parseInt($("#msgTtl").value) : null,
+          scheduledEnqueueTime: $("#msgScheduledSecs").value
+            ? new Date(Date.now() + parseInt($("#msgScheduledSecs").value) * 1000).toISOString()
+            : null,
           properties: collectAppProps(),
         });
-        toast(`Sent (id=${r.messageId || "auto"})`, "ok");
+        toast(r.scheduledFor
+          ? `Scheduled (id=${r.messageId}, for=${r.scheduledFor})`
+          : `Sent (id=${r.messageId || "auto"})`, "ok");
         loadQueues();
       } catch (e) { toast(e.message, "err"); }
     });

@@ -55,13 +55,14 @@ public static class ExplorerEndpoints
             if (!string.IsNullOrWhiteSpace(req.SessionId)) msg.SessionId = req.SessionId;
             if (!string.IsNullOrWhiteSpace(req.PartitionKey)) msg.PartitionKey = req.PartitionKey;
             if (req.TimeToLiveSeconds is > 0) msg.TimeToLive = TimeSpan.FromSeconds(req.TimeToLiveSeconds.Value);
+            if (req.ScheduledEnqueueTime is { } scheduled) msg.ScheduledEnqueueTime = scheduled;
             if (req.Properties is { Count: > 0 })
             {
                 foreach (var (k, v) in req.Properties) msg.ApplicationProperties[k] = v;
             }
 
             await sender.SendMessageAsync(msg, ct);
-            return Results.Ok(new { sent = true, messageId = msg.MessageId });
+            return Results.Ok(new { sent = true, messageId = msg.MessageId, scheduledFor = msg.ScheduledEnqueueTime });
         });
 
         api.MapPost("/receive", async (ReceiveRequest req, SessionManager sessions, CancellationToken ct) =>
@@ -228,6 +229,7 @@ public sealed record SendRequest(
     string? SessionId,
     string? PartitionKey,
     int? TimeToLiveSeconds,
+    DateTimeOffset? ScheduledEnqueueTime,
     Dictionary<string, string>? Properties);
 public sealed record ReceiveRequest(string ConnectionString, string Queue, int? TimeoutSeconds);
 public sealed record DispositionRequest(string ConnectionString, string Queue, string LockToken);
