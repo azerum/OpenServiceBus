@@ -1,115 +1,48 @@
-using System.Net;
-using System.Net.Sockets;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
-using OpenServiceBus.Core.Entities;
-using OpenServiceBus.Core.Messaging;
-using OpenServiceBus.Core.Storage;
-using OpenServiceBus.Amqp.DependencyInjection;
 using OpenServiceBus.Amqp.Hosting;
-using OpenServiceBus.Amqp.Lifecycle;
-using OpenServiceBus.Amqp.Queues;
-using OpenServiceBus.Amqp.Routing;
-using OpenServiceBus.InMemoryStorage;
-using OpenServiceBus.InMemoryStorage.DependencyInjection;
-using OpenServiceBus.InMemoryStorage.Lifecycle;
-using OpenServiceBus.InMemoryStorage.Queues;
+using OpenServiceBus.Core.Storage;
+using OpenServiceBus.Core.Entities;
+using OpenServiceBus.Testing;
 
 namespace OpenServiceBus.IntegrationTests;
 
 /// <summary>
-/// Minimal in-process broker for Azure SDK integration tests. Provides an
-/// SDK-ready connection string with <c>UseDevelopmentEmulator=true</c>.
-/// Will be replaced by the public <c>OpenServiceBusTestHost</c> in M10.
+/// Thin adapter that lets the existing integration suite keep its old field names while
+/// delegating actual broker lifecycle to the public <see cref="OpenServiceBusTestHost"/>.
+/// New code should use <see cref="OpenServiceBusTestHost"/> directly.
 /// </summary>
 internal sealed class IntegrationHarness : IAsyncDisposable
 {
-    public AmqpListenerHost Host { get; }
-    public TtlExpirationService TtlSweeper { get; }
-    public ScheduledMessageActivator ScheduledActivator { get; }
-    public IQueueRegistry Queues { get; }
-    public IMessageStore Store { get; }
-    public int Port { get; }
-    public string AmqpUri => $"amqp://127.0.0.1:{Port}";
+    private readonly OpenServiceBusTestHost _host;
 
-    /// <summary>Service Bus SDK connection string targeting this broker in emulator mode.</summary>
-    public string ConnectionString =>
-        $"Endpoint=sb://127.0.0.1:{Port};SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true";
+    private IntegrationHarness(OpenServiceBusTestHost host) => _host = host;
 
-    private IntegrationHarness(AmqpListenerHost host, TtlExpirationService ttlSweeper, ScheduledMessageActivator scheduledActivator, IQueueRegistry queues, IMessageStore store, int port)
-    {
-        Host = host;
-        TtlSweeper = ttlSweeper;
-        ScheduledActivator = scheduledActivator;
-        Queues = queues;
-        Store = store;
-        Port = port;
-    }
+    public IQueueRegistry Queues => _host.Queues;
+    public IMessageStore Store => _host.Store;
+    public int Port => _host.Port;
+    public string AmqpUri => _host.AmqpUri;
+    public string ConnectionString => _host.ConnectionString;
 
     public static async Task<IntegrationHarness> StartAsync(Action<AmqpListenerOptions>? configure = null)
     {
-        var port = GetFreePort();
-        var options = new AmqpListenerOptions
+        var host = await OpenServiceBusTestHost.StartAsync(o =>
         {
-            Host = "127.0.0.1",
-            Port = port,
-            ContainerId = "OpenServiceBus.Integration",
-            IdleTimeoutMs = 30_000,
-            EnableFrameTracing = Environment.GetEnvironmentVariable("OSB_TRACE_FRAMES") == "1",
-        };
-        configure?.Invoke(options);
+            o.ContainerId = "OpenServiceBus.Integration";
+            o.EnableFrameTracing = Environment.GetEnvironmentVariable("OSB_TRACE_FRAMES") == "1";
 
-        var store = new InMemoryMessageStore();
-        IMessageStore storeAsIface = store;
-        var queues = new QueueManager(storeAsIface);
+            if (configure is not null)
+            {
+                var listenerOpts = new AmqpListenerOptions { Port = 0 };
+                configure(listenerOpts);
 
-        var enableLogs = Environment.GetEnvironmentVariable("OSB_TRACE_FRAMES") == "1";
-        ILoggerFactory loggerFactory = enableLogs
-            ? LoggerFactory.Create(b => b
-                .SetMinimumLevel(LogLevel.Debug)
-                .AddSimpleConsole(o => { o.SingleLine = true; o.TimestampFormat = "HH:mm:ss.fff "; }))
-            : NullLoggerFactory.Instance;
-
-        var host = new AmqpListenerHost(
-            Options.Create(options),
-            queues,
-            storeAsIface,
-            TimeProvider.System,
-            loggerFactory);
-
-        var ttlSweeper = new TtlExpirationService(
-            storeAsIface,
-            queues,
-            TimeProvider.System,
-            loggerFactory.CreateLogger<TtlExpirationService>());
-
-        var scheduledActivator = new ScheduledMessageActivator(
-            storeAsIface,
-            queues,
-            TimeProvider.System,
-            loggerFactory.CreateLogger<ScheduledMessageActivator>());
-
-        await host.StartAsync(CancellationToken.None);
-        await ttlSweeper.StartAsync(CancellationToken.None);
-        await scheduledActivator.StartAsync(CancellationToken.None);
-        return new IntegrationHarness(host, ttlSweeper, scheduledActivator, queues, storeAsIface, port);
+                o.RequireSasAuth = listenerOpts.RequireSasAuth;
+                foreach (var (name, key) in listenerOpts.SasKeys)
+                {
+                    o.AdditionalSasKeys[name] = key;
+                }
+            }
+        });
+        return new IntegrationHarness(host);
     }
 
-    private static int GetFreePort()
-    {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        try { return ((IPEndPoint)listener.LocalEndpoint).Port; }
-        finally { listener.Stop(); }
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        await ScheduledActivator.StopAsync(CancellationToken.None);
-        ScheduledActivator.Dispose();
-        await TtlSweeper.StopAsync(CancellationToken.None);
-        TtlSweeper.Dispose();
-        await Host.StopAsync(CancellationToken.None);
-    }
+    public ValueTask DisposeAsync() => _host.DisposeAsync();
 }

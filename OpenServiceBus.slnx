@@ -14,5 +14,6 @@
     <Project Path="tests/OpenServiceBus.InMemoryStorage.Tests/OpenServiceBus.InMemoryStorage.Tests.csproj" />
     <Project Path="tests/OpenServiceBus.Core.Tests/OpenServiceBus.Core.Tests.csproj" />
     <Project Path="tests/OpenServiceBus.IntegrationTests/OpenServiceBus.IntegrationTests.csproj" />
+    <Project Path="tests/OpenServiceBus.Testing.Tests/OpenServiceBus.Testing.Tests.csproj" />
   </Folder>
 </Solution>
