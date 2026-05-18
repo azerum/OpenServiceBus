@@ -1,3 +1,4 @@
+using OpenServiceBus.Amqp.Diagnostics;
 using OpenServiceBus.Amqp.Hosting;
 using OpenServiceBus.Amqp.Lifecycle;
 
@@ -26,6 +27,7 @@ public static class ServiceCollectionExtensions
         services.AddHostedService(sp => sp.GetRequiredService<AmqpListenerHost>());
         services.AddHostedService<TtlExpirationService>();
         services.AddHostedService<ScheduledMessageActivator>();
+        services.AddHostedService<DiagnosticsHostedService>();
 
         return services;
     }

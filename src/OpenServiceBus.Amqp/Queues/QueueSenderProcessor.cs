@@ -1,9 +1,11 @@
+using System.Diagnostics;
 using Amqp;
 using Amqp.Framing;
 using Amqp.Listener;
 using Amqp.Transactions;
 using Amqp.Types;
 using Microsoft.Extensions.Logging;
+using OpenServiceBus.Core.Diagnostics;
 using OpenServiceBus.Core.Entities;
 using OpenServiceBus.Core.Filters;
 using OpenServiceBus.Core.Messaging;
@@ -215,21 +217,48 @@ public sealed class QueueSenderProcessor : IMessageProcessor
     }
 
     /// <summary>
-    /// Hook for auto-forwarding (M16). When the queue has <c>ForwardTo</c>, the message is
-    /// routed to the configured destination via <see cref="IMessageRouter"/> — which transparently
-    /// handles topic fan-out and chained queues up to the 4-hop cap. Otherwise it's a direct
-    /// store enqueue, identical to pre-M16 behavior.
+    /// Hook for auto-forwarding (M16) + the M20 send-instrumentation point. Every accepted send
+    /// (single, batched, or transactional commit-replay) flows through here exactly once per
+    /// message — making it the single right place to emit the <c>osb.send</c> activity and bump
+    /// the sent counter.
     /// </summary>
-    private Task RouteOrEnqueueAsync(byte[] encoded, DateTimeOffset? expiresAt, DateTimeOffset? scheduledFor, string? sessionId, string? messageId, TimeSpan? dedupWindow, MessageFilterContext filterContext)
+    private async Task RouteOrEnqueueAsync(byte[] encoded, DateTimeOffset? expiresAt, DateTimeOffset? scheduledFor, string? sessionId, string? messageId, TimeSpan? dedupWindow, MessageFilterContext filterContext)
     {
-        if (!string.IsNullOrEmpty(_descriptor.ForwardTo))
+        using var activity = OpenServiceBusDiagnostics.ActivitySource.StartActivity(
+            OpenServiceBusDiagnostics.SpanSend, ActivityKind.Producer);
+        if (activity is not null)
         {
-            return _router.RouteAsync(
-                _descriptor.ForwardTo, encoded, expiresAt, scheduledFor,
-                sessionId, messageId, dedupWindow, filterContext);
+            activity.SetTag(OpenServiceBusDiagnostics.TagSystem, OpenServiceBusDiagnostics.SystemValue);
+            activity.SetTag(OpenServiceBusDiagnostics.TagDestination, _queueName);
+            activity.SetTag(OpenServiceBusDiagnostics.TagOperation, "send");
+            if (filterContext.MessageId is { } mid)
+                activity.SetTag(OpenServiceBusDiagnostics.TagMessageId, mid);
+            if (filterContext.CorrelationId is { } cid)
+                activity.SetTag(OpenServiceBusDiagnostics.TagConversationId, cid);
+            if (sessionId is not null)
+                activity.SetTag(OpenServiceBusDiagnostics.TagSessionId, sessionId);
         }
 
-        return _store.EnqueueAsync(_queueName, encoded, expiresAt, scheduledFor, sessionId, messageId, dedupWindow);
+        try
+        {
+            if (!string.IsNullOrEmpty(_descriptor.ForwardTo))
+            {
+                await _router.RouteAsync(
+                    _descriptor.ForwardTo, encoded, expiresAt, scheduledFor,
+                    sessionId, messageId, dedupWindow, filterContext).ConfigureAwait(false);
+            }
+            else
+            {
+                await _store.EnqueueAsync(_queueName, encoded, expiresAt, scheduledFor, sessionId, messageId, dedupWindow).ConfigureAwait(false);
+            }
+            OpenServiceBusDiagnostics.MessagesSent.Add(1,
+                new KeyValuePair<string, object?>(OpenServiceBusDiagnostics.TagDestination, _queueName));
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            throw;
+        }
     }
 
     private static MessageFilterContext BuildFilterContext(Message msg, DateTimeOffset enqueuedAt)

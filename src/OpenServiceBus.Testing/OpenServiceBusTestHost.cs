@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using OpenServiceBus.Amqp.Diagnostics;
 using OpenServiceBus.Amqp.Hosting;
 using OpenServiceBus.Amqp.Lifecycle;
 using OpenServiceBus.Core.Entities;
@@ -139,9 +140,14 @@ public sealed class OpenServiceBusTestHost : IAsyncDisposable
             opts.TimeProvider,
             NullLogger<ScheduledMessageActivator>.Instance);
 
+        // M20: register the observable gauges for queue depth. No-op when no MeterListener
+        // is attached, so this is essentially free for tests that don't care about telemetry.
+        var diagnostics = new DiagnosticsHostedService(storeAsIface, queues);
+
         await listener.StartAsync(CancellationToken.None);
         await ttlSweeper.StartAsync(CancellationToken.None);
         await scheduledActivator.StartAsync(CancellationToken.None);
+        await diagnostics.StartAsync(CancellationToken.None);
 
         var connectionString =
             $"Endpoint=sb://{opts.Host}:{port};SharedAccessKeyName={opts.SasKeyName};SharedAccessKey={opts.SasKey};UseDevelopmentEmulator=true";

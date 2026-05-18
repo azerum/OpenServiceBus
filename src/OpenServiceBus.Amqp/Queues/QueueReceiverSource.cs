@@ -1,11 +1,13 @@
 using OpenServiceBus.Amqp.DeadLettering;
 
+using System.Diagnostics;
 using Amqp;
 using Amqp.Framing;
 using Amqp.Listener;
 using Amqp.Transactions;
 using Amqp.Types;
 using Microsoft.Extensions.Logging;
+using OpenServiceBus.Core.Diagnostics;
 using OpenServiceBus.Core.Entities;
 using OpenServiceBus.Core.Messaging;
 using OpenServiceBus.Core.Routing;
@@ -100,6 +102,26 @@ public sealed class QueueReceiverSource : IMessageSource
             var amqp = DecodeMessage(locked.Message.EncodedMessage);
             StampSystemProperties(amqp, locked);
 
+            // M20: emit a receive activity carrying the messaging conventions. Cheap when no
+            // listener is attached (StartActivity returns null and the SetTag block is skipped).
+            using (var activity = OpenServiceBusDiagnostics.ActivitySource.StartActivity(
+                OpenServiceBusDiagnostics.SpanReceive, ActivityKind.Consumer))
+            {
+                if (activity is not null)
+                {
+                    activity.SetTag(OpenServiceBusDiagnostics.TagSystem, OpenServiceBusDiagnostics.SystemValue);
+                    activity.SetTag(OpenServiceBusDiagnostics.TagDestination, _entityName);
+                    activity.SetTag(OpenServiceBusDiagnostics.TagOperation, "receive");
+                    activity.SetTag(OpenServiceBusDiagnostics.TagDeliveryCount, locked.Message.DeliveryCount);
+                    if (amqp.Properties?.MessageId is { } mid)
+                        activity.SetTag(OpenServiceBusDiagnostics.TagMessageId, mid.ToString());
+                    if (locked.Message.SessionId is { } sid)
+                        activity.SetTag(OpenServiceBusDiagnostics.TagSessionId, sid);
+                }
+            }
+            OpenServiceBusDiagnostics.MessagesReceived.Add(1,
+                new KeyValuePair<string, object?>(OpenServiceBusDiagnostics.TagDestination, _entityName));
+
             // ReceiveAndDelete: the client opened the link with snd-settle-mode=settled, meaning
             // we send the message as settled and NO disposition will arrive. The peek-lock we just
             // took would otherwise expire → ghost redelivery. Settle (delete) it now so the message
@@ -123,6 +145,18 @@ public sealed class QueueReceiverSource : IMessageSource
             return;
         }
 
+        // M20: settle activity covers the whole disposition pipeline. We tag the outcome at the
+        // end (post-switch) so transactional and non-transactional paths both produce one span.
+        using var activity = OpenServiceBusDiagnostics.ActivitySource.StartActivity(
+            OpenServiceBusDiagnostics.SpanSettle, ActivityKind.Consumer);
+        if (activity is not null)
+        {
+            activity.SetTag(OpenServiceBusDiagnostics.TagSystem, OpenServiceBusDiagnostics.SystemValue);
+            activity.SetTag(OpenServiceBusDiagnostics.TagDestination, _entityName);
+            activity.SetTag(OpenServiceBusDiagnostics.TagOperation, "settle");
+        }
+        string disposition;
+
         try
         {
             // M17: a transactional disposition wraps the real outcome in TransactionalState.
@@ -141,6 +175,7 @@ public sealed class QueueReceiverSource : IMessageSource
                 {
                     dispositionContext.Complete();
                 }
+                activity?.SetTag(OpenServiceBusDiagnostics.TagDisposition, "transactional");
                 return;
             }
 
@@ -148,22 +183,27 @@ public sealed class QueueReceiverSource : IMessageSource
             {
                 case Accepted:
                     _store.TryCompleteAsync(_entityName, lockToken).GetAwaiter().GetResult();
+                    disposition = "complete";
                     break;
 
                 // M8: Modified with UndeliverableHere=true is the SDK's DeferAsync wire signal —
                 // park the message in Deferred state instead of returning it to the active pool.
                 case Modified modified when modified.UndeliverableHere:
                     _store.TryDeferAsync(_entityName, lockToken).GetAwaiter().GetResult();
+                    disposition = "defer";
                     break;
 
                 case Released:
                 case Modified:
                     _store.TryAbandonAsync(_entityName, lockToken).GetAwaiter().GetResult();
+                    disposition = "abandon";
                     break;
 
                 case Rejected rejected:
                     var (reason, description) = ExtractDeadLetterInfo(rejected);
                     DeadLetterAsync(lockToken, reason, description).GetAwaiter().GetResult();
+                    disposition = "deadletter";
+                    if (reason is not null) activity?.SetTag(OpenServiceBusDiagnostics.TagDeadLetterReason, reason);
                     break;
 
                 default:
@@ -171,8 +211,16 @@ public sealed class QueueReceiverSource : IMessageSource
                         "Unexpected delivery state {State} for lock {Lock} on {Entity}",
                         dispositionContext.DeliveryState?.GetType().Name ?? "<null>", lockToken, _entityName);
                     _store.TryAbandonAsync(_entityName, lockToken).GetAwaiter().GetResult();
+                    disposition = "abandon";
                     break;
             }
+
+            // Tag + count once the outcome is known. Counters carry the disposition status so
+            // dashboards can break down complete-vs-dlq-vs-abandon rates per destination.
+            activity?.SetTag(OpenServiceBusDiagnostics.TagDisposition, disposition);
+            OpenServiceBusDiagnostics.MessagesDispositioned.Add(1,
+                new KeyValuePair<string, object?>(OpenServiceBusDiagnostics.TagDestination, _entityName),
+                new KeyValuePair<string, object?>(OpenServiceBusDiagnostics.TagDisposition, disposition));
         }
         finally
         {
@@ -250,6 +298,12 @@ public sealed class QueueReceiverSource : IMessageSource
             ? _entityName + EntityNames.DeadLetterSuffix
             : _descriptor.ForwardDeadLetteredMessagesTo!;
         await _router.RouteAsync(dlqTarget, dlqBytes, expiresAt: null, cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        // M20: dead-letter counter tagged with the source queue and reason — lets a dashboard
+        // group "DLQ rate per queue" and spot reason-specific spikes (MaxDeliveryCountExceeded vs TTL).
+        OpenServiceBusDiagnostics.MessagesDeadLettered.Add(1,
+            new KeyValuePair<string, object?>(OpenServiceBusDiagnostics.TagDeadLetterSource, _entityName),
+            new KeyValuePair<string, object?>(OpenServiceBusDiagnostics.TagDeadLetterReason, reason ?? "(unspecified)"));
 
         _logger.LogDebug("Dead-lettered seq#{Seq} from {Entity} to {Dlq} (reason={Reason})",
             removed.SequenceNumber, _entityName, dlqTarget, reason ?? "(unspecified)");

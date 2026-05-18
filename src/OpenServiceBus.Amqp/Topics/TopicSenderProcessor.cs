@@ -1,9 +1,11 @@
+using System.Diagnostics;
 using Amqp;
 using Amqp.Framing;
 using Amqp.Listener;
 using Amqp.Transactions;
 using Amqp.Types;
 using Microsoft.Extensions.Logging;
+using OpenServiceBus.Core.Diagnostics;
 using OpenServiceBus.Core.Entities;
 using OpenServiceBus.Core.Filters;
 using OpenServiceBus.Core.Routing;
@@ -109,9 +111,23 @@ public sealed class TopicSenderProcessor : IMessageProcessor
     {
         try
         {
+            using var activity = OpenServiceBusDiagnostics.ActivitySource.StartActivity(
+                OpenServiceBusDiagnostics.SpanSend, ActivityKind.Producer);
+            if (activity is not null)
+            {
+                activity.SetTag(OpenServiceBusDiagnostics.TagSystem, OpenServiceBusDiagnostics.SystemValue);
+                activity.SetTag(OpenServiceBusDiagnostics.TagDestination, _topic.Name);
+                activity.SetTag(OpenServiceBusDiagnostics.TagOperation, "publish");
+                if (filterContext.MessageId is { } mid) activity.SetTag(OpenServiceBusDiagnostics.TagMessageId, mid);
+                if (filterContext.CorrelationId is { } cid) activity.SetTag(OpenServiceBusDiagnostics.TagConversationId, cid);
+            }
+
             // Routing the topic name itself triggers the router's fan-out path, which also
             // walks each subscription's ForwardTo (M16) before landing on a backing queue.
             var landed = await _router.RouteAsync(_topic.Name, encoded, expiresAt, scheduledFor, sessionId, filterContext: filterContext).ConfigureAwait(false);
+            activity?.SetTag("osb.fanout.subscribers", landed.Count);
+            OpenServiceBusDiagnostics.MessagesSent.Add(1,
+                new KeyValuePair<string, object?>(OpenServiceBusDiagnostics.TagDestination, _topic.Name));
             _logger.LogDebug("Fanned out 1 message on topic {Topic} to {Count} subscriber(s)", _topic.Name, landed.Count);
             context.Complete();
         }

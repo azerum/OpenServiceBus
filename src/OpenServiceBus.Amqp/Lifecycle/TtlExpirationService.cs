@@ -3,6 +3,7 @@ using OpenServiceBus.Amqp.Queues;
 
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using OpenServiceBus.Core.Diagnostics;
 using OpenServiceBus.Core.Entities;
 using OpenServiceBus.Core.Messaging;
 using OpenServiceBus.Core.Routing;
@@ -65,6 +66,10 @@ public sealed class TtlExpirationService : BackgroundService
 
                 var routeToDlq = !EntityNames.IsDeadLetterQueue(queue.Name)
                     && queue.DeadLetteringOnMessageExpiration;
+
+                // M20: count every message the sweeper dropped or routed to DLQ, tagged with the source queue.
+                OpenServiceBusDiagnostics.MessagesExpired.Add(expired.Count,
+                    new KeyValuePair<string, object?>(OpenServiceBusDiagnostics.TagDestination, queue.Name));
 
                 if (routeToDlq)
                 {
