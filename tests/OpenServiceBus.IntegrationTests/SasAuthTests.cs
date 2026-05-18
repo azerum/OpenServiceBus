@@ -4,7 +4,7 @@ using OpenServiceBus.Core.Entities;
 namespace OpenServiceBus.IntegrationTests;
 
 /// <summary>
-/// M9 — when <c>RequireSasAuth=true</c>, $cbs put-token validates the SDK's SAS against the
+/// M9 - when <c>RequireSasAuth=true</c>, $cbs put-token validates the SDK's SAS against the
 /// configured keys. The SDK derives a SAS from the connection string's SharedAccessKey, so
 /// matching keys → connection works; mismatched → SDK gets an auth failure from CBS.
 /// </summary>

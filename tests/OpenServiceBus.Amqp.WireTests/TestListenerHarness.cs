@@ -26,7 +26,7 @@ namespace OpenServiceBus.Amqp.WireTests;
 ///
 /// Tests needing deterministic time control (e.g. lock expiration) can pass a custom
 /// <see cref="TimeProvider"/> (typically <c>FakeTimeProvider</c>) and drive expiration
-/// directly via <see cref="IMessageStore.ExpireLocks"/> — the harness does not run the
+/// directly via <see cref="IMessageStore.ExpireLocks"/> - the harness does not run the
 /// production <c>LockManager</c> sweep loop, so behavior is fully test-controlled.
 /// </summary>
 internal sealed class TestListenerHarness : IAsyncDisposable

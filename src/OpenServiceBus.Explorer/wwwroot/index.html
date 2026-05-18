@@ -996,7 +996,7 @@
       <div id="emptyView" class="empty-state">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg>
         <h2>Select an entity to get started</h2>
-        <p>Pick a queue, topic, or subscription from the sidebar — or create one to begin sending and receiving messages.</p>
+        <p>Pick a queue, topic, or subscription from the sidebar - or create one to begin sending and receiving messages.</p>
       </div>
 
       <div id="entityView" hidden>
@@ -1052,7 +1052,7 @@
                     Add row
                   </button>
                 </label>
-                <div class="help">Custom key/value pairs — also used by filter rules.</div>
+                <div class="help">Custom key/value pairs - also used by filter rules.</div>
                 <div class="kv-editor" id="appProps" style="margin-top:6px"></div>
               </div>
             </details>
@@ -1126,7 +1126,7 @@
         </div>
         <div class="field" style="margin-top:10px">
           <label>Dedup window (seconds)</label>
-          <input id="cqDedupWindow" type="number" min="1" placeholder="600 (default — 10 min)">
+          <input id="cqDedupWindow" type="number" min="1" placeholder="600 (default - 10 min)">
           <div class="help">Only applies when duplicate detection is enabled.</div>
         </div>
         <div class="field-grid" style="margin-top:14px">
@@ -1185,7 +1185,7 @@
           <div class="field"><label>Topic</label><select id="csTopic"></select></div>
           <div class="field"><label>Subscription name</label><input id="csName" placeholder="my-subscription"></div>
         </div>
-        <div class="help" style="margin-bottom:14px">A <code>$Default</code> rule with a TrueFilter is installed automatically — replace it on the Rules tab.</div>
+        <div class="help" style="margin-bottom:14px">A <code>$Default</code> rule with a TrueFilter is installed automatically - replace it on the Rules tab.</div>
         <div class="field-grid">
           <div class="field"><label>Max delivery count</label><input id="csMaxDelivery" type="number" min="1" value="10"></div>
           <div class="field"><label>Lock duration (seconds)</label><input id="csLockDuration" type="number" min="1" value="60"></div>
@@ -1261,7 +1261,7 @@
           <div class="help" style="margin-top:6px">Empty fields are wildcards. All non-empty fields must match exactly.</div>
         </div>
         <div id="ruleTrivialBlock" hidden style="margin-top:14px">
-          <div class="alert info">Trivial filter — no parameters. Use this for an explicit catch-all (<code>true</code>) or to keep a subscription quiescent (<code>false</code>).</div>
+          <div class="alert info">Trivial filter - no parameters. Use this for an explicit catch-all (<code>true</code>) or to keep a subscription quiescent (<code>false</code>).</div>
         </div>
       </div>
       <div class="modal-foot">
@@ -1727,7 +1727,7 @@
       $("#btnSend").disabled = !canSend;
       $("#btnReceive").disabled = !canReceive;
       $("#sendHint").innerHTML = sel?.kind === 'topic'
-        ? "Sending to a <strong>topic</strong> — the broker evaluates each subscription's rules and fans out."
+        ? "Sending to a <strong>topic</strong> - the broker evaluates each subscription's rules and fans out."
         : 'Sent via <code>Azure.Messaging.ServiceBus</code> SDK.';
 
       // Force activeTab into valid range
@@ -1779,10 +1779,10 @@
         }
         rows.push(["Auto-forward to", d.forwardTo
           ? `<code>${escapeHtml(d.forwardTo)}</code>`
-          : '<span class="muted">— (no forwarding)</span>']);
+          : '<span class="muted">- (no forwarding)</span>']);
         rows.push(["DLQ forward to", d.forwardDeadLetteredMessagesTo
           ? `<code>${escapeHtml(d.forwardDeadLetteredMessagesTo)}</code>`
-          : '<span class="muted">— (local <code>$DeadLetterQueue</code>)</span>']);
+          : '<span class="muted">- (local <code>$DeadLetterQueue</code>)</span>']);
         if (d.backingQueueName) rows.push(["Backing queue", `<code>${escapeHtml(d.backingQueueName)}</code>`]);
       } else if (sel.kind === 'topic') {
         const subs = state.subscriptionsByTopic[d.name] || [];
@@ -2114,7 +2114,7 @@
     }
 
     function formatTime(iso) {
-      if (!iso) return "—";
+      if (!iso) return "-";
       try {
         const d = new Date(iso);
         if (isNaN(d.getTime())) return iso;
@@ -2214,7 +2214,7 @@
           ].filter(([_, v]) => v);
           bodyHtml = fields.length
             ? `<div class="rule-correlation">${fields.map(([k,v]) => `<span class="pair">${k} <code>${escapeHtml(v)}</code></span>`).join("")}</div>`
-            : '<div class="muted" style="font-size:12.5px">(no constraints — equivalent to TrueFilter)</div>';
+            : '<div class="muted" style="font-size:12.5px">(no constraints - equivalent to TrueFilter)</div>';
         } else if (r.filterType === "true") {
           bodyHtml = '<div class="muted" style="font-size:12.5px">Always matches (catch-all).</div>';
         } else if (r.filterType === "false") {

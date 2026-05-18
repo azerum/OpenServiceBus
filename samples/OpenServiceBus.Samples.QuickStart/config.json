@@ -1,0 +1,18 @@
+{
+  "UserConfig": {
+    "Namespaces": [
+      {
+        "Name": "quickstart",
+        "Queues": [
+          {
+            "Name": "quickstart",
+            "Properties": {
+              "LockDuration": "PT30S",
+              "MaxDeliveryCount": 5
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

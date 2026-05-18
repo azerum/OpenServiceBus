@@ -4,7 +4,7 @@ using OpenServiceBus.Core.Entities;
 namespace OpenServiceBus.IntegrationTests;
 
 /// <summary>
-/// PeekMessage(s) over <c>$management com.microsoft:peek-message</c> — read without locking.
+/// PeekMessage(s) over <c>$management com.microsoft:peek-message</c> - read without locking.
 /// Verifies sequence-number stamping and the Scheduled vs Active <c>x-opt-message-state</c>.
 /// </summary>
 public class PeekTests
@@ -33,7 +33,7 @@ public class PeekTests
         peeked.Select(m => m.SequenceNumber).ShouldBe(new[] { 1L, 2L, 3L });
         peeked.All(m => m.State == ServiceBusMessageState.Active).ShouldBeTrue();
         recv.ShouldNotBeNull();
-        recv.MessageId.ShouldBe("m-1", "peek did not consume — receive still gets the first message");
+        recv.MessageId.ShouldBe("m-1", "peek did not consume - receive still gets the first message");
         await receiver.CompleteMessageAsync(recv);
     }
 

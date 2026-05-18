@@ -2,7 +2,7 @@ using Azure.Messaging.ServiceBus;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 
-namespace OpenServiceBus.Functions.Sample;
+namespace OpenServiceBus.Samples.Functions;
 
 /// <summary>
 /// Service Bus trigger function. On each message, appends the message id to the file at

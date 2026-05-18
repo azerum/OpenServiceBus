@@ -18,7 +18,7 @@ public interface IMessageStore
     /// <summary>
     /// Names of every queue the store currently has rows for. Used at broker startup by
     /// persistent stores (M18) so the in-memory <c>QueueManager</c> can rehydrate after a
-    /// restart — without this the queues exist in the backing file but the registry has
+    /// restart - without this the queues exist in the backing file but the registry has
     /// forgotten about them.
     /// </summary>
     IReadOnlyCollection<string> ListQueueNames();
@@ -85,7 +85,7 @@ public interface IMessageStore
     /// </summary>
     /// <param name="associatedLinkName">
     /// Optional: the receiver link name that's taking the lock. When set, renew-lock requests
-    /// for this token must declare the same link name in <c>associated-link-name</c> — matches
+    /// for this token must declare the same link name in <c>associated-link-name</c> - matches
     /// Service Bus's lock-link affinity.
     /// </param>
     Task<LockedMessage?> TryDequeueAsync(
@@ -100,7 +100,7 @@ public interface IMessageStore
         Guid lockToken,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Abandon a locked message — release the lock and make it available for redelivery.</summary>
+    /// <summary>Abandon a locked message - release the lock and make it available for redelivery.</summary>
     Task<bool> TryAbandonAsync(
         string queueName,
         Guid lockToken,
@@ -115,7 +115,7 @@ public interface IMessageStore
     /// <summary>
     /// Extend a peek-lock by another <paramref name="lockDuration"/> from now.
     /// Returns the new locked-until timestamp, or <c>null</c> if the lock token is unknown
-    /// (e.g. already completed or expired) — or if <paramref name="requestingLinkName"/>
+    /// (e.g. already completed or expired) - or if <paramref name="requestingLinkName"/>
     /// doesn't match the link that originally took the lock.
     /// </summary>
     Task<DateTimeOffset?> TryRenewLockAsync(
@@ -126,7 +126,7 @@ public interface IMessageStore
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Atomically remove a locked message — releases the lock AND removes the stored message,
+    /// Atomically remove a locked message - releases the lock AND removes the stored message,
     /// returning what was stored so the caller can re-enqueue it elsewhere (e.g. to the DLQ).
     /// Returns <c>null</c> if the lock token is unknown.
     /// </summary>
@@ -138,7 +138,7 @@ public interface IMessageStore
     /// <summary>
     /// Read messages without locking or removing them. Returns up to <paramref name="maxCount"/>
     /// messages with <c>SequenceNumber &gt;= fromSequenceNumber</c>, ordered by sequence number.
-    /// Includes both Active and Scheduled messages — callers (the peek handler) flag the state
+    /// Includes both Active and Scheduled messages - callers (the peek handler) flag the state
     /// to consumers. Locked messages ARE visible to Peek.
     /// </summary>
     IReadOnlyList<StoredMessage> Peek(string queueName, long fromSequenceNumber, int maxCount);

@@ -18,13 +18,13 @@ namespace OpenServiceBus.Amqp.Management;
 ///
 /// Operations implemented:
 /// <list type="bullet">
-///   <item><c>com.microsoft:renew-lock</c> (M5) — extends one or more peek-lock deadlines.</item>
-///   <item><c>com.microsoft:schedule-message</c> (M7) — enqueue messages for future delivery.</item>
-///   <item><c>com.microsoft:cancel-scheduled-message</c> (M7) — cancel scheduled messages by sequence number.</item>
+///   <item><c>com.microsoft:renew-lock</c> (M5) - extends one or more peek-lock deadlines.</item>
+///   <item><c>com.microsoft:schedule-message</c> (M7) - enqueue messages for future delivery.</item>
+///   <item><c>com.microsoft:cancel-scheduled-message</c> (M7) - cancel scheduled messages by sequence number.</item>
 /// </list>
 ///
 /// Wire contract verified against <c>Azure.Messaging.ServiceBus.Amqp.ManagementConstants</c>:
-/// response <c>application-properties</c> keys are <b>camelCase</b> (<c>statusCode</c>, <c>statusDescription</c>) —
+/// response <c>application-properties</c> keys are <b>camelCase</b> (<c>statusCode</c>, <c>statusDescription</c>) -
 /// this differs from <c>$cbs</c> which is kebab-case.
 /// </summary>
 public sealed class ManagementRequestProcessor : IRequestProcessor
@@ -41,7 +41,7 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
     private const string ReceiveBySequenceNumberOperation = "com.microsoft:receive-by-sequence-number";
     private const string UpdateDispositionOperation = "com.microsoft:update-disposition";
 
-    // M13.5 — rule management ops, scoped to a subscription's $management endpoint.
+    // M13.5 - rule management ops, scoped to a subscription's $management endpoint.
     private const string AddRuleOperation = "com.microsoft:add-rule";
     private const string RemoveRuleOperation = "com.microsoft:remove-rule";
     private const string EnumerateRulesOperation = "com.microsoft:enumerate-rules";
@@ -51,7 +51,7 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
     private const string EnumerateTopKey = "top";
     private const string EnumerateSkipKey = "skip";
 
-    // M14.3 — session ops, available on every queue/subscription $management endpoint.
+    // M14.3 - session ops, available on every queue/subscription $management endpoint.
     private const string SetSessionStateOperation = "com.microsoft:set-session-state";
     private const string GetSessionStateOperation = "com.microsoft:get-session-state";
     private const string RenewSessionLockOperation = "com.microsoft:renew-session-lock";
@@ -76,7 +76,7 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
     // Wire values for disposition-status (lowercased Enum.ToString() from the SDK's DispositionStatus).
     private const string DispositionCompleted = "completed";
     private const string DispositionAbandoned = "abandoned";
-    private const string DispositionDeferred = "defered";          // SDK enum is mis-spelled — match it on the wire
+    private const string DispositionDeferred = "defered";          // SDK enum is mis-spelled - match it on the wire
     private const string DispositionSuspended = "suspended";       // = dead-letter
 
     private static readonly Symbol ScheduledEnqueueTimeSymbol = new("x-opt-scheduled-enqueue-time");
@@ -119,7 +119,7 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
     }
 
     /// <summary>
-    /// Overload that adds subscription context — enables the M13.5 rule-management operations.
+    /// Overload that adds subscription context - enables the M13.5 rule-management operations.
     /// <paramref name="entityName"/> is still the storage entity (the subscription's backing
     /// queue, e.g. <c>events/Subscriptions/eu</c>) so peek-lock and disposition ops continue to
     /// land on the right messages.
@@ -204,7 +204,7 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
                 .GetAwaiter().GetResult();
             if (newUntil is null)
             {
-                // Service Bus surfaces "lock lost" as 410 Gone — for unknown lock OR cross-link renew.
+                // Service Bus surfaces "lock lost" as 410 Gone - for unknown lock OR cross-link renew.
                 return BuildResponse(request, 410, $"Gone: lock token {lockTokens[i]} is unknown, expired, or held by a different link");
             }
             expirations[i] = newUntil.Value.UtcDateTime;
@@ -432,7 +432,7 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
 
     /// <summary>
     /// Move a locked message to the DLQ via the management path (when the original receiver link
-    /// is no longer in scope — e.g. for a message retrieved via receive-by-sequence-number).
+    /// is no longer in scope - e.g. for a message retrieved via receive-by-sequence-number).
     /// Mirrors <c>QueueReceiverSource.DeadLetterAsync</c> at this layer.
     /// </summary>
     private async Task DeadLetterViaManagementAsync(Guid lockToken, string? reason, string? description)
@@ -480,7 +480,7 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
             return BuildResponse(request, 400, "BadRequest: " + ex.Message);
         }
 
-        // Service Bus's add-rule is upsert-style — if the rule already exists with the same
+        // Service Bus's add-rule is upsert-style - if the rule already exists with the same
         // name and same definition it's a no-op; if the name exists with a different
         // definition that's a conflict. We treat any same-name call as a replace, which
         // matches how the in-memory TopicManager already behaves and avoids ambiguity.
@@ -625,7 +625,7 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
         }
         foreach (var seq in seqs)
         {
-            // Cancel is idempotent — silent no-op for unknown seq or already-activated messages.
+            // Cancel is idempotent - silent no-op for unknown seq or already-activated messages.
             _store.TryCancelScheduledAsync(_entityName, seq).GetAwaiter().GetResult();
         }
         return BuildResponse(request, 200, "OK");

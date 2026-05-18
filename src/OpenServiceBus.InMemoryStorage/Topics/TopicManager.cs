@@ -8,7 +8,7 @@ namespace OpenServiceBus.InMemoryStorage.Topics;
 /// <summary>
 /// In-memory <see cref="ITopicRegistry"/>. Each subscription is modelled as a regular queue
 /// (created via <see cref="IQueueRegistry"/>) named <c>&lt;topic&gt;/Subscriptions/&lt;sub&gt;</c>;
-/// that reuses every queue feature the broker already has — peek-lock, DLQ, lock renewal,
+/// that reuses every queue feature the broker already has - peek-lock, DLQ, lock renewal,
 /// TTL, scheduled messages, defer, dead-letter, etc.
 /// </summary>
 public sealed class TopicManager : ITopicRegistry
@@ -88,10 +88,10 @@ public sealed class TopicManager : ITopicRegistry
         ArgumentException.ThrowIfNullOrWhiteSpace(descriptor.Name);
         if (!_topics.ContainsKey(descriptor.TopicName))
         {
-            throw new InvalidOperationException($"Cannot create subscription '{descriptor.Name}' — topic '{descriptor.TopicName}' does not exist.");
+            throw new InvalidOperationException($"Cannot create subscription '{descriptor.Name}' - topic '{descriptor.TopicName}' does not exist.");
         }
 
-        // M16: self-forwarding rejection — also catches "forwards to my own backing queue" since
+        // M16: self-forwarding rejection - also catches "forwards to my own backing queue" since
         // that's the same entity from the router's point of view.
         if (!string.IsNullOrEmpty(descriptor.ForwardTo)
             && (string.Equals(descriptor.ForwardTo, descriptor.BackingQueueName, StringComparison.OrdinalIgnoreCase)
@@ -117,7 +117,7 @@ public sealed class TopicManager : ITopicRegistry
         // The backing queue gives us all the queue-level machinery for free.
         // M16: mirror ForwardDeadLetteredMessagesTo onto the backing queue so the receiver
         // sources (which key off the queue descriptor) honor it. Subscription-level ForwardTo
-        // is enforced one level up — in the topic fan-out — so it stays on the descriptor only.
+        // is enforced one level up - in the topic fan-out - so it stays on the descriptor only.
         await _queues.CreateAsync(new QueueDescriptor
         {
             Name = descriptor.BackingQueueName,
@@ -128,7 +128,7 @@ public sealed class TopicManager : ITopicRegistry
             ForwardDeadLetteredMessagesTo = descriptor.ForwardDeadLetteredMessagesTo,
         }, cancellationToken).ConfigureAwait(false);
 
-        // Every fresh subscription gets a $Default rule with a TrueFilter — same as Azure SB.
+        // Every fresh subscription gets a $Default rule with a TrueFilter - same as Azure SB.
         var rules = _rules.GetOrAdd(key, _ => new ConcurrentDictionary<string, RuleDescriptor>(StringComparer.OrdinalIgnoreCase));
         rules[DefaultRuleName] = new RuleDescriptor
         {
@@ -177,7 +177,7 @@ public sealed class TopicManager : ITopicRegistry
         var key = SubKey(rule.TopicName, rule.SubscriptionName);
         if (!_subscriptions.ContainsKey(key))
         {
-            throw new InvalidOperationException($"Cannot add rule to '{rule.TopicName}/{rule.SubscriptionName}' — subscription does not exist.");
+            throw new InvalidOperationException($"Cannot add rule to '{rule.TopicName}/{rule.SubscriptionName}' - subscription does not exist.");
         }
         var rules = _rules.GetOrAdd(key, _ => new ConcurrentDictionary<string, RuleDescriptor>(StringComparer.OrdinalIgnoreCase));
         rules[rule.Name] = rule;

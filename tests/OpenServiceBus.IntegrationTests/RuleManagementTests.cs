@@ -15,7 +15,7 @@ public class RuleManagementTests
     [Fact]
     public async Task AddRule_AfterCreatingSubscription_OverridesDefaultAndRoutesByPredicate()
     {
-        // Arrange — topic + sub created via the in-process registry; rules will be managed over AMQP.
+        // Arrange - topic + sub created via the in-process registry; rules will be managed over AMQP.
         await using var harness = await IntegrationHarness.StartAsync();
         await harness.Topics.CreateTopicAsync(new TopicDescriptor { Name = "events" });
         await harness.Topics.CreateSubscriptionAsync(new SubscriptionDescriptor { TopicName = "events", Name = "eu" });
@@ -23,7 +23,7 @@ public class RuleManagementTests
         await using var client = new ServiceBusClient(harness.ConnectionString);
         var ruleManager = client.CreateRuleManager("events", "eu");
 
-        // Act — replace $Default (TrueFilter) with a targeted SQL filter over AMQP.
+        // Act - replace $Default (TrueFilter) with a targeted SQL filter over AMQP.
         await ruleManager.DeleteRuleAsync("$Default");
         await ruleManager.CreateRuleAsync(new CreateRuleOptions("region-eu", new SqlRuleFilter("region = 'eu'")));
 
@@ -38,7 +38,7 @@ public class RuleManagementTests
 
         var euIds = await DrainAsync(client, "events", "eu");
 
-        // Assert — only eu-1 landed in the subscription's backing queue.
+        // Assert - only eu-1 landed in the subscription's backing queue.
         euIds.ShouldBe(new[] { "eu-1" });
     }
 

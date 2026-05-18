@@ -2,7 +2,7 @@ using Azure.Messaging.ServiceBus;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 
-namespace OpenServiceBus.Samples.TriggerDemo.Functions;
+namespace OpenServiceBus.Samples.FunctionsTriggerDemo.Functions;
 
 /// <summary>
 /// With <c>IsBatched = true</c> the trigger receives an array of messages per invocation

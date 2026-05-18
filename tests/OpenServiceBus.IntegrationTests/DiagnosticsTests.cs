@@ -9,15 +9,15 @@ namespace OpenServiceBus.IntegrationTests;
 /// <summary>
 /// M20 gate: the broker emits OpenTelemetry-shaped <see cref="ActivitySource"/> spans and
 /// <see cref="Meter"/> measurements on the send / receive / settle / DLQ paths. Tests subscribe
-/// via <see cref="ActivityListener"/> and <see cref="MeterListener"/> — the same way an OTel
-/// pipeline would — and assert the conventional tag values.
+/// via <see cref="ActivityListener"/> and <see cref="MeterListener"/> - the same way an OTel
+/// pipeline would - and assert the conventional tag values.
 /// </summary>
 public class DiagnosticsTests
 {
     [Fact]
     public async Task SendAndComplete_EmitsSendReceiveAndSettleActivitiesWithMessagingTags()
     {
-        // Arrange — capture every activity from OpenServiceBus's source for the duration.
+        // Arrange - capture every activity from OpenServiceBus's source for the duration.
         var captured = new List<Activity>();
         using var listener = new ActivityListener
         {
@@ -38,7 +38,7 @@ public class DiagnosticsTests
         msg.ShouldNotBeNull();
         await receiver.CompleteMessageAsync(msg);
 
-        // Assert — one span per phase. Note: the topic-fanout test below covers the publish/fanout shape;
+        // Assert - one span per phase. Note: the topic-fanout test below covers the publish/fanout shape;
         // here we only care that send + receive + settle each surface once with the right tags.
         // ActivitySource is process-global; other parallel tests may be emitting too. Filter to
         // our queue so the assertions don't flake under parallel test execution.
@@ -65,7 +65,7 @@ public class DiagnosticsTests
     [Fact]
     public async Task DeadLetterMessage_IncrementsDeadLetteredCounterWithReasonTag()
     {
-        // Arrange — listen for the dead-letter counter and record (delta, tags) tuples.
+        // Arrange - listen for the dead-letter counter and record (delta, tags) tuples.
         var captures = new List<(long Value, IReadOnlyDictionary<string, object?> Tags)>();
         using var listener = new MeterListener
         {
@@ -97,7 +97,7 @@ public class DiagnosticsTests
         msg.ShouldNotBeNull();
         await receiver.DeadLetterMessageAsync(msg, deadLetterReason: "boom", deadLetterErrorDescription: "manual");
 
-        // Assert — filter to our queue (Meter is process-global; parallel tests may DLQ too).
+        // Assert - filter to our queue (Meter is process-global; parallel tests may DLQ too).
         var ours = captures.Where(c => "dlq-q".Equals(c.Tags[OpenServiceBusDiagnostics.TagDeadLetterSource])).ToList();
         ours.ShouldNotBeEmpty();
         ours.Sum(c => c.Value).ShouldBe(1L);
@@ -107,7 +107,7 @@ public class DiagnosticsTests
     [Fact]
     public async Task QueueDepthGauge_ObservedAfterEnqueue_ReportsCurrentCount()
     {
-        // Arrange — capture the queue.depth gauge readings on demand.
+        // Arrange - capture the queue.depth gauge readings on demand.
         var readings = new List<(long Value, IReadOnlyDictionary<string, object?> Tags)>();
         Instrument? depthInstrument = null;
         using var listener = new MeterListener
@@ -133,7 +133,7 @@ public class DiagnosticsTests
         await using var harness = await IntegrationHarness.StartAsync();
         await harness.Queues.CreateAsync(new QueueDescriptor { Name = "depth-q" });
 
-        // Act — enqueue two messages then ask the listener to poll the gauge.
+        // Act - enqueue two messages then ask the listener to poll the gauge.
         await using var client = new ServiceBusClient(harness.ConnectionString);
         var sender = client.CreateSender("depth-q");
         await sender.SendMessageAsync(new ServiceBusMessage("1"));
@@ -142,7 +142,7 @@ public class DiagnosticsTests
         // Force one gauge collection cycle for the observable instrument.
         listener.RecordObservableInstruments();
 
-        // Assert — at least the main queue's reading should show 2.
+        // Assert - at least the main queue's reading should show 2.
         var depthQReadings = readings
             .Where(r => "depth-q".Equals(r.Tags[OpenServiceBusDiagnostics.TagDestination]))
             .ToList();

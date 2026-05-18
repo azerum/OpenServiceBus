@@ -42,7 +42,7 @@ public sealed record QueueDescriptor
     /// <summary>
     /// When true, the broker silently drops repeat sends within
     /// <see cref="DuplicateDetectionHistoryTimeWindow"/> based on the message's
-    /// <c>MessageId</c>. Mirrors Azure Service Bus — duplicates are not surfaced to the
+    /// <c>MessageId</c>. Mirrors Azure Service Bus - duplicates are not surfaced to the
     /// sender; the SDK still gets an "accepted" disposition. Enforced in M15.
     /// </summary>
     public bool RequiresDuplicateDetection { get; init; }
@@ -50,7 +50,7 @@ public sealed record QueueDescriptor
     /// <summary>
     /// Sliding-window duration during which two sends with the same <c>MessageId</c> are
     /// treated as duplicates. Only honoured when <see cref="RequiresDuplicateDetection"/>
-    /// is true. Defaults to 10 minutes when null — matches Azure Service Bus.
+    /// is true. Defaults to 10 minutes when null - matches Azure Service Bus.
     /// </summary>
     public TimeSpan? DuplicateDetectionHistoryTimeWindow { get; init; }
 
@@ -64,7 +64,7 @@ public sealed record QueueDescriptor
 
     /// <summary>
     /// Destination entity that dead-lettered messages are forwarded to instead of the
-    /// queue's local <c>$DeadLetterQueue</c>. Applies to every DLQ trigger — explicit
+    /// queue's local <c>$DeadLetterQueue</c>. Applies to every DLQ trigger - explicit
     /// dead-letter, max-delivery, TTL expiration. Enforced in M16. Null = standard local DLQ.
     /// </summary>
     public string? ForwardDeadLetteredMessagesTo { get; init; }

@@ -1,0 +1,220 @@
+name: Release
+
+# Tag-driven release pipeline. Push a `v1.2.3` tag (or trigger manually with a version
+# input) and this workflow:
+#   1. Runs the full test suite (build must be green to ship).
+#   2. Packs every library NuGet with the tag's version and publishes to GitHub Packages.
+#   3. Builds the multi-arch (linux/amd64 + linux/arm64) Docker image and pushes to
+#      both GHCR (ghcr.io/mauritsarissen/openservicebus) and Docker Hub
+#      (mauritsarissen/openservicebus).
+#   4. Creates a GitHub Release with auto-generated notes.
+#
+# Required repository secrets:
+#   DOCKERHUB_USERNAME - Docker Hub login
+#   DOCKERHUB_TOKEN    - Docker Hub access token (NOT your password)
+# GHCR + NuGet on GitHub Packages use the built-in GITHUB_TOKEN.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Semver version (e.g. 1.2.3) - required when running manually"
+        required: true
+        type: string
+
+permissions:
+  contents: write # creating GitHub Releases
+  packages: write # pushing NuGet to GitHub Packages, image to GHCR
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  test:
+    name: Build & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Azure Functions Core Tools (for M11 integration test)
+        run: npm install -g azure-functions-core-tools@4 --unsafe-perm true
+      - run: dotnet restore
+      - run: dotnet build --no-restore --configuration Release
+      - run: dotnet test  --no-build --configuration Release --verbosity normal
+
+  resolve-version:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    needs: test
+    outputs:
+      version: ${{ steps.compute.outputs.version }}
+    steps:
+      - id: compute
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ inputs.version }}"
+          else
+            # github.ref looks like refs/tags/v1.2.3 - strip the prefix.
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          fi
+          # Sanity: bail if it doesn't look like semver. Loose check, just no slashes / spaces.
+          if [[ -z "$VERSION" || "$VERSION" =~ [[:space:]/] ]]; then
+            echo "Could not resolve a valid version (got '$VERSION')"; exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: $VERSION"
+
+  nuget:
+    name: Pack & publish NuGets
+    runs-on: ubuntu-latest
+    needs: resolve-version
+    env:
+      VERSION: ${{ needs.resolve-version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+          # Source maps GitHub Packages so `dotnet nuget push` can authenticate via GITHUB_TOKEN.
+          source-url: https://nuget.pkg.github.com/mauritsarissen/index.json
+        env:
+          NUGET_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - run: dotnet restore
+
+      - name: Pack
+        # Pack the solution - IsPackable=false on Host + Explorer means we get exactly the
+        # six library nupkgs. -p:Version stamps the assembly + package version from the tag.
+        run: |
+          dotnet pack OpenServiceBus.slnx \
+            --configuration Release \
+            --no-restore \
+            "-p:Version=${VERSION}" \
+            "-p:AssemblyVersion=${VERSION%.*.*}.0.0" \
+            "-p:FileVersion=${VERSION}.0" \
+            --output ./nupkgs
+
+      - name: List packed artifacts
+        run: ls -la ./nupkgs
+
+      - name: Push to GitHub Packages
+        run: |
+          dotnet nuget push './nupkgs/*.nupkg' \
+            --source https://nuget.pkg.github.com/mauritsarissen/index.json \
+            --api-key ${{ secrets.GITHUB_TOKEN }} \
+            --skip-duplicate
+          # Symbols too - GitHub Packages accepts .snupkg via the same endpoint.
+          dotnet nuget push './nupkgs/*.snupkg' \
+            --source https://nuget.pkg.github.com/mauritsarissen/index.json \
+            --api-key ${{ secrets.GITHUB_TOKEN }} \
+            --skip-duplicate || true
+
+      - name: Upload nupkg artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: nupkgs
+          path: ./nupkgs/*.*nupkg
+
+  docker:
+    name: Build & push image (GHCR + Docker Hub)
+    runs-on: ubuntu-latest
+    needs: resolve-version
+    env:
+      VERSION: ${{ needs.resolve-version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-qemu-action@v3 # arm64 emulation for the multi-arch build
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/mauritsarissen/openservicebus:${{ env.VERSION }}
+            ghcr.io/mauritsarissen/openservicebus:latest
+            mauritsarissen/openservicebus:${{ env.VERSION }}
+            mauritsarissen/openservicebus:latest
+          labels: |
+            org.opencontainers.image.title=OpenServiceBus
+            org.opencontainers.image.description=Zero-dependency, embeddable Azure Service Bus emulator
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ env.VERSION }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=MIT
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  release:
+    name: GitHub Release
+    runs-on: ubuntu-latest
+    needs: [nuget, docker, resolve-version]
+    if: github.event_name == 'push' # only auto-create a Release on tag push; manual runs skip it
+    env:
+      VERSION: ${{ needs.resolve-version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # full history for auto-generated notes
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: nupkgs
+          path: ./nupkgs
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: v${{ env.VERSION }}
+          generate_release_notes: true
+          files: ./nupkgs/*.*nupkg
+          body: |
+            ## Install
+
+            ### NuGet (GitHub Packages)
+
+            ```bash
+            dotnet add package OpenServiceBus.Testing --version ${{ env.VERSION }} \
+              --source https://nuget.pkg.github.com/mauritsarissen/index.json
+            ```
+
+            ### Docker
+
+            ```bash
+            docker pull ghcr.io/mauritsarissen/openservicebus:${{ env.VERSION }}
+            # or
+            docker pull mauritsarissen/openservicebus:${{ env.VERSION }}
+            ```
+
+            See the [Wiki](https://github.com/${{ github.repository }}/wiki) for full
+            documentation.

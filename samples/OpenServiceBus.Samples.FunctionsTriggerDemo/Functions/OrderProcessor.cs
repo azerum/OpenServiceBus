@@ -2,12 +2,12 @@ using Azure.Messaging.ServiceBus;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 
-namespace OpenServiceBus.Samples.TriggerDemo.Functions;
+namespace OpenServiceBus.Samples.FunctionsTriggerDemo.Functions;
 
 /// <summary>
 /// Plain peek-lock trigger. AutoComplete is on (host.json default), so a clean return ⇒ Complete,
 /// an unhandled exception ⇒ Abandon (re-delivery). After <c>MaxDeliveryCount</c> abandons the
-/// broker auto-dead-letters the message — pick that up in <see cref="DeadLetterWatcher"/>.
+/// broker auto-dead-letters the message - pick that up in <see cref="DeadLetterWatcher"/>.
 /// </summary>
 /// <remarks>
 /// Try it: send a message via the Explorer with body <c>fail-anything</c> to force a throw.
@@ -36,7 +36,7 @@ public sealed class OrderProcessor
 
         if (body.StartsWith("slow", StringComparison.OrdinalIgnoreCase))
         {
-            // Deliberately exceeds lock duration if it's <2s — demonstrates lock renewal.
+            // Deliberately exceeds lock duration if it's <2s - demonstrates lock renewal.
             _logger.LogInformation("[orders] processing slowly to exercise lock renewal…");
             await Task.Delay(TimeSpan.FromSeconds(2));
         }

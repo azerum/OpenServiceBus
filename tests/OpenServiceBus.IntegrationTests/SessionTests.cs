@@ -23,7 +23,7 @@ public class SessionTests
         await sender.SendMessageAsync(new ServiceBusMessage("b-1") { SessionId = "beta", MessageId = "b-1" });
         await sender.SendMessageAsync(new ServiceBusMessage("a-2") { SessionId = "alpha", MessageId = "a-2" });
 
-        // Act — loop until the session drain returns null.
+        // Act - loop until the session drain returns null.
         var receiver = await client.AcceptSessionAsync("orders", "alpha");
         var ids = new List<string>();
         while (true)

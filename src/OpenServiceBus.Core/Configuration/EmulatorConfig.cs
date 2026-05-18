@@ -30,7 +30,7 @@ public sealed class NamespaceConfig
     [JsonPropertyName("Queues")]
     public List<QueueConfig> Queues { get; set; } = [];
 
-    /// <summary>Topics are accepted but not yet honoured (post-MVP — see M13).</summary>
+    /// <summary>Topics are accepted but not yet honoured (post-MVP - see M13).</summary>
     [JsonPropertyName("Topics")]
     public List<TopicConfig>? Topics { get; set; }
 }
@@ -46,32 +46,32 @@ public sealed class QueueConfig
 
 public sealed class QueueProperties
 {
-    /// <summary>ISO 8601 duration (e.g. <c>PT1M</c>) — converted to <see cref="TimeSpan"/>.</summary>
+    /// <summary>ISO 8601 duration (e.g. <c>PT1M</c>) - converted to <see cref="TimeSpan"/>.</summary>
     [JsonPropertyName("LockDuration")]
     public string? LockDuration { get; set; }
 
     [JsonPropertyName("MaxDeliveryCount")]
     public int? MaxDeliveryCount { get; set; }
 
-    /// <summary>ISO 8601 duration — null means messages never expire.</summary>
+    /// <summary>ISO 8601 duration - null means messages never expire.</summary>
     [JsonPropertyName("DefaultMessageTimeToLive")]
     public string? DefaultMessageTimeToLive { get; set; }
 
     [JsonPropertyName("DeadLetteringOnMessageExpiration")]
     public bool? DeadLetteringOnMessageExpiration { get; set; }
 
-    /// <summary>Accepted for compatibility — sessions not yet supported (post-MVP, M14).</summary>
+    /// <summary>Accepted for compatibility - sessions not yet supported (post-MVP, M14).</summary>
     [JsonPropertyName("RequiresSession")]
     public bool? RequiresSession { get; set; }
 
-    /// <summary>Accepted for compatibility — duplicate detection not yet supported (post-MVP, M15).</summary>
+    /// <summary>Accepted for compatibility - duplicate detection not yet supported (post-MVP, M15).</summary>
     [JsonPropertyName("RequiresDuplicateDetection")]
     public bool? RequiresDuplicateDetection { get; set; }
 
     [JsonPropertyName("DuplicateDetectionHistoryTimeWindow")]
     public string? DuplicateDetectionHistoryTimeWindow { get; set; }
 
-    /// <summary>Accepted for compatibility — auto-forwarding not yet supported (post-MVP, M16).</summary>
+    /// <summary>Accepted for compatibility - auto-forwarding not yet supported (post-MVP, M16).</summary>
     [JsonPropertyName("ForwardTo")]
     public string? ForwardTo { get; set; }
 

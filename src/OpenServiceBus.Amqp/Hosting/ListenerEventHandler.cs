@@ -9,14 +9,14 @@ namespace OpenServiceBus.Amqp.Hosting;
 /// <summary>
 /// Per-connection handler that hooks two points in the AMQPNetLite pipeline:
 ///
-/// <para><b>ConnectionLocalOpen</b> — stamp container-id, idle-timeout, max-frame-size on the
+/// <para><b>ConnectionLocalOpen</b> - stamp container-id, idle-timeout, max-frame-size on the
 /// outgoing AMQP Open frame. Workaround for AMQPNetLite #238 which means these are not
 /// configurable directly on <see cref="ConnectionListener"/>.</para>
 ///
-/// <para><b>SendDelivery</b> — when an outgoing delivery carries a <see cref="ReceiveContext"/>
+/// <para><b>SendDelivery</b> - when an outgoing delivery carries a <see cref="ReceiveContext"/>
 /// in its UserToken (the IMessageSource path), copy its peek-lock token into the AMQP
 /// <c>delivery-tag</c>. The Azure SDK's <c>ServiceBusReceiver.CompleteMessageAsync</c>
-/// rejects messages with empty lock tokens — a non-Guid delivery-tag round-trips as
+/// rejects messages with empty lock tokens - a non-Guid delivery-tag round-trips as
 /// <see cref="Guid.Empty"/> and Complete throws InvalidOperationException.</para>
 /// </summary>
 internal sealed class ListenerEventHandler : IHandler

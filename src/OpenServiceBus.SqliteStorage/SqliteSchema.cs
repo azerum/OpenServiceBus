@@ -3,14 +3,14 @@ using Microsoft.Data.Sqlite;
 namespace OpenServiceBus.SqliteStorage;
 
 /// <summary>
-/// One-shot DDL applied at store startup. Pragmatic single-script migration — when the
+/// One-shot DDL applied at store startup. Pragmatic single-script migration - when the
 /// schema needs to evolve we'll switch to a versioned strategy, but the v1 shape is stable
 /// enough that an additive change can just run the same script (every <c>CREATE</c> is
 /// <c>IF NOT EXISTS</c>).
 ///
 /// Timestamps are stored as INTEGER (unix milliseconds, UTC) rather than TEXT so range
 /// queries like "expires_at &lt; now" use a B-tree scan instead of string comparison.
-/// Booleans are INTEGER (0/1) — SQLite has no native bool type.
+/// Booleans are INTEGER (0/1) - SQLite has no native bool type.
 /// </summary>
 internal static class SqliteSchema
 {

@@ -1,0 +1,19 @@
+{
+  "UserConfig": {
+    "Namespaces": [
+      {
+        "Name": "worker-service",
+        "Queues": [
+          {
+            "Name": "work",
+            "Properties": {
+              "LockDuration": "PT30S",
+              "MaxDeliveryCount": 3,
+              "DeadLetteringOnMessageExpiration": true
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

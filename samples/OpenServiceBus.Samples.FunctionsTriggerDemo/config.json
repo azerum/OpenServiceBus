@@ -2,7 +2,7 @@
   "UserConfig": {
     "Namespaces": [
       {
-        "Name": "openservicebus-demo",
+        "Name": "functions-trigger-demo",
         "Queues": [
           {
             "Name": "orders",
@@ -27,12 +27,8 @@
               "MaxDeliveryCount": 5
             }
           }
-        ],
-        "Topics": []
+        ]
       }
-    ],
-    "Logging": {
-      "Type": "File"
-    }
+    ]
   }
 }

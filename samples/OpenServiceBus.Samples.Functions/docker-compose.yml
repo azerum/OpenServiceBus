@@ -1,0 +1,26 @@
+# Brings up an OpenServiceBus broker with the queues this sample needs pre-declared.
+# Run from this directory:
+#
+#   docker compose up
+#
+# Then start the Functions worker in a second terminal:
+#
+#   func start
+services:
+  openservicebus:
+    image: ghcr.io/mauritsarissen/openservicebus:latest
+    container_name: osb-samples-functions
+    ports:
+      - "5672:5672"   # AMQP — the ServiceBusTrigger connects here
+      - "5300:5300"   # REST management API + /health
+    environment:
+      OPENSERVICEBUS__STORAGE__MODE: Sqlite
+      OPENSERVICEBUS__STORAGE__DATASOURCE: /data/broker.db
+      OPENSERVICEBUS_CONFIG: /etc/openservicebus/config.json
+    volumes:
+      - osb-functions-data:/data
+      - ./config.json:/etc/openservicebus/config.json:ro
+    restart: unless-stopped
+
+volumes:
+  osb-functions-data:

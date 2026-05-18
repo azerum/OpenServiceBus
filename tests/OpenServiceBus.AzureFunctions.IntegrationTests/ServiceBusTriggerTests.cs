@@ -14,7 +14,7 @@ public class ServiceBusTriggerTests
     [SkippableFact]
     public async Task ServiceBusTrigger_HundredMessages_AreAllProcessedByIsolatedWorkerAgainstOpenServiceBus()
     {
-        // Arrange — environment prereqs
+        // Arrange - environment prereqs
         var funcExe = FuncRuntime.FindFunc();
         Skip.If(funcExe is null,
             "Azure Functions Core Tools (`func`) not on PATH. Install: `brew install azure/functions/azure-functions-core-tools@4` or `npm i -g azure-functions-core-tools@4`.");
@@ -48,7 +48,7 @@ public class ServiceBusTriggerTests
         try
         {
             // Use a /bin/sh wrapper so we can guarantee DOTNET_ROOT and PATH are scoped to the
-            // child. brew's `dotnet@8` is keg-only — without these, `func` (a Node.js script)
+            // child. brew's `dotnet@8` is keg-only - without these, `func` (a Node.js script)
             // happily finds the system `dotnet` 10 and the build fails trying to load .NET 10's
             // hostfxr against a DOTNET_ROOT we've redirected to .NET 8.
             // ArgumentList passes each arg verbatim, so we don't have to worry about argv re-parsing.
@@ -56,7 +56,7 @@ public class ServiceBusTriggerTests
             // `dotnet test` injects MSBuild/SDK env vars (MSBuildExtensionsPath,
             // MSBuildSDKsPath, DOTNET_HOST_PATH, MSBuildLoadMicrosoftTargetsReadOnly, etc.)
             // pointing at the .NET 10 SDK that ran the test. They poison the SDK-8 build that
-            // func is about to perform — unset everything that could redirect MSBuild lookups.
+            // func is about to perform - unset everything that could redirect MSBuild lookups.
             var shellCommand = "unset MSBuildExtensionsPath MSBuildSDKsPath MSBuildLoadMicrosoftTargetsReadOnly " +
                                "DOTNET_HOST_PATH DOTNET_CLI_TELEMETRY_SESSIONID DOTNET_ADD_GLOBAL_TOOLS_TO_PATH " +
                                "DOTNET_NOLOGO MSBuildToolsPath MSBUILD_EXE_PATH MSBuildBinPath; " +
@@ -83,7 +83,7 @@ public class ServiceBusTriggerTests
             func.BeginOutputReadLine();
             func.BeginErrorReadLine();
 
-            // Act — wait for func host to be ready, then dispatch 100 messages.
+            // Act - wait for func host to be ready, then dispatch 100 messages.
             await WaitForFuncReadyAsync(func, stdoutBuffer, stderrBuffer, TimeSpan.FromSeconds(90));
 
             await using var client = new ServiceBusClient(broker.ConnectionString);
@@ -168,7 +168,7 @@ public class ServiceBusTriggerTests
 
     private static async Task<string[]> ReadAllLinesShareReadAsync(string path)
     {
-        // The worker holds the file open intermittently — use shared-read access.
+        // The worker holds the file open intermittently - use shared-read access.
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         using var reader = new StreamReader(stream);
         var content = await reader.ReadToEndAsync();

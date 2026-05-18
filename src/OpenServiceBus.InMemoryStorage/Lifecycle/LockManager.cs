@@ -9,7 +9,7 @@ namespace OpenServiceBus.InMemoryStorage.Lifecycle;
 /// <summary>
 /// Periodically sweeps the store for expired peek-locks and abandons them, returning their
 /// messages to the available pool. Tests can drive expiration directly via
-/// <see cref="IMessageStore.ExpireLocks"/> with a FakeTimeProvider — this background loop
+/// <see cref="IMessageStore.ExpireLocks"/> with a FakeTimeProvider - this background loop
 /// exists for runtime, not for tests.
 /// </summary>
 public sealed class LockManager : BackgroundService

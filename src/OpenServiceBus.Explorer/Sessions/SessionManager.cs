@@ -103,7 +103,7 @@ public sealed class Session : IAsyncDisposable
 
     /// <summary>
     /// Stash a received message so a later Complete/Abandon call can find it by lock-token.
-    /// Remembers the receiver instance — for session messages the same session-receiver must
+    /// Remembers the receiver instance - for session messages the same session-receiver must
     /// be used to settle the message; using a plain receiver would surface a lock-lost error.
     /// </summary>
     public void TrackLocked(ServiceBusReceivedMessage message, ServiceBusReceiver receiver)

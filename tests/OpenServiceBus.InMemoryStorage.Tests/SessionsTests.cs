@@ -164,7 +164,7 @@ public class SessionsTests
         var renewed = await store.TryRenewSessionLockAsync("q", "s", TimeSpan.FromSeconds(60), requestingLinkName: "r2");
 
         // Assert
-        renewed.ShouldBeNull("session lock affinity matches message-lock affinity — cross-link renew is refused");
+        renewed.ShouldBeNull("session lock affinity matches message-lock affinity - cross-link renew is refused");
     }
 
     [Fact]

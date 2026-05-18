@@ -65,7 +65,7 @@ public class DeferTests
 
         // Assert
         none.ShouldBeNull("normal dequeue must still skip the message after abandon");
-        again.ShouldNotBeNull("receive-by-seq still finds the message — it stays deferred");
+        again.ShouldNotBeNull("receive-by-seq still finds the message - it stays deferred");
     }
 
     [Fact]

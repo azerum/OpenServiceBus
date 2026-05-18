@@ -211,12 +211,12 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
     {
         if (_host is null || _topicRegistry is null) return;
 
-        // The processor needs the subscription's QueueDescriptor (for lock duration etc.) —
+        // The processor needs the subscription's QueueDescriptor (for lock duration etc.) -
         // pull it from the queue registry where TopicManager registered it on create.
         var queue = _queueRegistry.GetAsync(descriptor.BackingQueueName).GetAwaiter().GetResult();
         if (queue is null)
         {
-            _logger.LogWarning("Backing queue {Name} not found when registering subscription $management — skipping.", descriptor.BackingQueueName);
+            _logger.LogWarning("Backing queue {Name} not found when registering subscription $management - skipping.", descriptor.BackingQueueName);
             return;
         }
 

@@ -2,7 +2,7 @@ using Azure.Messaging.ServiceBus;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 
-namespace OpenServiceBus.Samples.TriggerDemo.Functions;
+namespace OpenServiceBus.Samples.FunctionsTriggerDemo.Functions;
 
 /// <summary>
 /// The DLQ is itself a triggerable sub-entity. This handler shows you the failure reason and

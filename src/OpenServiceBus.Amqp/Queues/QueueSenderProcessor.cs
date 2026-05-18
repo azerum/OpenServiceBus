@@ -27,7 +27,7 @@ public sealed class QueueSenderProcessor : IMessageProcessor
     /// Microsoft.Azure.Amqp's batched-message-format marker. When this is set on the outer
     /// transfer, the body is one or more <c>Data</c> sections (a <see cref="DataList"/> in
     /// AMQPNetLite terms) each holding a fully-encoded inner message. Real Service Bus splits
-    /// these on the broker side so each inner message gets its own sequence number — we do the same.
+    /// these on the broker side so each inner message gets its own sequence number - we do the same.
     /// </summary>
     private const uint AmqpBatchedMessageFormat = 0x80013700u;
 
@@ -65,7 +65,7 @@ public sealed class QueueSenderProcessor : IMessageProcessor
         {
             var msg = messageContext.Message;
 
-            // Batched envelope from SendMessagesAsync / ServiceBusMessageBatch — split into N individual
+            // Batched envelope from SendMessagesAsync / ServiceBusMessageBatch - split into N individual
             // enqueues so each inner message gets its own sequence number and lifecycle.
             if (msg.Format == AmqpBatchedMessageFormat && msg.BodySection is DataList dataList)
             {
@@ -81,7 +81,7 @@ public sealed class QueueSenderProcessor : IMessageProcessor
             // x-opt-scheduled-enqueue-time annotation; or via the dedicated ScheduleMessageAsync
             // which goes through $management. Both end up at IMessageStore.EnqueueAsync(..., scheduledEnqueueTime).
             var scheduledFor = ReadScheduledEnqueueTime(msg);
-            // M14: AMQP properties.group-id IS Service Bus's SessionId — but only route by it
+            // M14: AMQP properties.group-id IS Service Bus's SessionId - but only route by it
             // when the queue is session-enabled; on a plain queue the GroupId is preserved as
             // metadata via the encoded bytes and the message stays on the regular delivery path.
             var sessionId = _descriptor.RequiresSession ? msg.Properties?.GroupId : null;
@@ -90,7 +90,7 @@ public sealed class QueueSenderProcessor : IMessageProcessor
             var dedupWindow = _descriptor.RequiresDuplicateDetection
                 ? _descriptor.DuplicateDetectionHistoryTimeWindow ?? TimeSpan.FromMinutes(10)
                 : (TimeSpan?)null;
-            // M16: forward target may be a topic — build a filter context unconditionally so
+            // M16: forward target may be a topic - build a filter context unconditionally so
             // the router can fan-out if the chain hits one. Cheap when not forwarded.
             var filterContext = BuildFilterContext(msg, _timeProvider.GetUtcNow());
 
@@ -219,7 +219,7 @@ public sealed class QueueSenderProcessor : IMessageProcessor
     /// <summary>
     /// Hook for auto-forwarding (M16) + the M20 send-instrumentation point. Every accepted send
     /// (single, batched, or transactional commit-replay) flows through here exactly once per
-    /// message — making it the single right place to emit the <c>osb.send</c> activity and bump
+    /// message - making it the single right place to emit the <c>osb.send</c> activity and bump
     /// the sent counter.
     /// </summary>
     private async Task RouteOrEnqueueAsync(byte[] encoded, DateTimeOffset? expiresAt, DateTimeOffset? scheduledFor, string? sessionId, string? messageId, TimeSpan? dedupWindow, MessageFilterContext filterContext)

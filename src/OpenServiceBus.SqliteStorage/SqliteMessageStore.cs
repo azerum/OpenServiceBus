@@ -10,13 +10,13 @@ namespace OpenServiceBus.SqliteStorage;
 
 /// <summary>
 /// SQLite-backed <see cref="IMessageStore"/>. Single-file persistence with the same semantics
-/// as <c>InMemoryMessageStore</c> — peek-lock, dead-letter routing handled at the layer above,
+/// as <c>InMemoryMessageStore</c> - peek-lock, dead-letter routing handled at the layer above,
 /// sessions, dedup, scheduled, TTL, defer, peek. Survives broker restarts.
 ///
 /// Concurrency model: SQLite serialises writers; multiple readers are fine. We open a
 /// single connection (with WAL) and serialise all access through one async lock to keep
 /// the implementation simple. With WAL on a real file, read concurrency could be unlocked
-/// later — the gating bottleneck for now is the lone connection.
+/// later - the gating bottleneck for now is the lone connection.
 ///
 /// Long-poll dequeue uses an in-process per-queue <see cref="Channel{T}"/> as a notification
 /// channel: every enqueue / abandon / scheduled-activation writes to it, and
@@ -34,7 +34,7 @@ public sealed class SqliteMessageStore : IMessageStore, IAsyncDisposable
     // at the DB level anyway; doing it here lets us avoid SqliteException busy retries.
     private readonly SemaphoreSlim _gate = new(1, 1);
 
-    // Per-queue notification channels — used by TryDequeueAsync to wake on enqueue.
+    // Per-queue notification channels - used by TryDequeueAsync to wake on enqueue.
     // Bounded capacity of 1 with DropWrite means multiple signals collapse into "go check"
     // without piling up; the dequeue path can drain at its own pace.
     private readonly ConcurrentDictionary<string, Channel<bool>> _notify =
@@ -50,7 +50,7 @@ public sealed class SqliteMessageStore : IMessageStore, IAsyncDisposable
         _logger = logger;
 
         var dataSource = options.DataSource == ":memory:"
-            // Shared-cache so the same logical DB is visible to every connection — important
+            // Shared-cache so the same logical DB is visible to every connection - important
             // if we ever open >1 connection (we don't today, but a shared in-memory DB also
             // survives one connection being closed which makes tests cleaner).
             ? $"file:osb-{Guid.NewGuid():N}?mode=memory&cache=shared"
@@ -139,11 +139,11 @@ public sealed class SqliteMessageStore : IMessageStore, IAsyncDisposable
                 if (existing is not null) return existing;
             }
 
-            // Per-queue monotonic sequence — allocate inside the gate so two concurrent
+            // Per-queue monotonic sequence - allocate inside the gate so two concurrent
             // enqueues can't collide. RETURNING gives us the new value atomically.
             var seq = AllocateSequence(queueName);
 
-            // A scheduled time in the past has no meaning — fold it into "available immediately"
+            // A scheduled time in the past has no meaning - fold it into "available immediately"
             // so the dequeue path doesn't need a "scheduled but already due" check.
             var effectiveSchedule = scheduledEnqueueTime is { } sched && sched > now ? scheduledEnqueueTime : null;
 
@@ -193,7 +193,7 @@ public sealed class SqliteMessageStore : IMessageStore, IAsyncDisposable
                 SessionId = sessionId,
             };
 
-            // Signal the dequeue waiter, only when the message would actually be visible —
+            // Signal the dequeue waiter, only when the message would actually be visible -
             // scheduled messages don't wake anyone (the activator does, later).
             if (effectiveSchedule is null)
             {
@@ -223,7 +223,7 @@ public sealed class SqliteMessageStore : IMessageStore, IAsyncDisposable
 
     private void EnsureQueueRow(string queueName)
     {
-        // Called inside the gate; idempotent — handles the "enqueue to a queue created
+        // Called inside the gate; idempotent - handles the "enqueue to a queue created
         // moments ago in a parallel session" edge case where the FK would otherwise fail.
         using var cmd = _connection.CreateCommand();
         cmd.CommandText = """
@@ -441,7 +441,7 @@ public sealed class SqliteMessageStore : IMessageStore, IAsyncDisposable
 
             // Find the lowest-seq message that's available (not deferred, not scheduled-future,
             // not currently locked, optionally matching a session). The session filter is used
-            // by TryDequeueFromSessionAsync — passing null means "no session filter".
+            // by TryDequeueFromSessionAsync - passing null means "no session filter".
             using var select = _connection.CreateCommand();
             select.Transaction = tx;
             select.CommandText = sessionId is null
@@ -698,7 +698,7 @@ public sealed class SqliteMessageStore : IMessageStore, IAsyncDisposable
                 if (entry is null) return false;
                 DeleteLock(tx, lockToken);
                 SetDeferred(tx, entry.QueueName, entry.SequenceNumber, deferred: true);
-                // Note: no NotifyAvailable — deferred messages aren't available to the normal pool.
+                // Note: no NotifyAvailable - deferred messages aren't available to the normal pool.
                 return true;
             });
         }
@@ -1007,7 +1007,7 @@ public sealed class SqliteMessageStore : IMessageStore, IAsyncDisposable
         _gate.Wait();
         try
         {
-            // A session is "live" if it has any non-deferred message OR a stored state — same
+            // A session is "live" if it has any non-deferred message OR a stored state - same
             // contract as the in-memory store, used by the $management get-message-sessions op.
             using var cmd = _connection.CreateCommand();
             cmd.CommandText = """

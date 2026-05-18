@@ -1,0 +1,70 @@
+name: Sync wiki
+
+# Mirrors every Markdown file in /docs into the repo's GitHub Wiki. GitHub Wikis are a
+# parallel git repo at <owner>/<repo>.wiki.git - this workflow clones it, replaces its
+# contents with what's in /docs, and pushes back.
+#
+# Page names: GitHub Wiki treats a file's *base name* as the page title and renders
+# hyphens as spaces (so `Getting-Started.md` → "Getting Started"). Every file in
+# /docs/ already uses hyphen-case so it round-trips cleanly.
+#
+# Notes
+#   - Wikis don't support folder structure (everything is flat). We copy every .md file
+#     to the wiki root.
+#   - The workflow uses the built-in GITHUB_TOKEN - wikis are part of the repo from
+#     a permissions standpoint, so `contents: write` on the workflow token is enough.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - ".github/workflows/wiki.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    name: Sync /docs → Wiki
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
+
+      - name: Configure git
+        run: |
+          git config --global user.name  "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Clone wiki repo
+        run: |
+          # GitHub auto-creates the wiki repo only after the first wiki page exists. If the
+          # clone fails (HTTP 404) we treat that as "wiki not initialized yet" and bail with
+          # a clear message - go create any page in the UI once and re-run this workflow.
+          set +e
+          git clone "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git" wiki
+          rc=$?
+          set -e
+          if [ $rc -ne 0 ]; then
+            echo "::warning::Wiki repository not initialized. Create any page in the GitHub UI once, then re-run this workflow."
+            exit 0
+          fi
+
+      - name: Rsync docs into wiki
+        run: |
+          # Wipe everything except the wiki's own .git/ folder, then copy docs/*.md in.
+          find wiki -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+          cp docs/*.md wiki/
+
+      - name: Commit + push
+        working-directory: wiki
+        run: |
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No wiki changes - nothing to push."
+            exit 0
+          fi
+          git commit -m "docs: sync from ${{ github.sha }}"
+          git push origin HEAD:master

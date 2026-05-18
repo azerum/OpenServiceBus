@@ -69,14 +69,14 @@ public sealed class OpenServiceBusTestHostOptions
     public TimeProvider TimeProvider { get; set; } = TimeProvider.System;
 
     /// <summary>
-    /// Enable AMQPNetLite frame-level tracing. Off by default — useful only when diagnosing
+    /// Enable AMQPNetLite frame-level tracing. Off by default - useful only when diagnosing
     /// wire-protocol issues.
     /// </summary>
     public bool EnableFrameTracing { get; set; }
 
     /// <summary>
     /// Optional store factory. When set, the test host wires this <see cref="IMessageStore"/>
-    /// in place of the default in-memory implementation — used by the SQLite test project to
+    /// in place of the default in-memory implementation - used by the SQLite test project to
     /// run the full SDK suite against a persistent backing store without coupling the
     /// <c>OpenServiceBus.Testing</c> package to <c>OpenServiceBus.SqliteStorage</c>.
     /// </summary>

@@ -1,11 +1,11 @@
 # syntax=docker/dockerfile:1
 # Multi-stage build for OpenServiceBus.Host. Alpine-based to keep the image small.
 # Runs SQLite-backed by default (persistent across container restarts) with the .db file at
-# /data/broker.db — mount /data as a volume for durability.
+# /data/broker.db - mount /data as a volume for durability.
 #
 # Exposed ports:
-#   5672 — AMQP listener (Service Bus SDK + AMQPNetLite clients)
-#   5300 — REST management API + /health
+#   5672 - AMQP listener (Service Bus SDK + AMQPNetLite clients)
+#   5300 - REST management API + /health
 #
 # Optional environment variables:
 #   OPENSERVICEBUS__STORAGE__MODE        InMemory | Sqlite (default: Sqlite in this image)
@@ -31,14 +31,14 @@ RUN dotnet restore src/OpenServiceBus.Host/OpenServiceBus.Host.csproj
 # Copy the rest of the source and publish a self-contained-ish framework-dependent build.
 COPY src/ src/
 RUN dotnet publish src/OpenServiceBus.Host/OpenServiceBus.Host.csproj \
-        --configuration Release \
-        --no-restore \
-        --output /app/publish
+    --configuration Release \
+    --no-restore \
+    --output /app/publish
 
 # ─── Runtime stage ────────────────────────────────────────────────────────────
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
 
-# Run as a non-root user — the broker doesn't need root and OCI scanners flag images that do.
+# Run as a non-root user - the broker doesn't need root and OCI scanners flag images that do.
 RUN addgroup -S osb && adduser -S osb -G osb \
     && mkdir -p /data \
     && chown -R osb:osb /data

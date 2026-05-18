@@ -25,7 +25,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\OpenServiceBus.Testing\OpenServiceBus.Testing.csproj" />
     <!-- Reference the sample so it builds as a prerequisite for the test. -->
-    <ProjectReference Include="..\..\samples\OpenServiceBus.Functions.Sample\OpenServiceBus.Functions.Sample.csproj"
+    <ProjectReference Include="..\..\samples\OpenServiceBus.Samples.Functions\OpenServiceBus.Samples.Functions.csproj"
                       ReferenceOutputAssembly="false"
                       Private="false" />
   </ItemGroup>

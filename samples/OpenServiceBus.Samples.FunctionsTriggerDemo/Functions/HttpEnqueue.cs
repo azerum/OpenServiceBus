@@ -3,7 +3,7 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 
-namespace OpenServiceBus.Samples.TriggerDemo.Functions;
+namespace OpenServiceBus.Samples.FunctionsTriggerDemo.Functions;
 
 /// <summary>
 /// HTTP trigger + Service Bus output binding. POST to one of the routes and the body becomes a
@@ -61,7 +61,7 @@ public sealed class HttpEnqueue
 
         var http = req.CreateResponse(HttpStatusCode.Accepted);
         await http.WriteStringAsync(
-            $"queued verdict '{verdict}' — watch for [manual-queue] log line.\n" +
+            $"queued verdict '{verdict}' - watch for [manual-queue] log line.\n" +
             $"valid verdicts: complete | abandon | deadletter | defer\n");
         return new ManualEnqueueResult { Message = verdict, Http = http };
     }

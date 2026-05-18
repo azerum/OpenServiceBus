@@ -57,7 +57,7 @@ public sealed class InMemoryMessageStore : IMessageStore
         var state = GetQueue(queueName);
         var now = _timeProvider.GetUtcNow();
 
-        // M15: silent-drop duplicate sends. Azure SB does not surface the dup to the sender —
+        // M15: silent-drop duplicate sends. Azure SB does not surface the dup to the sender -
         // the SDK gets an "accepted" disposition either way. We return the *original*
         // StoredMessage so callers that propagate sequence numbers stay consistent.
         if (duplicateDetectionWindow is not null && !string.IsNullOrEmpty(messageId))
@@ -75,7 +75,7 @@ public sealed class InMemoryMessageStore : IMessageStore
         }
 
         var seq = Interlocked.Increment(ref state.NextSequenceNumber);
-        // A scheduled time in the past is meaningless — treat it as available immediately.
+        // A scheduled time in the past is meaningless - treat it as available immediately.
         var effectiveSchedule = scheduledEnqueueTime is { } sched && sched > now ? scheduledEnqueueTime : null;
         var message = new StoredMessage
         {
@@ -107,7 +107,7 @@ public sealed class InMemoryMessageStore : IMessageStore
                 throw new InvalidOperationException($"Queue '{queueName}' is closed.");
             }
         }
-        // else: scheduled — waits in Messages until ActivateScheduled promotes it.
+        // else: scheduled - waits in Messages until ActivateScheduled promotes it.
 
         return Task.FromResult(message);
     }
@@ -147,7 +147,7 @@ public sealed class InMemoryMessageStore : IMessageStore
         }
         if (msg.ScheduledEnqueueTime is null)
         {
-            // Already activated — caller should use normal disposition / lock-cancel paths.
+            // Already activated - caller should use normal disposition / lock-cancel paths.
             return Task.FromResult(false);
         }
         // TryRemove with comparison so we don't race with ActivateScheduled.
@@ -159,7 +159,7 @@ public sealed class InMemoryMessageStore : IMessageStore
     {
         if (!_queues.TryGetValue(queueName, out var state)) return Array.Empty<StoredMessage>();
 
-        // Build a set of currently-locked sequence numbers — locked messages stay alive
+        // Build a set of currently-locked sequence numbers - locked messages stay alive
         // even if they cross their TTL deadline; the lock holder gets the chance to settle them.
         var locked = new HashSet<long>();
         foreach (var entry in state.Locks.Values) locked.Add(entry.SequenceNumber);
@@ -255,7 +255,7 @@ public sealed class InMemoryMessageStore : IMessageStore
 
         if (entry.WasDeferred)
         {
-            // Message was deferred before lock — abandon returns it to Deferred state, not Active.
+            // Message was deferred before lock - abandon returns it to Deferred state, not Active.
             if (state.Messages.TryGetValue(entry.SequenceNumber, out var msg))
             {
                 state.Messages[entry.SequenceNumber] = msg with { IsDeferred = true };
@@ -330,7 +330,7 @@ public sealed class InMemoryMessageStore : IMessageStore
         }
 
         // Link-affinity check: if the lock was taken from a specific link, only that link
-        // can renew it. Matches Service Bus's lock-link scoping — a sneaky cross-link renew
+        // can renew it. Matches Service Bus's lock-link scoping - a sneaky cross-link renew
         // attempt returns Gone.
         if (entry.AssociatedLink is not null
             && requestingLinkName is not null
@@ -372,7 +372,7 @@ public sealed class InMemoryMessageStore : IMessageStore
         {
             state.Messages[entry.SequenceNumber] = msg with { IsDeferred = true };
         }
-        // Don't write to Available — deferred messages are only retrievable by sequence number.
+        // Don't write to Available - deferred messages are only retrievable by sequence number.
         return Task.FromResult(true);
     }
 
@@ -394,7 +394,7 @@ public sealed class InMemoryMessageStore : IMessageStore
         var unmarked = stored with { IsDeferred = false };
         if (!state.Messages.TryUpdate(sequenceNumber, unmarked, stored))
         {
-            // Lost the race — someone else grabbed it concurrently.
+            // Lost the race - someone else grabbed it concurrently.
             return Task.FromResult<LockedMessage?>(null);
         }
 
@@ -524,7 +524,7 @@ public sealed class InMemoryMessageStore : IMessageStore
 
         if (!state.Messages.TryGetValue(seq, out var stored))
         {
-            // Out-of-band removal — recurse.
+            // Out-of-band removal - recurse.
             return await TryDequeueFromSessionAsync(queueName, sessionId, messageLockDuration, linkName, cancellationToken).ConfigureAwait(false);
         }
 
@@ -628,13 +628,13 @@ public sealed class InMemoryMessageStore : IMessageStore
             SingleWriter = false,
         });
 
-        // M14 — sessions. Lazy per-session state container keyed by SessionId.
+        // M14 - sessions. Lazy per-session state container keyed by SessionId.
         public readonly ConcurrentDictionary<string, SessionState> Sessions = new(StringComparer.Ordinal);
 
         public SessionState GetOrAddSession(string sessionId) =>
             Sessions.GetOrAdd(sessionId, _ => new SessionState());
 
-        // M15 — duplicate detection sliding window keyed on MessageId. Two parallel maps:
+        // M15 - duplicate detection sliding window keyed on MessageId. Two parallel maps:
         // SeenMessageIds tracks expiry (for the cheap eviction sweep), OriginalsByMessageId
         // gives us back the StoredMessage so a duplicate send returns the same sequence number.
         public readonly ConcurrentDictionary<string, DateTimeOffset> SeenMessageIds = new(StringComparer.Ordinal);
@@ -647,7 +647,7 @@ public sealed class InMemoryMessageStore : IMessageStore
         public required DateTimeOffset LockedUntil { get; set; }
         public string? AssociatedLink { get; init; }
         /// <summary>True when this lock was acquired via receive-by-sequence-number on a deferred
-        /// message — abandon returns it to Deferred state, not the Active pool.</summary>
+        /// message - abandon returns it to Deferred state, not the Active pool.</summary>
         public bool WasDeferred { get; init; }
         /// <summary>The session id this message came from, if any. Locking continues to hold
         /// the session lock alongside the message lock; release on message disposition.</summary>

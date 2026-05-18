@@ -1,0 +1,19 @@
+{
+  "UserConfig": {
+    "Namespaces": [
+      {
+        "Name": "sessions",
+        "Queues": [
+          {
+            "Name": "sessioned",
+            "Properties": {
+              "LockDuration": "PT1M",
+              "MaxDeliveryCount": 5,
+              "RequiresSession": true
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

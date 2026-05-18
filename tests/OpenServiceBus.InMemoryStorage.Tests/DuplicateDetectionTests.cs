@@ -79,7 +79,7 @@ public class DuplicateDetectionTests
         await store.CreateQueueAsync("q");
         var window = TimeSpan.FromMinutes(5);
 
-        // Act — both sends have a null/empty messageId; can't dedup without an id.
+        // Act - both sends have a null/empty messageId; can't dedup without an id.
         await store.EnqueueAsync("q", [1], messageId: null, duplicateDetectionWindow: window);
         await store.EnqueueAsync("q", [2], messageId: "", duplicateDetectionWindow: window);
 

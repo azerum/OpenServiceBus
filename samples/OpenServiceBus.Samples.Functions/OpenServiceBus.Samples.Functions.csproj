@@ -4,7 +4,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <AzureFunctionsVersion>v4</AzureFunctionsVersion>
     <OutputType>Exe</OutputType>
-    <RootNamespace>OpenServiceBus.Functions.Sample</RootNamespace>
+    <RootNamespace>OpenServiceBus.Samples.Functions</RootNamespace>
     <Description>Isolated-worker Azure Functions app with a ServiceBusTrigger, used by M11 to prove OpenServiceBus is a drop-in replacement for Azure Service Bus.</Description>
     <IsPackable>false</IsPackable>
     <!-- Azure Functions Worker SDK source-generator emits boilerplate that may trip our strict warnings policy. -->

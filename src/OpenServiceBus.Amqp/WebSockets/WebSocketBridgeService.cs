@@ -11,7 +11,7 @@ namespace OpenServiceBus.Amqp.WebSockets;
 /// <summary>
 /// AMQP-over-WebSocket bridge (M21). Hosts an <see cref="HttpListener"/> on a dedicated port
 /// that accepts WebSocket upgrades with the <c>amqp</c> sub-protocol, then tunnels every
-/// incoming binary frame to a loopback TCP connection on the running AMQP listener — and the
+/// incoming binary frame to a loopback TCP connection on the running AMQP listener - and the
 /// upstream replies back, framed as binary WebSocket messages.
 ///
 /// This avoids modifying the existing AMQP pipeline at all: AMQPNetLite keeps owning the
@@ -133,7 +133,7 @@ public sealed class WebSocketBridgeService : IHostedService, IAsyncDisposable
             await tcp.ConnectAsync(_options.UpstreamHost, UpstreamPort, pumpCts.Token).ConfigureAwait(false);
             var stream = tcp.GetStream();
 
-            // Two pumps in parallel — first one to finish (clean close OR error) cancels the other.
+            // Two pumps in parallel - first one to finish (clean close OR error) cancels the other.
             var wsToTcp = Task.Run(() => PumpWebSocketToTcpAsync(ws, stream, pumpCts.Token), pumpCts.Token);
             var tcpToWs = Task.Run(() => PumpTcpToWebSocketAsync(stream, ws, pumpCts.Token), pumpCts.Token);
 
@@ -142,7 +142,7 @@ public sealed class WebSocketBridgeService : IHostedService, IAsyncDisposable
             try { await Task.WhenAll(wsToTcp, tcpToWs).WaitAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false); }
             catch { /* shutting down a pump */ }
 
-            // Surface pump errors at debug level — most are just "connection closed".
+            // Surface pump errors at debug level - most are just "connection closed".
             if (first.IsFaulted) _logger.LogDebug(first.Exception, "Bridge pump terminated with exception.");
         }
         catch (Exception ex)
@@ -184,7 +184,7 @@ public sealed class WebSocketBridgeService : IHostedService, IAsyncDisposable
         {
             var read = await tcp.ReadAsync(buffer.AsMemory(), ct).ConfigureAwait(false);
             if (read == 0) return; // upstream closed
-            // AMQP framing flows transparently as opaque bytes — the broker reads them as if from
+            // AMQP framing flows transparently as opaque bytes - the broker reads them as if from
             // a regular TCP client, so we just forward each TCP read as a binary WS message.
             await ws.SendAsync(buffer.AsMemory(0, read), WebSocketMessageType.Binary, endOfMessage: true, ct).ConfigureAwait(false);
         }

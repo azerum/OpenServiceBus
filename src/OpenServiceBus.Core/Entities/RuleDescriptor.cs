@@ -5,7 +5,7 @@ namespace OpenServiceBus.Core.Entities;
 /// <summary>
 /// A single rule attached to a subscription. The filter decides whether a message published
 /// to the parent topic flows into the subscription. Actions (e.g. property rewriting) are
-/// noted for compatibility but not yet evaluated — see M13 follow-ups.
+/// noted for compatibility but not yet evaluated - see M13 follow-ups.
 /// </summary>
 public sealed record RuleDescriptor
 {

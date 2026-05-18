@@ -9,7 +9,7 @@ namespace OpenServiceBus.Amqp.WebSockets;
 public sealed class WebSocketBridgeOptions
 {
     /// <summary>
-    /// Master switch. Off by default — set to <c>true</c> in <c>appsettings.json</c> under
+    /// Master switch. Off by default - set to <c>true</c> in <c>appsettings.json</c> under
     /// <c>OpenServiceBus:WebSockets:Enabled</c>, or pass <c>configure</c> to the DI extension.
     /// </summary>
     public bool Enabled { get; set; }
@@ -21,20 +21,20 @@ public sealed class WebSocketBridgeOptions
     public string Host { get; set; } = "+";
 
     /// <summary>
-    /// Port the WebSocket bridge listens on. Defaults to 5673 — one above the AMQP port — so
+    /// Port the WebSocket bridge listens on. Defaults to 5673 - one above the AMQP port - so
     /// the existing <c>5672</c> mapping stays untouched.
     /// </summary>
     public int Port { get; set; } = 5673;
 
     /// <summary>
-    /// HTTP path the bridge responds on. Defaults to <c>/$servicebus/websocket/</c> — the
+    /// HTTP path the bridge responds on. Defaults to <c>/$servicebus/websocket/</c> - the
     /// path the Azure SDK appends when <c>TransportType=AmqpWebSockets</c>.
     /// </summary>
     public string Path { get; set; } = "/$servicebus/websocket/";
 
     /// <summary>
     /// TCP endpoint the upstream AMQP listener is on. Defaults to <c>127.0.0.1</c> + the
-    /// broker's AMQP port — bridge and broker live in the same process so loopback is correct.
+    /// broker's AMQP port - bridge and broker live in the same process so loopback is correct.
     /// </summary>
     public string UpstreamHost { get; set; } = "127.0.0.1";
 

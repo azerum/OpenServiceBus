@@ -44,7 +44,7 @@ public class TtlTests
         var expired = store.ExpireMessages("q", time.GetUtcNow());
 
         // Assert
-        expired.Count.ShouldBe(0, "locked messages must NOT be expired by the sweeper — the lock holder owns them");
+        expired.Count.ShouldBe(0, "locked messages must NOT be expired by the sweeper - the lock holder owns them");
         (await store.CountAsync("q")).ShouldBe(1L);
     }
 

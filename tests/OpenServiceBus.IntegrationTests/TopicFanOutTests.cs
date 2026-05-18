@@ -15,7 +15,7 @@ public class TopicFanOutTests
     [Fact]
     public async Task SendMessageAsync_TopicWithThreeFilteredSubscriptions_OnlyMatchingSubsReceive()
     {
-        // Arrange — broker, topology, and SDK client.
+        // Arrange - broker, topology, and SDK client.
         await using var harness = await IntegrationHarness.StartAsync();
 
         await harness.Topics.CreateTopicAsync(new TopicDescriptor { Name = "events" });
@@ -26,12 +26,16 @@ public class TopicFanOutTests
         // Replace $Default on eu/us with targeted SQL filters; everything keeps the catch-all $Default.
         await harness.Topics.CreateOrReplaceRuleAsync(new RuleDescriptor
         {
-            TopicName = "events", SubscriptionName = "eu", Name = "$Default",
+            TopicName = "events",
+            SubscriptionName = "eu",
+            Name = "$Default",
             Filter = new SqlFilter("region = 'eu'"),
         });
         await harness.Topics.CreateOrReplaceRuleAsync(new RuleDescriptor
         {
-            TopicName = "events", SubscriptionName = "us", Name = "$Default",
+            TopicName = "events",
+            SubscriptionName = "us",
+            Name = "$Default",
             Filter = new SqlFilter("region = 'us'"),
         });
 
@@ -47,12 +51,12 @@ public class TopicFanOutTests
         var zaMsg = new ServiceBusMessage("za-payload") { MessageId = "za-1" };
         zaMsg.ApplicationProperties["region"] = "za";
 
-        // Act — publish three messages, one per region.
+        // Act - publish three messages, one per region.
         await sender.SendMessageAsync(euMsg);
         await sender.SendMessageAsync(usMsg);
         await sender.SendMessageAsync(zaMsg);
 
-        // Assert — receive from each subscription and confirm the routing.
+        // Assert - receive from each subscription and confirm the routing.
         var euIds = await DrainAsync(client, "events", "eu");
         var usIds = await DrainAsync(client, "events", "us");
         var everythingIds = await DrainAsync(client, "events", "everything");
@@ -71,7 +75,9 @@ public class TopicFanOutTests
         await harness.Topics.CreateSubscriptionAsync(new SubscriptionDescriptor { TopicName = "events", Name = "eu" });
         await harness.Topics.CreateOrReplaceRuleAsync(new RuleDescriptor
         {
-            TopicName = "events", SubscriptionName = "eu", Name = "$Default",
+            TopicName = "events",
+            SubscriptionName = "eu",
+            Name = "$Default",
             Filter = new SqlFilter("region = 'eu'"),
         });
 
@@ -97,7 +103,9 @@ public class TopicFanOutTests
         await harness.Topics.CreateSubscriptionAsync(new SubscriptionDescriptor { TopicName = "events", Name = "orders" });
         await harness.Topics.CreateOrReplaceRuleAsync(new RuleDescriptor
         {
-            TopicName = "events", SubscriptionName = "orders", Name = "$Default",
+            TopicName = "events",
+            SubscriptionName = "orders",
+            Name = "$Default",
             Filter = new CorrelationFilter { Subject = "order-created" },
         });
 

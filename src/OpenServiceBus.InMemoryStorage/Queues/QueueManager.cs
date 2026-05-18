@@ -46,7 +46,7 @@ public sealed class QueueManager : IQueueRegistry
         ArgumentException.ThrowIfNullOrWhiteSpace(descriptor.Name);
 
         // M16: reject obviously broken auto-forward configs. We only do the cheap self-equality
-        // check at creation; target-exists is checked lazily by the router at runtime — that lets
+        // check at creation; target-exists is checked lazily by the router at runtime - that lets
         // config.json bootstrap entities in arbitrary order without forcing a topological sort.
         if (!string.IsNullOrEmpty(descriptor.ForwardTo) && string.Equals(descriptor.ForwardTo, descriptor.Name, StringComparison.OrdinalIgnoreCase))
         {
@@ -67,7 +67,7 @@ public sealed class QueueManager : IQueueRegistry
         await _store.CreateQueueAsync(descriptor.Name, cancellationToken).ConfigureAwait(false);
         QueueCreated?.Invoke(this, descriptor);
 
-        // Every main queue gets an implicit dead-letter sibling — Azure Service Bus's contract.
+        // Every main queue gets an implicit dead-letter sibling - Azure Service Bus's contract.
         // DLQs themselves do NOT get DLQ siblings (no recursion).
         if (!IsDeadLetterQueue(descriptor.Name))
         {

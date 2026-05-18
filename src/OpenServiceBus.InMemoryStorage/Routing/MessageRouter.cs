@@ -65,7 +65,7 @@ public sealed class MessageRouter : IMessageRouter
         if (depth >= ((IMessageRouter)this).MaxForwardDepth)
         {
             _logger.LogWarning(
-                "Auto-forward chain exceeded {MaxDepth} hops at '{Target}' — message dropped to prevent loops.",
+                "Auto-forward chain exceeded {MaxDepth} hops at '{Target}' - message dropped to prevent loops.",
                 ((IMessageRouter)this).MaxForwardDepth, targetEntityName);
             return;
         }
@@ -80,7 +80,7 @@ public sealed class MessageRouter : IMessageRouter
                 if (filterContext is null)
                 {
                     _logger.LogWarning(
-                        "Cannot fan-out at '{Topic}' without a filter context — message dropped. " +
+                        "Cannot fan-out at '{Topic}' without a filter context - message dropped. " +
                         "This usually means a queue's ForwardTo points at a topic; pass a filter context through the call site.",
                         topic.Name);
                     return;
@@ -115,7 +115,7 @@ public sealed class MessageRouter : IMessageRouter
         var queue = await _queues.GetAsync(targetEntityName, cancellationToken).ConfigureAwait(false);
         if (queue is null)
         {
-            _logger.LogWarning("Routing target '{Target}' resolves to neither a topic nor a queue — message dropped.", targetEntityName);
+            _logger.LogWarning("Routing target '{Target}' resolves to neither a topic nor a queue - message dropped.", targetEntityName);
             return;
         }
 

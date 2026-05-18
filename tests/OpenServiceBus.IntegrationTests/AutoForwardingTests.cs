@@ -13,7 +13,7 @@ public class AutoForwardingTests
     [Fact]
     public async Task SendMessageAsync_QueueWithForwardTo_LandsAtTargetNotSource()
     {
-        // Arrange — source forwards every message to target.
+        // Arrange - source forwards every message to target.
         await using var harness = await IntegrationHarness.StartAsync();
         await harness.Queues.CreateAsync(new QueueDescriptor { Name = "fwd-target" });
         await harness.Queues.CreateAsync(new QueueDescriptor { Name = "fwd-source", ForwardTo = "fwd-target" });
@@ -23,7 +23,7 @@ public class AutoForwardingTests
         var sender = client.CreateSender("fwd-source");
         await sender.SendMessageAsync(new ServiceBusMessage("hello") { MessageId = "m1" });
 
-        // Assert — source stays empty, target sees the message.
+        // Assert - source stays empty, target sees the message.
         (await harness.Store.CountAsync("fwd-source")).ShouldBe(0L, "the forwarding source must not hold messages");
         (await harness.Store.CountAsync("fwd-target")).ShouldBe(1L, "the message landed at the forward target");
 
@@ -37,7 +37,7 @@ public class AutoForwardingTests
     [Fact]
     public async Task DeadLetterMessageAsync_QueueWithForwardDlqTo_LandsAtTargetDlq()
     {
-        // Arrange — when source's DLQ would fire, route to a configured DLQ destination instead.
+        // Arrange - when source's DLQ would fire, route to a configured DLQ destination instead.
         await using var harness = await IntegrationHarness.StartAsync();
         await harness.Queues.CreateAsync(new QueueDescriptor { Name = "dlq-target" });
         await harness.Queues.CreateAsync(new QueueDescriptor
@@ -55,7 +55,7 @@ public class AutoForwardingTests
         received.ShouldNotBeNull();
         await receiver.DeadLetterMessageAsync(received, deadLetterReason: "boom", deadLetterErrorDescription: "manual");
 
-        // Assert — the source's own /$DeadLetterQueue stays empty; the configured target gets it.
+        // Assert - the source's own /$DeadLetterQueue stays empty; the configured target gets it.
         (await harness.Store.CountAsync("dlq-source/$DeadLetterQueue")).ShouldBe(0L,
             "the local DLQ must be bypassed when ForwardDeadLetteredMessagesTo is set");
         (await harness.Store.CountAsync("dlq-target")).ShouldBe(1L,
@@ -71,7 +71,7 @@ public class AutoForwardingTests
     [Fact]
     public async Task ForwardTo_ChainOfTwoQueues_MessageWalksTheChain()
     {
-        // Arrange — A → B → C
+        // Arrange - A → B → C
         await using var harness = await IntegrationHarness.StartAsync();
         await harness.Queues.CreateAsync(new QueueDescriptor { Name = "chain-c" });
         await harness.Queues.CreateAsync(new QueueDescriptor { Name = "chain-b", ForwardTo = "chain-c" });
@@ -90,7 +90,7 @@ public class AutoForwardingTests
     [Fact]
     public async Task ForwardTo_QueueToTopic_FanOutToSubscriptions()
     {
-        // Arrange — queue auto-forwards to a topic; both subscriptions match (TrueFilter $Default).
+        // Arrange - queue auto-forwards to a topic; both subscriptions match (TrueFilter $Default).
         await using var harness = await IntegrationHarness.StartAsync();
         await harness.Topics.CreateTopicAsync(new TopicDescriptor { Name = "events" });
         await harness.Topics.CreateSubscriptionAsync(new SubscriptionDescriptor { TopicName = "events", Name = "all-1" });
@@ -98,7 +98,7 @@ public class AutoForwardingTests
         await harness.Queues.CreateAsync(new QueueDescriptor { Name = "ingress", ForwardTo = "events" });
         await using var client = new ServiceBusClient(harness.ConnectionString);
 
-        // Act — sender attaches to the queue, broker forwards to the topic, topic fans out.
+        // Act - sender attaches to the queue, broker forwards to the topic, topic fans out.
         await client.CreateSender("ingress").SendMessageAsync(new ServiceBusMessage("broadcast"));
 
         // Assert
@@ -110,13 +110,15 @@ public class AutoForwardingTests
     [Fact]
     public async Task SubscriptionForwardTo_TopicFanOut_RoutesToSubsForwardTarget()
     {
-        // Arrange — events → sub 'eu' forwards to queue 'aggregate'; sub 'us' lands normally.
+        // Arrange - events → sub 'eu' forwards to queue 'aggregate'; sub 'us' lands normally.
         await using var harness = await IntegrationHarness.StartAsync();
         await harness.Topics.CreateTopicAsync(new TopicDescriptor { Name = "events2" });
         await harness.Queues.CreateAsync(new QueueDescriptor { Name = "aggregate" });
         await harness.Topics.CreateSubscriptionAsync(new SubscriptionDescriptor
         {
-            TopicName = "events2", Name = "eu", ForwardTo = "aggregate",
+            TopicName = "events2",
+            Name = "eu",
+            ForwardTo = "aggregate",
         });
         await harness.Topics.CreateSubscriptionAsync(new SubscriptionDescriptor { TopicName = "events2", Name = "us" });
         await using var client = new ServiceBusClient(harness.ConnectionString);
@@ -124,7 +126,7 @@ public class AutoForwardingTests
         // Act
         await client.CreateSender("events2").SendMessageAsync(new ServiceBusMessage("fanned"));
 
-        // Assert — 'eu' sub's backing queue stays empty (was forwarded); 'us' got the regular copy.
+        // Assert - 'eu' sub's backing queue stays empty (was forwarded); 'us' got the regular copy.
         (await harness.Store.CountAsync("events2/Subscriptions/eu")).ShouldBe(0L);
         (await harness.Store.CountAsync("events2/Subscriptions/us")).ShouldBe(1L);
         (await harness.Store.CountAsync("aggregate")).ShouldBe(1L);
@@ -142,13 +144,13 @@ public class AutoForwardingTests
     [Fact]
     public async Task ForwardTo_CycleExceedsDepthCap_MessageDropped()
     {
-        // Arrange — a → b, b → a is a runtime cycle. The 4-hop cap drops the message rather
+        // Arrange - a → b, b → a is a runtime cycle. The 4-hop cap drops the message rather
         // than recursing forever. Note: we install b first with no ForwardTo (which lets
         // creation succeed), then mutate it via the registry's idempotent-replace path.
         await using var harness = await IntegrationHarness.StartAsync();
         await harness.Queues.CreateAsync(new QueueDescriptor { Name = "ring-a", ForwardTo = "ring-b" });
         await harness.Queues.CreateAsync(new QueueDescriptor { Name = "ring-b" });
-        // Sneak in the back-reference by direct construction — going through CreateAsync
+        // Sneak in the back-reference by direct construction - going through CreateAsync
         // would self-loop-protect us, but ring-b → ring-a is allowed (only same-name rejected).
         await harness.Queues.DeleteAsync("ring-b");
         await harness.Queues.CreateAsync(new QueueDescriptor { Name = "ring-b", ForwardTo = "ring-a" });
@@ -157,7 +159,7 @@ public class AutoForwardingTests
         // Act
         await client.CreateSender("ring-a").SendMessageAsync(new ServiceBusMessage("doomed"));
 
-        // Assert — both ends stay empty: the router drops at MaxForwardDepth.
+        // Assert - both ends stay empty: the router drops at MaxForwardDepth.
         (await harness.Store.CountAsync("ring-a")).ShouldBe(0L);
         (await harness.Store.CountAsync("ring-b")).ShouldBe(0L);
     }

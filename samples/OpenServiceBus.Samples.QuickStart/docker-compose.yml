@@ -1,0 +1,24 @@
+# Brings up an OpenServiceBus broker with the `quickstart` queue pre-declared.
+#
+# Run from this directory:
+#
+#   docker compose up -d
+#   dotnet run                 # sends + receives three messages
+#   docker compose down -v     # tear down (the -v wipes the volume)
+services:
+  openservicebus:
+    image: ghcr.io/mauritsarissen/openservicebus:latest
+    container_name: osb-samples-quickstart
+    ports:
+      - "5672:5672"
+      - "5300:5300"
+    environment:
+      OPENSERVICEBUS__STORAGE__MODE: Sqlite
+      OPENSERVICEBUS__STORAGE__DATASOURCE: /data/broker.db
+      OPENSERVICEBUS_CONFIG: /etc/openservicebus/config.json
+    volumes:
+      - osb-quickstart-data:/data
+      - ./config.json:/etc/openservicebus/config.json:ro
+
+volumes:
+  osb-quickstart-data:

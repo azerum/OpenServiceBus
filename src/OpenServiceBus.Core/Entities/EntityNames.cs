@@ -1,9 +1,9 @@
 namespace OpenServiceBus.Core.Entities;
 
 /// <summary>
-/// Service Bus entity name conventions — the suffixes and helpers used to reason about
+/// Service Bus entity name conventions - the suffixes and helpers used to reason about
 /// sub-entities of a queue or topic (dead-letter queues, management endpoints, subscriptions).
-/// Lives in Core because every adapter — AMQP routing, REST CRUD, future config loader —
+/// Lives in Core because every adapter - AMQP routing, REST CRUD, future config loader -
 /// needs to recognise these patterns.
 /// </summary>
 public static class EntityNames

@@ -99,7 +99,7 @@ public sealed class EntityLinkProcessor : ILinkProcessor
                 return;
             }
 
-            // Topic vs queue is ambiguous from the attach alone — the address looks the same
+            // Topic vs queue is ambiguous from the attach alone - the address looks the same
             // ("orders" could be a queue or a topic). Resolve preferring topics IF this is a
             // sender attach and the topic exists; otherwise fall through to queue lookup.
             // Receiver attaches with a bare topic name (no /Subscriptions/) aren't valid in
@@ -140,7 +140,7 @@ public sealed class EntityLinkProcessor : ILinkProcessor
             return false;
         }
 
-        // Subscriptions are backed by regular queues — the receiver path works as-is. Sender
+        // Subscriptions are backed by regular queues - the receiver path works as-is. Sender
         // attaches to a subscription don't have a SB semantic (you publish to the topic, not the
         // subscription); refuse them to avoid silent misuse.
         if (isReceiverFromClient)
@@ -227,7 +227,7 @@ public sealed class EntityLinkProcessor : ILinkProcessor
     {
         // Acquire (or take next-available) session lock at attach time, BEFORE completing the
         // attach. The SDK reads the resolved session id from the attach response's filter set
-        // (via Source.FilterSet on the reply) — so we must know which session was picked.
+        // (via Source.FilterSet on the reply) - so we must know which session was picked.
         var linkName = attachContext.Link.Name;
         SessionLock? sessionLock;
         if (filter.SessionId is not null)

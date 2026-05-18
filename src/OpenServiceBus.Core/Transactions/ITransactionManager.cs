@@ -6,7 +6,7 @@ namespace OpenServiceBus.Core.Transactions;
 /// executing immediately; the coordinator link processor calls <see cref="CommitAsync"/> or
 /// <see cref="Rollback"/> when the client discharges the txn.
 ///
-/// Operations within a single txn replay in order on commit, atomically — partial-commit is
+/// Operations within a single txn replay in order on commit, atomically - partial-commit is
 /// not possible (the in-memory store is not crash-safe anyway). Rollback simply discards.
 /// </summary>
 public interface ITransactionManager
@@ -16,7 +16,7 @@ public interface ITransactionManager
 
     /// <summary>
     /// Append <paramref name="operation"/> to the named transaction. Returns false if the
-    /// txn id is unknown — typically because <see cref="CommitAsync"/>/<see cref="Rollback"/>
+    /// txn id is unknown - typically because <see cref="CommitAsync"/>/<see cref="Rollback"/>
     /// already ran. The caller should reject the wire-level frame in that case.
     /// </summary>
     bool Enlist(byte[] txnId, Func<CancellationToken, Task> operation);
@@ -27,6 +27,6 @@ public interface ITransactionManager
     /// <summary>Discard every enlisted op and forget the txn. No-op on unknown txn id.</summary>
     void Rollback(byte[] txnId);
 
-    /// <summary>Total open transactions — exposed for tests + diagnostics.</summary>
+    /// <summary>Total open transactions - exposed for tests + diagnostics.</summary>
     int OpenCount { get; }
 }

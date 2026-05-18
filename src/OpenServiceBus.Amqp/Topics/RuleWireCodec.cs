@@ -134,7 +134,7 @@ internal static class RuleWireCodec
     /// for the <c>enumerate-rules</c> response body. The Azure SDK's <c>AmqpRuleManager</c>
     /// requires the response shape to be a <see cref="DescribedValue"/> with the Service Bus
     /// rule-description descriptor code, whose value is a positional list of
-    /// <c>[filter, action, name]</c> — each entry itself a described-list value.
+    /// <c>[filter, action, name]</c> - each entry itself a described-list value.
     /// </summary>
     public static DescribedValue EncodeRuleDescription(string ruleName, RuleFilter filter) =>
         new DescribedValue(

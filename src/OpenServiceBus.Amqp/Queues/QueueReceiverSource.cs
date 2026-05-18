@@ -22,7 +22,7 @@ namespace OpenServiceBus.Amqp.Queues;
 /// dispositions back into store operations, moves messages to the DLQ when an explicit
 /// Rejected disposition arrives or when the delivery-count budget is exhausted (M5), and
 /// dead-letters / drops expired messages on dequeue (M6).
-/// One instance per (queue, sub-resource) — multiple client receivers can share it safely.
+/// One instance per (queue, sub-resource) - multiple client receivers can share it safely.
 /// </summary>
 public sealed class QueueReceiverSource : IMessageSource
 {
@@ -74,7 +74,7 @@ public sealed class QueueReceiverSource : IMessageSource
     {
         while (true)
         {
-            // Pass the receiver link name so the lock is scoped to this link — only this
+            // Pass the receiver link name so the lock is scoped to this link - only this
             // link's $management session can renew it (matches Service Bus's lock-link affinity).
             var locked = await _store.TryDequeueAsync(_entityName, _descriptor.LockDuration, link.Name).ConfigureAwait(false);
             if (locked is null) return null!;
@@ -125,7 +125,7 @@ public sealed class QueueReceiverSource : IMessageSource
             // ReceiveAndDelete: the client opened the link with snd-settle-mode=settled, meaning
             // we send the message as settled and NO disposition will arrive. The peek-lock we just
             // took would otherwise expire → ghost redelivery. Settle (delete) it now so the message
-            // is gone the moment we hand it to the framework. This is at-most-once semantics — a
+            // is gone the moment we hand it to the framework. This is at-most-once semantics - a
             // wire-level send failure loses the message, matching real Service Bus.
             if (link.SettleOnSend)
             {
@@ -186,7 +186,7 @@ public sealed class QueueReceiverSource : IMessageSource
                     disposition = "complete";
                     break;
 
-                // M8: Modified with UndeliverableHere=true is the SDK's DeferAsync wire signal —
+                // M8: Modified with UndeliverableHere=true is the SDK's DeferAsync wire signal -
                 // park the message in Deferred state instead of returning it to the active pool.
                 case Modified modified when modified.UndeliverableHere:
                     _store.TryDeferAsync(_entityName, lockToken).GetAwaiter().GetResult();
@@ -299,7 +299,7 @@ public sealed class QueueReceiverSource : IMessageSource
             : _descriptor.ForwardDeadLetteredMessagesTo!;
         await _router.RouteAsync(dlqTarget, dlqBytes, expiresAt: null, cancellationToken: cancellationToken).ConfigureAwait(false);
 
-        // M20: dead-letter counter tagged with the source queue and reason — lets a dashboard
+        // M20: dead-letter counter tagged with the source queue and reason - lets a dashboard
         // group "DLQ rate per queue" and spot reason-specific spikes (MaxDeliveryCountExceeded vs TTL).
         OpenServiceBusDiagnostics.MessagesDeadLettered.Add(1,
             new KeyValuePair<string, object?>(OpenServiceBusDiagnostics.TagDeadLetterSource, _entityName),

@@ -70,7 +70,7 @@ public sealed class TopicSenderProcessor : IMessageProcessor
             var scheduledFor = ReadScheduledEnqueueTime(msg);
             var filterContext = BuildFilterContext(msg, _timeProvider.GetUtcNow());
 
-            // M17: transactional fan-out — buffer the route-and-fanout under the txn so it
+            // M17: transactional fan-out - buffer the route-and-fanout under the txn so it
             // only happens on commit. Each enlist captures the same byte[] + filter context.
             if (messageContext.DeliveryState is TransactionalState txnState && txnState.TxnId is { Length: > 0 } txnId)
             {

@@ -1,0 +1,48 @@
+{
+  "UserConfig": {
+    "Namespaces": [
+      {
+        "Name": "topics-and-filters",
+        "Topics": [
+          {
+            "Name": "events",
+            "Subscriptions": [
+              {
+                "Name": "all",
+                "Properties": { "MaxDeliveryCount": 5 }
+              },
+              {
+                "Name": "eu-orders",
+                "Properties": { "MaxDeliveryCount": 5 },
+                "Rules": [
+                  {
+                    "Name": "EuAndHigh",
+                    "Properties": {
+                      "FilterType": "Sql",
+                      "SqlFilter": { "SqlExpression": "region = 'eu' AND priority >= 5" }
+                    }
+                  }
+                ]
+              },
+              {
+                "Name": "high-priority",
+                "Properties": { "MaxDeliveryCount": 5 },
+                "Rules": [
+                  {
+                    "Name": "PriorityNine",
+                    "Properties": {
+                      "FilterType": "Correlation",
+                      "CorrelationFilter": {
+                        "Properties": { "priority": "9" }
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -26,7 +26,7 @@ public sealed class AmqpListenerOptions
 
     /// <summary>
     /// Enable AMQPNetLite frame-level tracing routed through our logger at Debug level.
-    /// Off by default — useful when diagnosing wire-protocol interop issues with new clients.
+    /// Off by default - useful when diagnosing wire-protocol interop issues with new clients.
     /// </summary>
     public bool EnableFrameTracing { get; set; }
 

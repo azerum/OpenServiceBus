@@ -24,8 +24,8 @@ public class DuplicateDetectionTests
         await using var client = new ServiceBusClient(harness.ConnectionString);
         var sender = client.CreateSender("deduped");
 
-        // Act — three sends, two of which share MessageId "dup".
-        await sender.SendMessageAsync(new ServiceBusMessage("first")  { MessageId = "dup" });
+        // Act - three sends, two of which share MessageId "dup".
+        await sender.SendMessageAsync(new ServiceBusMessage("first") { MessageId = "dup" });
         await sender.SendMessageAsync(new ServiceBusMessage("second") { MessageId = "dup" });
         await sender.SendMessageAsync(new ServiceBusMessage("unique") { MessageId = "other" });
 
@@ -48,7 +48,7 @@ public class DuplicateDetectionTests
     [Fact]
     public async Task SendMessageAsync_DupOnQueueWithoutDetection_BothSurvive()
     {
-        // Arrange — same scenario, but the queue is not dup-detect-enabled.
+        // Arrange - same scenario, but the queue is not dup-detect-enabled.
         await using var harness = await IntegrationHarness.StartAsync();
         await harness.Queues.CreateAsync(new QueueDescriptor { Name = "no-dedup" });
         await using var client = new ServiceBusClient(harness.ConnectionString);

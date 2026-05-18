@@ -1,4 +1,4 @@
-# OpenServiceBus — post-v1.0 roadmap
+# OpenServiceBus - post-v1.0 roadmap
 
 v1.0 proved the protocol surface (queues + Functions trigger end-to-end via real AMQP 1.0).
 This document captures the next ~12 months of work, grouped into shippable phases. Each
@@ -7,7 +7,7 @@ phase ends with a tagged release; you don't have to ship the whole arc to make i
 ## Locked decisions
 
 - **Bicep/ARM bootstrap lands late (Phase 4, M22)** so it can map the full Service Bus
-  resource surface from day one — including topics, subscription rules, forwarding,
+  resource surface from day one - including topics, subscription rules, forwarding,
   sessions, and duplicate detection.
 - **Transactions are in-scope for Phase 2 (M17).** v1.x targets genuine Service Bus parity,
   not a subset.
@@ -19,12 +19,12 @@ phase ends with a tagged release; you don't have to ship the whole arc to make i
 
 ---
 
-## Phase 2 — Service Bus feature parity (v1.1 → v1.6)
+## Phase 2 - Service Bus feature parity (v1.1 → v1.6)
 
 The biggest gaps in the SB feature surface. Ordered so each milestone builds on the
 routing/storage primitives the previous one added.
 
-### M13 — Topics + Subscriptions + Filters (v1.1)
+### M13 - Topics + Subscriptions + Filters (v1.1)
 
 The flagship feature of Phase 2 and the largest single milestone in the roadmap.
 
@@ -33,7 +33,7 @@ The flagship feature of Phase 2 and the largest single milestone in the roadmap.
   `topic-name/subscriptions/sub-name/$DeadLetterQueue`.
 - Filter language support:
   - `TrueFilter` / `FalseFilter` (trivial)
-  - `CorrelationFilter` (property equality match — easy)
+  - `CorrelationFilter` (property equality match - easy)
   - `SqlFilter` (subset of T-SQL: comparison, AND/OR/NOT, property references,
     `LIKE`, `IS NULL`, `EXISTS`). Builds on the existing SqlFilter parser shape from
     the Azure SDK.
@@ -48,9 +48,9 @@ The flagship feature of Phase 2 and the largest single milestone in the roadmap.
 **Gate:** SDK publishes to a topic with three subscriptions on different SQL filters;
 only matching subs receive the message.
 
-### M14 — Sessions (v1.2)
+### M14 - Sessions (v1.2)
 
-Can run parallel to M13 — independent code paths.
+Can run parallel to M13 - independent code paths.
 
 - New queue/subscription property: `RequiresSession`.
 - `SessionId` propagation on send and receive.
@@ -65,19 +65,19 @@ Can run parallel to M13 — independent code paths.
 **Gate:** SDK `CreateSessionReceiverAsync` + ordered receive of all messages with the
 same `SessionId` + state round-trip.
 
-### M15 — Duplicate detection (v1.3)
+### M15 - Duplicate detection (v1.3)
 
-Smallest milestone — a quick win after the heavier M13/M14.
+Smallest milestone - a quick win after the heavier M13/M14.
 
 - New queue property: `RequiresDuplicateDetection`, `DuplicateDetectionHistoryTimeWindow`.
 - Per-entity sliding-window hash set keyed on `MessageId`.
 - Send path: if `MessageId` is in the window, silently drop (Service Bus's actual
-  behavior — not an error, the SDK is unaware).
+  behavior - not an error, the SDK is unaware).
 - Time-window eviction driven by `TimeProvider`.
 
 **Gate:** Send the same `MessageId` twice within the window → receiver sees only one.
 
-### M16 — Auto-forwarding (v1.4)
+### M16 - Auto-forwarding (v1.4)
 
 Builds on the routing layer from M13.
 
@@ -91,7 +91,7 @@ Builds on the routing layer from M13.
 **Gate:** Send to queue A configured `ForwardTo: B` → message lands in B only.
 Loop A→B→A → 4th hop rejected.
 
-### M17 — Transactions (v1.5)
+### M17 - Transactions (v1.5)
 
 The complex one. The AMQP spec is precise but the implementation has many edge cases.
 
@@ -105,29 +105,29 @@ The complex one. The AMQP spec is precise but the implementation has many edge c
 **Gate:** SDK `ServiceBusClient.CreateTransactionalBatch()` round-trip with mixed
 ops across two queues, committed atomically; same flow rolled back on discharge-fail.
 
-### M17.5 — v1.5 hardening + release (v1.5 final)
+### M17.5 - v1.5 hardening + release (v1.5 final)
 
 Bug bash, wire-protocol conformance test expansion, performance baseline run. Not a
-feature milestone — a release-stabilization milestone.
+feature milestone - a release-stabilization milestone.
 
 ---
 
-## Phase 3 — Production readiness (v1.6 → v1.9)
+## Phase 3 - Production readiness (v1.6 → v1.9)
 
 The "this broker can run unattended for weeks" phase.
 
-### M18 — Persistent storage (SQLite) (v1.6)
+### M18 - Persistent storage (SQLite) (v1.6)
 
 - `OpenServiceBus.SqliteStorage` package exposing `ISqlitePersistenceOptions` and an
   `AddOpenServiceBusSqliteStorage` DI extension.
-- Same `IMessageStore` contract as in-memory — pluggable, no broker-code changes.
+- Same `IMessageStore` contract as in-memory - pluggable, no broker-code changes.
 - Single SQLite file (configurable path); WAL mode for durability + concurrency.
 - Schema versioning + EF-Core-style migrations on startup.
 - Crash recovery: on restart, redeliver any messages that were under peek-lock when
   the process died (lock-expired-on-restart).
 - Performance gate: 10k msg/sec sustained send+receive on a laptop SSD.
 
-### M19 — OpenTelemetry (v1.7)
+### M19 - OpenTelemetry (v1.7)
 
 - `ActivitySource` for AMQP frame lifecycle, message lifecycle, lock lifecycle.
 - Metric instruments: queue depth (gauge), message-rate by op (counter), lock
@@ -136,7 +136,7 @@ The "this broker can run unattended for weeks" phase.
   names per subsystem.
 - OTel resource attributes (`service.namespace`, `service.name`, `service.version`).
 
-### M20 — AMQP-over-WebSocket (v1.8)
+### M20 - AMQP-over-WebSocket (v1.8)
 
 - ASP.NET Core WebSocket endpoint on the same Kestrel host as the management API.
 - Routes `Upgrade: websocket` requests through AMQPNetLite's `WebSocketTransport`.
@@ -144,32 +144,32 @@ The "this broker can run unattended for weeks" phase.
   firewalled environments).
 - Tested end-to-end with the Azure SDK in WebSocket mode.
 
-### M21 — Backpressure + memory bounds (v1.9)
+### M21 - Backpressure + memory bounds (v1.9)
 
 - Per-queue depth ceiling (configurable, default 100k messages or 256 MB whichever
   first).
 - On overflow: reject sends with `amqp:resource-limit-exceeded`.
-- Lock-table size ceiling — reject `TryDequeue` past a limit.
+- Lock-table size ceiling - reject `TryDequeue` past a limit.
 - Memory pressure observer hooked into GC notifications.
 - Stress test in CI: 1M-message burst doesn't OOM, gracefully rejects past the cap.
 
 ---
 
-## Phase 4 — Tooling & ecosystem (v2.0)
+## Phase 4 - Tooling & ecosystem (v2.0)
 
 This phase makes OpenServiceBus pleasant to use, not just functional.
 
-### M22 — Bicep / ARM template bootstrap (v2.0)
+### M22 - Bicep / ARM template bootstrap (v2.0)
 
 The single most-requested ergonomic feature.
 
 - `OpenServiceBus.BicepBootstrap` package.
 - Two input shapes:
-  - **`.bicep` file** — compiled in-process via the Bicep CLI (`bicep build --stdout`)
+  - **`.bicep` file** - compiled in-process via the Bicep CLI (`bicep build --stdout`)
     or via `Microsoft.Bicep.Core` if its public API has matured.
-  - **`.json` ARM template** — parsed directly; faster and dependency-free.
+  - **`.json` ARM template** - parsed directly; faster and dependency-free.
 - Recognizes the full `Microsoft.ServiceBus/*` resource family:
-  - `Microsoft.ServiceBus/namespaces` (namespace-level config — informational only)
+  - `Microsoft.ServiceBus/namespaces` (namespace-level config - informational only)
   - `Microsoft.ServiceBus/namespaces/queues`
   - `Microsoft.ServiceBus/namespaces/topics`
   - `Microsoft.ServiceBus/namespaces/topics/subscriptions`
@@ -185,7 +185,7 @@ The single most-requested ergonomic feature.
 **Gate:** Take a real production Bicep file used by an Azure deployment, point
 OpenServiceBus at it, get a broker shaped identically (modulo deferred features).
 
-### M23 — Explorer v2 (v2.0)
+### M23 - Explorer v2 (v2.0)
 
 - Topics + subscription tree view.
 - Subscription rule editor with a **"test this message against this filter"**
@@ -194,9 +194,9 @@ OpenServiceBus at it, get a broker shaped identically (modulo deferred features)
 - Scheduled-message timeline view.
 - DLQ tools: requeue-from-DLQ, reason filtering.
 - Session viewer.
-- All built on the management REST API — no Explorer-specific server code.
+- All built on the management REST API - no Explorer-specific server code.
 
-### M24 — `openservicebus` CLI (v2.0)
+### M24 - `openservicebus` CLI (v2.0)
 
 - Scriptable wrapper around the management REST API.
 - Verbs: `queue create/delete/list/describe`, `topic create`, `subscription create`,
@@ -204,7 +204,7 @@ OpenServiceBus at it, get a broker shaped identically (modulo deferred features)
 - Output formats: `--output json|table|jsonl` for piping into other tools.
 - Connection string read from `OPENSERVICEBUS_CONNECTION` env var or `--endpoint`.
 
-### M25 — Docker image + Helm chart (v2.0)
+### M25 - Docker image + Helm chart (v2.0)
 
 - Multi-arch (amd64, arm64) `ghcr.io/mauritsarissen/openservicebus` image.
 - Bundled `config.json`/Bicep bootstrap support via mounted volume.
@@ -213,7 +213,7 @@ OpenServiceBus at it, get a broker shaped identically (modulo deferred features)
 - Helm chart with sensible defaults; PVC for the SQLite file; ServiceMonitor for
   the OTel metrics from M19.
 
-### M26 — Documentation site (v2.0)
+### M26 - Documentation site (v2.0)
 
 - mkdocs-material site at `docs.openservicebus.dev` (or similar).
 - Sections: Getting Started, Concepts (queues/topics/subs/sessions/transactions),
@@ -227,16 +227,16 @@ OpenServiceBus at it, get a broker shaped identically (modulo deferred features)
 
 ## Release cadence
 
-| Phase | Releases | Target |
-| --- | --- | --- |
+| Phase   | Releases    | Target                                            |
+| ------- | ----------- | ------------------------------------------------- |
 | Phase 2 | v1.1 → v1.5 | One milestone per minor release; ~4–8 weeks each. |
 | Phase 3 | v1.6 → v1.9 | One milestone per minor release; ~3–6 weeks each. |
-| Phase 4 | v2.0 | All five milestones land together as v2.0. |
+| Phase 4 | v2.0        | All five milestones land together as v2.0.        |
 
 ## Versioning
 
 - Phase 2 lands feature additions under v1.x (no breaking changes).
-- Phase 3 is internal hardening — also v1.x.
+- Phase 3 is internal hardening - also v1.x.
 - Phase 4 is allowed breaking API changes if needed (e.g. config schema cleanups);
   hence v2.0.
 
@@ -258,5 +258,5 @@ The following have been considered and intentionally rejected from this roadmap:
 ## Tracking
 
 Each milestone gets its own GitHub milestone + tracking issue once Phase 2 starts.
-This document is the source of truth for ordering and scope — edit it (with a PR)
+This document is the source of truth for ordering and scope - edit it (with a PR)
 when priorities shift.

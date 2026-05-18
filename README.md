@@ -1,150 +1,333 @@
 # OpenServiceBus
 
 [![CI](https://github.com/mauritsarissen/OpenServiceBus/actions/workflows/ci.yml/badge.svg)](https://github.com/mauritsarissen/OpenServiceBus/actions/workflows/ci.yml)
+[![NuGet](https://img.shields.io/badge/NuGet-OpenServiceBus.Testing-blue?logo=nuget)](https://github.com/mauritsarissen/OpenServiceBus/packages)
+[![Docker Hub](https://img.shields.io/badge/Docker-mauritsarissen%2Fopenservicebus-2496ED?logo=docker)](https://hub.docker.com/r/mauritsarissen/openservicebus)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-> A zero-dependency, embeddable Azure Service Bus emulator for .NET. Speaks real AMQP 1.0 so any Service Bus client — including `Azure.Messaging.ServiceBus` and Azure Functions `ServiceBusTrigger` — connects unmodified.
+> A zero-dependency, embeddable **Azure Service Bus emulator** for .NET. Speaks real AMQP 1.0
+> over TCP **and** WebSocket so `Azure.Messaging.ServiceBus`, Azure Functions `ServiceBusTrigger`,
+> and any other Service Bus client connect unmodified.
 
-## Why?
+---
 
-Microsoft ships an official Service Bus emulator, but it requires Docker, SQL Server, and is EULA-gated. OpenServiceBus fills the gap: an MIT-licensed broker that runs as a NuGet package inside your unit-test fixture — no containers, no SQL, no external processes.
+## Why this exists
 
-| | OpenServiceBus | Official emulator |
-| --- | --- | --- |
-| License | MIT | EULA-gated |
-| Embeddable in tests | Yes (`OpenServiceBus.Testing`) | No |
-| Dependencies | None | Docker + SQL Server |
-| Footprint | ~MB | ~GB |
-| Persistence | In-memory (SQLite optional, post-MVP) | SQL Server |
-| Config format | Microsoft `config.json` compatible | Microsoft `config.json` |
+Microsoft ships an official Service Bus emulator, but it needs Docker + SQL Server and is
+EULA-gated. OpenServiceBus is the MIT-licensed alternative: a single-node Service Bus
+emulator that runs as a NuGet inside your test fixture, as a `docker run`, or as a
+standalone executable — no SQL Server, no licensing dance, no 5-minute container boot.
 
-## Feature coverage (v1.0)
+It implements the full Service Bus feature surface that real client code uses: **queues,
+topics + subscriptions (SQL/correlation filters), sessions, duplicate detection,
+auto-forwarding, transactions, defer, scheduled messages, TTL, peek-lock with renewal,
+dead-letter routing**, exposed over both **plain AMQP** and **AMQP-over-WebSocket**, with
+native **OpenTelemetry** instrumentation throughout.
 
-Queues end-to-end with the `Azure.Messaging.ServiceBus` SDK and Azure Functions `ServiceBusTrigger`:
+|                          | OpenServiceBus                         | Official Microsoft emulator |
+| ------------------------ | -------------------------------------- | --------------------------- |
+| License                  | MIT                                    | EULA-gated                  |
+| Embeddable in tests      | ✅ `OpenServiceBus.Testing` NuGet      | ❌                          |
+| Container size           | ~230 MB Alpine                         | ~2 GB                       |
+| Persistence              | In-memory or SQLite (single file)      | SQL Server (required)       |
+| Transports               | AMQP-TCP + AMQP-over-WebSocket         | AMQP-TCP only               |
+| Telemetry                | Native OpenTelemetry tracing + metrics | None                        |
+| `config.json` compatible | ✅                                     | ✅                          |
 
-- Peek-lock receive (`PeekLock` and `ReceiveAndDelete` modes)
-- Complete / Abandon / Dead-letter via dispositions and `$management`
-- Lock renewal (`RenewMessageLockAsync`)
-- Dead-letter queue as a triggerable sub-entity (`<queue>/$DeadLetterQueue`)
-- TTL per message and per queue (smaller wins; optional auto-DLQ on expiration)
-- Scheduled messages (`ScheduleMessageAsync`, `CancelScheduledMessageAsync`)
-- Defer + receive-by-sequence-number + update-disposition
-- Batched send (`SendMessagesAsync`) split into individual stored messages
-- Peek via `$management com.microsoft:peek-message`
-- Lock-token = delivery-tag UUID — matches Service Bus wire format
-- Standard AMQP properties + `x-opt-*` annotations (sequence, enqueued time, locked-until, delivery-count, deadletter-source, scheduled-enqueue-time, message-state)
-- Optional SAS auth via `$cbs put-token` (flag-gated, default off)
-- Bootstrap queues from Microsoft-emulator-compatible `config.json`
+---
 
-Out of scope for v1.0 (post-MVP): Topics + Subscriptions, Sessions, Duplicate detection, Auto-forwarding, Transactions, persistent storage (SQLite/SQL), Docker image.
+## Install
 
-## Quickstart
+### From source
 
-### As an embedded test fixture
+```bash
+git clone https://github.com/mauritsarissen/OpenServiceBus
+cd OpenServiceBus
+dotnet run --project src/OpenServiceBus.Host
+```
+
+The host binds `amqp://localhost:5672` (Service Bus SDK) and `http://localhost:5300`
+(REST management + `/health`).
+
+### Docker
+
+```bash
+docker run -d --name openservicebus \
+  -p 5672:5672 \
+  -p 5300:5300 \
+  -v osb-data:/data \
+  ghcr.io/mauritsarissen/openservicebus:latest
+```
+
+| Port   | What                                                                 |
+| ------ | -------------------------------------------------------------------- |
+| `5672` | AMQP (use this in the Azure SDK connection string)                   |
+| `5300` | REST management API + `/health`                                      |
+| `5673` | AMQP-over-WebSocket (when `OPENSERVICEBUS__WEBSOCKETS__ENABLED=true`) |
+
+The image runs SQLite-backed at `/data/broker.db` — mount the named volume and queues +
+messages survive container recreates. See [Docker](docs/Docker.md) for the compose recipe,
+every env var, and the WebSocket-transport setup.
+
+### Connect
+
+The same connection string works against either install path:
+
+```text
+Endpoint=sb://localhost:5672;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true
+```
+
+```csharp
+await using var client = new ServiceBusClient(
+    "Endpoint=sb://localhost:5672;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true");
+
+await client.CreateSender("orders").SendMessageAsync(new ServiceBusMessage("hello"));
+var msg = await client.CreateReceiver("orders").ReceiveMessageAsync();
+```
+
+`UseDevelopmentEmulator=true` tells the Azure SDK to skip TLS and accept the broker on
+plain TCP — the same trick the official Microsoft emulator uses.
+
+---
+
+## As a NuGet inside your tests
+
+If you don't want any external process at all, install the test fixture and run the broker
+inside your test process:
+
+```bash
+dotnet add package OpenServiceBus.Testing \
+    --source https://nuget.pkg.github.com/mauritsarissen/index.json
+```
 
 ```csharp
 await using var host = await OpenServiceBusTestHost.StartAsync();
 await host.CreateQueueAsync("orders");
 
 await using var client = new ServiceBusClient(host.ConnectionString);
-var sender = client.CreateSender("orders");
-await sender.SendMessageAsync(new ServiceBusMessage("hello"));
+await client.CreateSender("orders").SendMessageAsync(new ServiceBusMessage("hello"));
 
 var receiver = client.CreateReceiver("orders");
 var msg = await receiver.ReceiveMessageAsync();
 await receiver.CompleteMessageAsync(msg);
 ```
 
-### As a standalone process
+One disposable host, free ephemeral port, full AMQP semantics — run thousands of these in
+parallel. See [Testing](docs/Testing.md) for time-travel, parity testing, and the options
+surface.
 
-```bash
-dotnet run --project src/OpenServiceBus.Host
+---
+
+## Feature recipes
+
+### Topics + filters (SQL / correlation / true / false)
+
+```csharp
+await host.Topics.CreateTopicAsync(new TopicDescriptor { Name = "events" });
+await host.Topics.CreateSubscriptionAsync(new SubscriptionDescriptor
+    { TopicName = "events", Name = "eu" });
+await host.Topics.CreateOrReplaceRuleAsync(new RuleDescriptor
+{
+    TopicName = "events", SubscriptionName = "eu", Name = "EuOnly",
+    Filter = new SqlFilter("region = 'eu' AND priority >= 5"),
+});
+
+await client.CreateSender("events").SendMessageAsync(new ServiceBusMessage("hi-eu")
+{
+    ApplicationProperties = { ["region"] = "eu", ["priority"] = 7 }
+});
 ```
 
-Then connect with the standard Service Bus emulator connection string:
+→ [Topics and Subscriptions](docs/Topics-and-Subscriptions.md)
 
-```text
-Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true
+### Sessions
+
+```csharp
+await host.Queues.CreateAsync(new QueueDescriptor { Name = "sessioned", RequiresSession = true });
+var sender = client.CreateSender("sessioned");
+await sender.SendMessageAsync(new ServiceBusMessage("a") { SessionId = "S" });
+await sender.SendMessageAsync(new ServiceBusMessage("b") { SessionId = "S" });
+
+var session = await client.AcceptSessionAsync("sessioned", "S");
+var first  = await session.ReceiveMessageAsync(); // "a"
+var second = await session.ReceiveMessageAsync(); // "b"
 ```
 
-The `UseDevelopmentEmulator=true` flag tells the Azure SDK to skip TLS and accept the broker on plain TCP 5672.
+→ [Sessions](docs/Sessions.md)
 
-### Declarative bootstrap with `config.json`
+### Transactions (`TransactionScope`)
 
-OpenServiceBus reads the same `config.json` format as the official Microsoft Service Bus emulator. Drop a file like this next to the host and queues are declared at startup:
+```csharp
+using (var scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+{
+    await sender.SendMessageAsync(new ServiceBusMessage("a"));
+    await receiver.CompleteMessageAsync(previouslyReceivedMessage);
+    scope.Complete(); // commit; without this everything rolls back
+}
+```
+
+→ [Transactions](docs/Transactions.md)
+
+### Auto-forwarding
+
+```csharp
+await host.Queues.CreateAsync(new QueueDescriptor { Name = "downstream" });
+await host.Queues.CreateAsync(new QueueDescriptor
+    { Name = "ingress", ForwardTo = "downstream" });
+// Sends to "ingress" land on "downstream" — invisible to senders.
+```
+
+→ [Auto-Forwarding](docs/Auto-Forwarding.md)
+
+### Duplicate detection
+
+```csharp
+await host.Queues.CreateAsync(new QueueDescriptor
+{
+    Name = "deduped",
+    RequiresDuplicateDetection = true,
+    DuplicateDetectionHistoryTimeWindow = TimeSpan.FromMinutes(5),
+});
+
+await sender.SendMessageAsync(new ServiceBusMessage("first")  { MessageId = "k" });
+await sender.SendMessageAsync(new ServiceBusMessage("second") { MessageId = "k" }); // silently dropped
+```
+
+→ [Duplicate Detection](docs/Duplicate-Detection.md)
+
+### Declarative `config.json` bootstrap
+
+OpenServiceBus reads the same `config.json` format as the official Microsoft emulator:
 
 ```json
 {
   "UserConfig": {
-    "Namespaces": [
-      {
-        "Name": "openservicebus-demo",
-        "Queues": [
-          {
-            "Name": "orders",
-            "Properties": {
-              "LockDuration": "PT1M",
-              "MaxDeliveryCount": 3,
-              "DefaultMessageTimeToLive": "PT1H",
-              "DeadLetteringOnMessageExpiration": true
-            }
-          }
-        ]
-      }
-    ]
+    "Namespaces": [{
+      "Name": "demo",
+      "Queues": [
+        { "Name": "orders", "Properties": {
+            "LockDuration": "PT1M",
+            "MaxDeliveryCount": 3,
+            "RequiresSession": false,
+            "DefaultMessageTimeToLive": "PT1H"
+        }}
+      ]
+    }]
   }
 }
 ```
 
-Resolution order:
+Resolution: `--config <path>` → `OPENSERVICEBUS_CONFIG` env var → `config.json` in the
+host's content-root. Full schema in [Configuration](docs/Configuration.md).
 
-1. `--config <path>` CLI argument
-2. `OPENSERVICEBUS_CONFIG` environment variable
-3. `config.json` in the host's content-root directory
-
-Fields that map to post-MVP features (`RequiresSession`, `RequiresDuplicateDetection`, `ForwardTo`, `Topics`, …) are accepted for compatibility but logged as warnings.
-
-A working example lives at [`samples/config.sample.json`](samples/config.sample.json).
-
-## Architecture
-
-- `OpenServiceBus.Core` — domain types (`StoredMessage`, `QueueDescriptor`, `LockToken`), storage abstractions, `config.json` POCOs + loader.
-- `OpenServiceBus.InMemoryStorage` — `InMemoryMessageStore`, `QueueManager`, `LockManager`, TTL/scheduled sweepers, DI helpers.
-- `OpenServiceBus.Amqp` — AMQP 1.0 listener (via [AMQPNetLite.Listener](https://github.com/Azure/amqpnetlite)), link handlers, Service Bus protocol mapping, `$management` and `$cbs` endpoints, SAS validation.
-- `OpenServiceBus.Management` — REST API for entity CRUD.
-- `OpenServiceBus.Host` — executable hosting the AMQP listener + management API + `config.json` bootstrap.
-- `OpenServiceBus.Testing` — embeddable test fixture (`OpenServiceBusTestHost`).
-- `OpenServiceBus.Explorer` — browser-based UI for testing the broker end-to-end. Create queues, send and receive messages, complete or abandon under peek-lock.
+### Persistence (SQLite)
 
 ```bash
-# Terminal 1: broker (AMQP :5672, management REST :5300)
+export OPENSERVICEBUS__STORAGE__MODE=Sqlite
+export OPENSERVICEBUS__STORAGE__DATASOURCE=/data/broker.db
 dotnet run --project src/OpenServiceBus.Host
-
-# Terminal 2: explorer UI (:5400)
-dotnet run --project src/OpenServiceBus.Explorer
 ```
+
+→ [Persistence](docs/Persistence.md)
+
+### AMQP-over-WebSocket
+
+```bash
+export OPENSERVICEBUS__WEBSOCKETS__ENABLED=true
+dotnet run --project src/OpenServiceBus.Host
+```
+
+```csharp
+await using var client = new ServiceBusClient(
+    "Endpoint=sb://localhost:5673;...;UseDevelopmentEmulator=true",
+    new ServiceBusClientOptions { TransportType = ServiceBusTransportType.AmqpWebSockets });
+```
+
+→ [WebSocket Transport](docs/WebSocket-Transport.md)
+
+### OpenTelemetry
+
+```csharp
+services.AddOpenTelemetry()
+    .WithTracing(b => b.AddSource(OpenServiceBusDiagnostics.SourceName).AddOtlpExporter())
+    .WithMetrics(b => b.AddMeter(OpenServiceBusDiagnostics.SourceName).AddOtlpExporter());
+```
+
+→ [OpenTelemetry](docs/OpenTelemetry.md)
+
+---
+
+## Configuration
+
+The host honors these `appsettings.json` / environment variable keys:
+
+| Key                                  | Default    | Notes                                                               |
+| ------------------------------------ | ---------- | ------------------------------------------------------------------- |
+| `OpenServiceBus:Amqp:Port`           | `5672`     | AMQP listener port                                                  |
+| `OpenServiceBus:Amqp:RequireSasAuth` | `false`    | Validate `$cbs put-token` against `SasKeys`                         |
+| `OpenServiceBus:Storage:Mode`        | `InMemory` | `Sqlite` to persist via the SQLite store                            |
+| `OpenServiceBus:Storage:DataSource`  | `:memory:` | Path to the SQLite `.db` file (use `/data/broker.db` in containers) |
+| `OpenServiceBus:WebSockets:Enabled`  | `false`    | Start the AMQP-over-WebSocket bridge                                |
+| `OpenServiceBus:WebSockets:Port`     | `5673`     | WebSocket bridge port                                               |
+| `OPENSERVICEBUS_CONFIG`              | —          | Path to a `config.json` for declarative bootstrap                   |
+
+Full reference: [Configuration](docs/Configuration.md).
+
+---
 
 ## Samples
 
-- [`samples/OpenServiceBus.Functions.Sample`](samples/OpenServiceBus.Functions.Sample) — minimal isolated-worker Functions app used by the M11 "feels real" integration test.
-- [`samples/TriggerDemo`](samples/TriggerDemo) — interactive Functions app you start with `func start`. Exercises peek-lock, retry-to-DLQ, DLQ trigger, manual disposition, batched receive, and HTTP-driven output bindings — all against a running OpenServiceBus.Host instance.
-- [`samples/config.sample.json`](samples/config.sample.json) — sample `config.json` for declarative queue bootstrap.
+Each sample is self-contained: it ships a `docker-compose.yml`, a `config.json`, and a
+`README.md` that explains what it demonstrates and how to run it.
+
+- **[`samples/OpenServiceBus.Samples.QuickStart`](samples/OpenServiceBus.Samples.QuickStart)** — minimal console send/receive against an emulator container.
+- **[`samples/OpenServiceBus.Samples.TopicsAndFilters`](samples/OpenServiceBus.Samples.TopicsAndFilters)** — pub-sub with SQL + correlation filter rules.
+- **[`samples/OpenServiceBus.Samples.Sessions`](samples/OpenServiceBus.Samples.Sessions)** — session-locked workers with per-session FIFO ordering.
+- **[`samples/OpenServiceBus.Samples.WorkerService`](samples/OpenServiceBus.Samples.WorkerService)** — `Microsoft.Extensions.Hosting` background-worker pattern.
+- **[`samples/OpenServiceBus.Samples.Functions`](samples/OpenServiceBus.Samples.Functions)** — minimal Azure Functions `ServiceBusTrigger` app (the M11 integration-test target).
+- **[`samples/OpenServiceBus.Samples.FunctionsTriggerDemo`](samples/OpenServiceBus.Samples.FunctionsTriggerDemo)** — interactive multi-trigger Functions app driven via the Explorer or HTTP.
+
+See [`samples/README.md`](samples/README.md) for the full index and a quick chooser table.
+
+---
+
+## Documentation
+
+Multi-page guides in [`docs/`](docs/) — also published to the [GitHub Wiki](https://github.com/mauritsarissen/OpenServiceBus/wiki):
+
+- **[Getting Started](docs/Getting-Started.md)** — install + first send/receive
+- **[Configuration](docs/Configuration.md)** — `config.json`, env vars, every option
+- **[Architecture](docs/Architecture.md)** — assemblies, AMQP layer, store contracts
+- **[Docker](docs/Docker.md)** — image, compose, env vars, persistence
+- **[Persistence](docs/Persistence.md)** — SQLite store, schema, restart semantics
+- **[Topics and Subscriptions](docs/Topics-and-Subscriptions.md)** — filters, rules, fan-out
+- **[Sessions](docs/Sessions.md)** — session-locked receivers, state, ordering
+- **[Auto-Forwarding](docs/Auto-Forwarding.md)** — `ForwardTo`, DLQ forwarding, cycles
+- **[Transactions](docs/Transactions.md)** — coordinator, `TransactionScope`, semantics
+- **[Duplicate Detection](docs/Duplicate-Detection.md)** — window, observed behavior
+- **[WebSocket Transport](docs/WebSocket-Transport.md)** — bridge setup, ports, client config
+- **[OpenTelemetry](docs/OpenTelemetry.md)** — source names, attributes, gauges
+- **[Explorer UI](docs/Explorer.md)** — running the browser console
+- **[Testing](docs/Testing.md)** — `OpenServiceBusTestHost`, fake-time, parity tests
+- **[Contributing](docs/Contributing.md)** — repo layout, conventions, releasing
+- **[Roadmap](docs/ROADMAP.md)** — what's next
+
+---
 
 ## Development
 
 ```bash
-dotnet build
-dotnet test
+dotnet build         # multi-targets net8.0 + net10.0
+dotnet test          # full regression suite (~210 tests)
+docker build -t openservicebus:dev .
 ```
 
-Targets: `net8.0;net10.0` for libraries; `net10.0` for the executable host.
+The Azure Functions integration test (M11) requires `func` (Azure Functions Core Tools v4)
+and the .NET 8 runtime; it skips when either is missing. See [Contributing](docs/Contributing.md)
+for repo conventions, the release flow, and how to add a new milestone.
 
-The Azure Functions integration test (M11) requires `func` (Azure Functions Core Tools v4) and the .NET 8 runtime; it skips gracefully when either is missing.
-
-## Status
-
-v1.0 — Queues, the Azure SDK, and Azure Functions triggers covered end-to-end. See [the implementation plan](docs/PLAN.md) for the v1.0 milestones and [`docs/ROADMAP.md`](docs/ROADMAP.md) for the post-v1.0 roadmap (Topics + filters, sessions, transactions, persistence, Bicep bootstrap, …).
+---
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) © Maurits Arissen and OpenServiceBus contributors.

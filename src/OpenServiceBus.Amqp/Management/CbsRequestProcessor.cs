@@ -12,7 +12,7 @@ namespace OpenServiceBus.Amqp.Management;
 /// In emulator mode (the OpenServiceBus default), this processor accepts any token
 /// and replies with statusCode=202 / statusDescription="Accepted". When
 /// <see cref="AmqpListenerOptions.RequireSasAuth"/> is enabled the token is validated
-/// against the configured <see cref="AmqpListenerOptions.SasKeys"/> — invalid tokens
+/// against the configured <see cref="AmqpListenerOptions.SasKeys"/> - invalid tokens
 /// get 401 Unauthorized and the SDK surfaces an auth failure to the caller.
 ///
 /// Critical wire contract (the Azure SDK / Microsoft.Azure.Amqp is strict and NREs on missing fields).
@@ -20,8 +20,8 @@ namespace OpenServiceBus.Amqp.Management;
 /// <list type="bullet">
 ///   <item>Response <c>properties.correlation-id</c> must echo the request's <c>properties.message-id</c>.</item>
 ///   <item>Response <c>application-properties</c> keys are <b>kebab-case</b>
-///         (<c>status-code</c>, <c>status-description</c>) — NOT camelCase.</item>
-///   <item><c>status-code</c> is an <c>int32</c> (the SDK does <c>(int)</c> cast directly — wrong int width NREs).</item>
+///         (<c>status-code</c>, <c>status-description</c>) - NOT camelCase.</item>
+///   <item><c>status-code</c> is an <c>int32</c> (the SDK does <c>(int)</c> cast directly - wrong int width NREs).</item>
 ///   <item>The message body is sent as an <c>AmqpValue</c>.</item>
 /// </list>
 /// </summary>

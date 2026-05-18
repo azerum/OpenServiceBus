@@ -1,0 +1,21 @@
+# Broker for the interactive Functions trigger demo. The three queues this app's
+# triggers attach to (`orders`, `manual-queue`, `batch-queue`) are declared via the
+# mounted config.json so they're ready the moment the broker starts.
+services:
+  openservicebus:
+    image: ghcr.io/mauritsarissen/openservicebus:latest
+    container_name: osb-samples-trigger-demo
+    ports:
+      - "5672:5672"   # AMQP
+      - "5300:5300"   # REST + /health
+    environment:
+      OPENSERVICEBUS__STORAGE__MODE: Sqlite
+      OPENSERVICEBUS__STORAGE__DATASOURCE: /data/broker.db
+      OPENSERVICEBUS_CONFIG: /etc/openservicebus/config.json
+    volumes:
+      - osb-trigger-demo-data:/data
+      - ./config.json:/etc/openservicebus/config.json:ro
+    restart: unless-stopped
+
+volumes:
+  osb-trigger-demo-data:

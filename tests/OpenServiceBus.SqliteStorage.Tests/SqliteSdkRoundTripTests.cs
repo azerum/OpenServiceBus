@@ -10,7 +10,7 @@ namespace OpenServiceBus.SqliteStorage.Tests;
 /// End-to-end SDK proof that <see cref="SqliteMessageStore"/> works as the broker's backing
 /// store. Boots <see cref="OpenServiceBusTestHost"/> with a SQLite (in-memory) factory and
 /// drives it via the real <c>Azure.Messaging.ServiceBus</c> client. This is the parity gate
-/// — anything an in-memory test does should work here too.
+/// - anything an in-memory test does should work here too.
 /// </summary>
 public class SqliteSdkRoundTripTests
 {
@@ -94,9 +94,9 @@ public class SqliteSdkRoundTripTests
         await using var client = new ServiceBusClient(host.ConnectionString);
         var sender = client.CreateSender("dedup");
 
-        await sender.SendMessageAsync(new ServiceBusMessage("first")  { MessageId = "k" });
+        await sender.SendMessageAsync(new ServiceBusMessage("first") { MessageId = "k" });
         await sender.SendMessageAsync(new ServiceBusMessage("second") { MessageId = "k" });
-        await sender.SendMessageAsync(new ServiceBusMessage("third")  { MessageId = "other" });
+        await sender.SendMessageAsync(new ServiceBusMessage("third") { MessageId = "other" });
 
         (await host.Store.CountAsync("dedup")).ShouldBe(2L, "the second 'k' is silently dropped");
     }

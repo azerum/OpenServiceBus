@@ -7,8 +7,8 @@ namespace OpenServiceBus.Amqp.Hosting;
 
 /// <summary>
 /// Enables the SASL mechanisms an Azure Service Bus client expects:
-///   <c>ANONYMOUS</c>  — generic AMQP clients use this.
-///   <c>MSSBCBS</c>    — Azure SDK / Service Bus protocol stack always uses this in emulator mode;
+///   <c>ANONYMOUS</c>  - generic AMQP clients use this.
+///   <c>MSSBCBS</c>    - Azure SDK / Service Bus protocol stack always uses this in emulator mode;
 ///                       at the SASL layer it is a no-op handshake (real auth happens via $cbs put-token).
 /// </summary>
 internal static class ServiceBusSasl
@@ -25,7 +25,7 @@ internal static class ServiceBusSasl
     /// <summary>
     /// AMQPNetLite ships <c>SaslNoActionProfile</c> as the impl behind <c>SaslProfile.Anonymous</c>
     /// but keeps it <c>internal</c>. Construct it via reflection with our own mechanism name so the
-    /// listener advertises MSSBCBS as a supported, no-op mechanism — same wire behavior, different name.
+    /// listener advertises MSSBCBS as a supported, no-op mechanism - same wire behavior, different name.
     /// </summary>
     private static SaslProfile CreateMssbcbsProfile()
     {

@@ -1,0 +1,18 @@
+# Broker for the worker-service sample.
+services:
+  openservicebus:
+    image: ghcr.io/mauritsarissen/openservicebus:latest
+    container_name: osb-samples-worker
+    ports:
+      - "5672:5672"
+      - "5300:5300"
+    environment:
+      OPENSERVICEBUS__STORAGE__MODE: Sqlite
+      OPENSERVICEBUS__STORAGE__DATASOURCE: /data/broker.db
+      OPENSERVICEBUS_CONFIG: /etc/openservicebus/config.json
+    volumes:
+      - osb-worker-data:/data
+      - ./config.json:/etc/openservicebus/config.json:ro
+
+volumes:
+  osb-worker-data:

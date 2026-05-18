@@ -66,12 +66,16 @@ public class TopicManagerTests
         // Replace $Default on eu/us with targeted SQL filters; everything keeps $Default (TrueFilter).
         await topics.CreateOrReplaceRuleAsync(new RuleDescriptor
         {
-            TopicName = "events", SubscriptionName = "eu", Name = "$Default",
+            TopicName = "events",
+            SubscriptionName = "eu",
+            Name = "$Default",
             Filter = new SqlFilter("region = 'eu'"),
         });
         await topics.CreateOrReplaceRuleAsync(new RuleDescriptor
         {
-            TopicName = "events", SubscriptionName = "us", Name = "$Default",
+            TopicName = "events",
+            SubscriptionName = "us",
+            Name = "$Default",
             Filter = new SqlFilter("region = 'us'"),
         });
 
@@ -108,7 +112,7 @@ public class TopicManagerTests
         var matched = topics.EvaluateSubscribers("events", Msg());
 
         // Assert
-        matched.ShouldBeEmpty("a subscription with zero rules matches nothing — Azure SB's behavior");
+        matched.ShouldBeEmpty("a subscription with zero rules matches nothing - Azure SB's behavior");
     }
 
     [Fact]
@@ -122,12 +126,16 @@ public class TopicManagerTests
         // Act
         await topics.CreateOrReplaceRuleAsync(new RuleDescriptor
         {
-            TopicName = "events", SubscriptionName = "sub", Name = "filter-eu",
+            TopicName = "events",
+            SubscriptionName = "sub",
+            Name = "filter-eu",
             Filter = new SqlFilter("region = 'eu'"),
         });
         await topics.CreateOrReplaceRuleAsync(new RuleDescriptor
         {
-            TopicName = "events", SubscriptionName = "sub", Name = "filter-eu",
+            TopicName = "events",
+            SubscriptionName = "sub",
+            Name = "filter-eu",
             Filter = new SqlFilter("region = 'eu-west'"),
         });
         var rules = await topics.ListRulesAsync("events", "sub");

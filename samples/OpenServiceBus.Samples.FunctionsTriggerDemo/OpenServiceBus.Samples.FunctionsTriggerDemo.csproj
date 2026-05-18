@@ -4,7 +4,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <AzureFunctionsVersion>v4</AzureFunctionsVersion>
     <OutputType>Exe</OutputType>
-    <RootNamespace>OpenServiceBus.Samples.TriggerDemo</RootNamespace>
+    <RootNamespace>OpenServiceBus.Samples.FunctionsTriggerDemo</RootNamespace>
     <IsPackable>false</IsPackable>
     <Description>Isolated-worker Azure Functions app you start with `func start` to manually test that messages sent through the Explorer (against the running OpenServiceBus.Host) are picked up by a real Service Bus trigger.</Description>
     <!-- Worker SDK source generators emit boilerplate that may trip strict warnings policy. -->

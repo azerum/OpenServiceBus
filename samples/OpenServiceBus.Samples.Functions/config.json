@@ -1,0 +1,20 @@
+{
+  "UserConfig": {
+    "Namespaces": [
+      {
+        "Name": "functions-sample",
+        "Queues": [
+          {
+            "Name": "integration-queue",
+            "Properties": {
+              "LockDuration": "PT1M",
+              "MaxDeliveryCount": 5,
+              "DefaultMessageTimeToLive": "PT1H",
+              "DeadLetteringOnMessageExpiration": false
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

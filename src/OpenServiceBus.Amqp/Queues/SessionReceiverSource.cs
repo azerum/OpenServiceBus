@@ -88,7 +88,7 @@ public sealed class SessionReceiverSource : IMessageSource
                 }
                 catch (OperationCanceledException)
                 {
-                    // Poll timeout — loop and re-check drain state.
+                    // Poll timeout - loop and re-check drain state.
                 }
             }
 
@@ -130,7 +130,7 @@ public sealed class SessionReceiverSource : IMessageSource
 
         try
         {
-            // M17: transactional disposition — buffer the store op under the txn.
+            // M17: transactional disposition - buffer the store op under the txn.
             if (dispositionContext.DeliveryState is TransactionalState txnState && txnState.TxnId is { Length: > 0 } txnId)
             {
                 var inner = txnState.Outcome;

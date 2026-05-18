@@ -7,7 +7,7 @@ namespace OpenServiceBus.Amqp.Lifecycle;
 /// <summary>
 /// Periodic sweeper that promotes scheduled messages whose <c>ScheduledEnqueueTime</c> has
 /// arrived from "scheduled" to "available" in the store. The dequeue side never sees
-/// scheduled messages until this service moves them — so idle queues with future-dated
+/// scheduled messages until this service moves them - so idle queues with future-dated
 /// messages stay quiescent until their time.
 /// </summary>
 public sealed class ScheduledMessageActivator : BackgroundService

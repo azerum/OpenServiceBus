@@ -41,8 +41,8 @@ public static class ExplorerEndpoints
             await using var sender = session.Sender(req.Queue);
 
             var msg = new ServiceBusMessage(req.Body ?? string.Empty);
-            // Every message gets a MessageId — either the user-supplied one or an auto-generated
-            // Guid — so the Explorer can always show a stable identifier in the received list.
+            // Every message gets a MessageId - either the user-supplied one or an auto-generated
+            // Guid - so the Explorer can always show a stable identifier in the received list.
             // The Service Bus SDK does NOT auto-generate this; without it the field is null on the wire.
             msg.MessageId = string.IsNullOrWhiteSpace(req.MessageId)
                 ? Guid.NewGuid().ToString("N")
@@ -69,7 +69,7 @@ public static class ExplorerEndpoints
         {
             var session = sessions.GetOrCreate(req.ConnectionString);
             // When SessionId is provided we open (or reuse) a session-locked receiver via
-            // AcceptSessionAsync — required for session-enabled queues and subscriptions.
+            // AcceptSessionAsync - required for session-enabled queues and subscriptions.
             ServiceBusReceiver receiver = string.IsNullOrEmpty(req.SessionId)
                 ? session.Receiver(req.Queue)
                 : await session.SessionReceiverAsync(req.Queue, req.SessionId);
@@ -262,7 +262,7 @@ public static class ExplorerEndpoints
         lockToken = msg.LockToken,
         body = SafeBody(msg.Body),
         applicationProperties = msg.ApplicationProperties.ToDictionary(kv => kv.Key, kv => kv.Value?.ToString()),
-        // M5: dead-letter metadata — populated only on messages received from a DLQ.
+        // M5: dead-letter metadata - populated only on messages received from a DLQ.
         deadLetterReason = msg.DeadLetterReason,
         deadLetterErrorDescription = msg.DeadLetterErrorDescription,
         deadLetterSource = msg.DeadLetterSource,

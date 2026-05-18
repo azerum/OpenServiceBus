@@ -8,7 +8,7 @@ public static class ServiceCollectionExtensions
 {
     /// <summary>
     /// Register a SQLite-backed <see cref="IMessageStore"/>. Use this instead of
-    /// <c>AddOpenServiceBusInMemoryStorage</c> when you want persistence across restarts —
+    /// <c>AddOpenServiceBusInMemoryStorage</c> when you want persistence across restarts -
     /// the rest of the broker stack (queue / topic registry, router, transactions, AMQP
     /// listener) is identical, so callers don't change.
     ///

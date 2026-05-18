@@ -135,6 +135,6 @@ public class ConnectionLifecycleTests
         var harness2 = await TestListenerHarness.StartAsync(o => o.Port = port);
         await harness2.DisposeAsync();
 
-        // Assert: rebinding succeeded — implicit, would have thrown otherwise.
+        // Assert: rebinding succeeded - implicit, would have thrown otherwise.
     }
 }

@@ -2,7 +2,7 @@ using Azure.Messaging.ServiceBus;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 
-namespace OpenServiceBus.Samples.TriggerDemo.Functions;
+namespace OpenServiceBus.Samples.FunctionsTriggerDemo.Functions;
 
 /// <summary>
 /// With <see cref="ServiceBusTriggerAttribute.AutoCompleteMessages"/> set to false, the handler
@@ -44,7 +44,7 @@ public sealed class ManualDisposition
 
             case "defer":
                 await actions.DeferMessageAsync(message);
-                _logger.LogInformation("[manual-queue] message deferred — retrieve via ReceiveDeferredMessagesAsync(seq={Seq})", message.SequenceNumber);
+                _logger.LogInformation("[manual-queue] message deferred - retrieve via ReceiveDeferredMessagesAsync(seq={Seq})", message.SequenceNumber);
                 break;
 
             default:

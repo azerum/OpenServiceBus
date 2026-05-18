@@ -6,7 +6,7 @@ namespace OpenServiceBus.IntegrationTests;
 
 /// <summary>
 /// M17 gate: AMQP transactions. The Azure SDK enlists in <see cref="TransactionScope"/>
-/// automatically — opens a coordinator link on first transactional op, sends ops with
+/// automatically - opens a coordinator link on first transactional op, sends ops with
 /// <c>TransactionalState</c>, and discharges on scope completion.
 /// </summary>
 public class TransactionTests
@@ -20,7 +20,7 @@ public class TransactionTests
         await using var client = new ServiceBusClient(harness.ConnectionString);
         var sender = client.CreateSender("txn-q");
 
-        // Act — send inside a scope, mark complete.
+        // Act - send inside a scope, mark complete.
         using (var scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
         {
             await sender.SendMessageAsync(new ServiceBusMessage("hello-tx") { MessageId = "tx-1" });
@@ -49,7 +49,7 @@ public class TransactionTests
         await using var client = new ServiceBusClient(harness.ConnectionString);
         var sender = client.CreateSender("txn-rollback");
 
-        // Act — open scope, send, but DON'T call Complete — TransactionScope rolls back on dispose.
+        // Act - open scope, send, but DON'T call Complete - TransactionScope rolls back on dispose.
         using (new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
         {
             await sender.SendMessageAsync(new ServiceBusMessage("doomed") { MessageId = "rb-1" });
@@ -88,7 +88,7 @@ public class TransactionTests
     public async Task CompleteInTransactionScope_Rollback_LockReleasedAndRedelivered()
     {
         // Pre-seed a message, peek-lock it, then call CompleteMessageAsync inside a scope
-        // that rolls back. The lock release (TryComplete) must NOT happen — the next receive
+        // that rolls back. The lock release (TryComplete) must NOT happen - the next receive
         // (after the lock expires or via this same receiver) should still see the message.
         await using var harness = await IntegrationHarness.StartAsync();
         await harness.Queues.CreateAsync(new QueueDescriptor
@@ -111,7 +111,7 @@ public class TransactionTests
         }
         await Task.Delay(300);
 
-        // The completion was buffered and rolled back — message still on the queue under lock.
+        // The completion was buffered and rolled back - message still on the queue under lock.
         (await harness.Store.CountAsync("txn-complete-rb")).ShouldBe(1L,
             "the buffered complete must not have removed the message on rollback");
     }
@@ -143,7 +143,7 @@ internal static class TestUtilities
 {
     /// <summary>
     /// Spin until the queue count reaches <paramref name="expected"/> or the timeout elapses.
-    /// Used after a transaction commits — the discharge round-trip is asynchronous on the SDK
+    /// Used after a transaction commits - the discharge round-trip is asynchronous on the SDK
     /// side, so a tight check immediately after scope.Complete() can race the replay.
     /// </summary>
     public static async Task<bool> WaitForCountAsync(

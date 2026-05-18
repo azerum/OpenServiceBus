@@ -85,13 +85,13 @@ public sealed class OpenServiceBusTestHost : IAsyncDisposable
     /// <summary>Port the broker is listening on.</summary>
     public int Port { get; }
 
-    /// <summary>Queue registry — use to create/list/delete queues from inside tests.</summary>
+    /// <summary>Queue registry - use to create/list/delete queues from inside tests.</summary>
     public IQueueRegistry Queues { get; }
 
-    /// <summary>Topic registry — use to create/list/delete topics, subscriptions, and rules.</summary>
+    /// <summary>Topic registry - use to create/list/delete topics, subscriptions, and rules.</summary>
     public ITopicRegistry Topics { get; }
 
-    /// <summary>In-memory message store — exposed for direct test inspection.</summary>
+    /// <summary>In-memory message store - exposed for direct test inspection.</summary>
     public IMessageStore Store { get; }
 
     /// <summary><see cref="System.TimeProvider"/> the broker is driven by.</summary>

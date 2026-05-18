@@ -97,7 +97,7 @@ public sealed class TransactionManager : ITransactionManager
         public override bool Equals(object? obj) => obj is TxnIdKey k && Equals(k);
         public override int GetHashCode()
         {
-            // Simple FNV-1a over the bytes — collision risk is irrelevant at the scale we run.
+            // Simple FNV-1a over the bytes - collision risk is irrelevant at the scale we run.
             unchecked
             {
                 int hash = (int)2166136261u;

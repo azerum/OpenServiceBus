@@ -1,7 +1,7 @@
 namespace OpenServiceBus.Core.Entities;
 
 /// <summary>
-/// Configuration for a single topic entity. Topics themselves don't store messages — they're
+/// Configuration for a single topic entity. Topics themselves don't store messages - they're
 /// fan-out endpoints. Each subscription on the topic owns its own message store, peek-lock
 /// lifecycle, and DLQ (see <see cref="SubscriptionDescriptor"/>).
 /// </summary>
