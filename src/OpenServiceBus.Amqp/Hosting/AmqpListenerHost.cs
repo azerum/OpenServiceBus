@@ -61,7 +61,7 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
             listener.HandlerFactory = _ => handler;
         }
 
-        host.RegisterRequestProcessor("$cbs", new CbsRequestProcessor());
+        host.RegisterRequestProcessor("$cbs", new CbsRequestProcessor(_options, _loggerFactory.CreateLogger<CbsRequestProcessor>()));
 
         var linkProcessor = new EntityLinkProcessor(_queueRegistry, _messageStore, Options.Create(_options), _timeProvider, _loggerFactory);
         host.RegisterLinkProcessor(linkProcessor);

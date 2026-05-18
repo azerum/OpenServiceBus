@@ -47,7 +47,7 @@ internal sealed class IntegrationHarness : IAsyncDisposable
         Port = port;
     }
 
-    public static async Task<IntegrationHarness> StartAsync()
+    public static async Task<IntegrationHarness> StartAsync(Action<AmqpListenerOptions>? configure = null)
     {
         var port = GetFreePort();
         var options = new AmqpListenerOptions
@@ -58,6 +58,7 @@ internal sealed class IntegrationHarness : IAsyncDisposable
             IdleTimeoutMs = 30_000,
             EnableFrameTracing = Environment.GetEnvironmentVariable("OSB_TRACE_FRAMES") == "1",
         };
+        configure?.Invoke(options);
 
         var store = new InMemoryMessageStore();
         IMessageStore storeAsIface = store;

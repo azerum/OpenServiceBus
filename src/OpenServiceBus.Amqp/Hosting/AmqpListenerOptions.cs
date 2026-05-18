@@ -29,4 +29,17 @@ public sealed class AmqpListenerOptions
     /// Off by default — useful when diagnosing wire-protocol interop issues with new clients.
     /// </summary>
     public bool EnableFrameTracing { get; set; }
+
+    /// <summary>
+    /// When true, the broker validates SAS tokens at <c>$cbs put-token</c> against
+    /// <see cref="SasKeys"/>. Off by default to preserve emulator-mode permissive auth.
+    /// </summary>
+    public bool RequireSasAuth { get; set; }
+
+    /// <summary>
+    /// Shared access keys recognised by <c>$cbs</c> when <see cref="RequireSasAuth"/> is enabled.
+    /// Key = name (e.g. <c>RootManageSharedAccessKey</c>); value = the raw key string clients
+    /// use in their connection-string <c>SharedAccessKey</c>.
+    /// </summary>
+    public Dictionary<string, string> SasKeys { get; set; } = new(StringComparer.Ordinal);
 }

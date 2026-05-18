@@ -1,6 +1,8 @@
 using Amqp;
 using Amqp.Framing;
 using Amqp.Listener;
+using Microsoft.Extensions.Logging;
+using OpenServiceBus.Amqp.Hosting;
 
 namespace OpenServiceBus.Amqp.Management;
 
@@ -8,8 +10,10 @@ namespace OpenServiceBus.Amqp.Management;
 /// Handles AMQP Claims-Based Security ($cbs) <c>put-token</c> requests.
 ///
 /// In emulator mode (the OpenServiceBus default), this processor accepts any token
-/// and replies with statusCode=202 / statusDescription="Accepted". Real SAS validation
-/// is opt-in and arrives in M9.
+/// and replies with statusCode=202 / statusDescription="Accepted". When
+/// <see cref="AmqpListenerOptions.RequireSasAuth"/> is enabled the token is validated
+/// against the configured <see cref="AmqpListenerOptions.SasKeys"/> — invalid tokens
+/// get 401 Unauthorized and the SDK surfaces an auth failure to the caller.
 ///
 /// Critical wire contract (the Azure SDK / Microsoft.Azure.Amqp is strict and NREs on missing fields).
 /// Verified against Microsoft.Azure.Amqp's CbsConstants.cs and AmqpCbsLink.cs:
@@ -23,6 +27,15 @@ namespace OpenServiceBus.Amqp.Management;
 /// </summary>
 public sealed class CbsRequestProcessor : IRequestProcessor
 {
+    private readonly AmqpListenerOptions _options;
+    private readonly ILogger<CbsRequestProcessor>? _logger;
+
+    public CbsRequestProcessor(AmqpListenerOptions options, ILogger<CbsRequestProcessor>? logger = null)
+    {
+        _options = options;
+        _logger = logger;
+    }
+
     /// <summary>Link credit advertised to clients on the $cbs receiver link.</summary>
     public int Credit => 100;
 
@@ -30,17 +43,29 @@ public sealed class CbsRequestProcessor : IRequestProcessor
     {
         var request = requestContext.Message;
 
-        var response = BuildAcceptedResponse(request);
-        requestContext.Complete(response);
+        if (_options.RequireSasAuth)
+        {
+            var token = request.Body as string;
+            var result = SasTokenValidator.Validate(token, _options.SasKeys, DateTimeOffset.UtcNow);
+            if (!result.IsValid)
+            {
+                _logger?.LogWarning("Rejected $cbs put-token: {Reason}", result.FailureReason);
+                requestContext.Complete(BuildResponse(request, 401, "Unauthorized: " + result.FailureReason));
+                return;
+            }
+            _logger?.LogDebug("Accepted $cbs put-token for audience {Audience} (keyName={Key})", result.Audience, result.KeyName);
+        }
+
+        requestContext.Complete(BuildResponse(request, 202, "Accepted"));
     }
 
-    private static Message BuildAcceptedResponse(Message request)
+    private static Message BuildResponse(Message request, int statusCode, string statusDescription)
     {
         var response = new Message
         {
             Properties = new Properties(),
             ApplicationProperties = new ApplicationProperties(),
-            BodySection = new AmqpValue { Value = "Accepted" },
+            BodySection = new AmqpValue { Value = statusDescription },
         };
 
         var requestMessageId = request.Properties?.GetMessageId();
@@ -49,8 +74,8 @@ public sealed class CbsRequestProcessor : IRequestProcessor
             response.Properties.SetCorrelationId(requestMessageId);
         }
 
-        response.ApplicationProperties["status-code"] = (int)202;
-        response.ApplicationProperties["status-description"] = "Accepted";
+        response.ApplicationProperties["status-code"] = (int)statusCode;
+        response.ApplicationProperties["status-description"] = statusDescription;
 
         return response;
     }
