@@ -143,7 +143,7 @@ The Azure Functions integration test (M11) requires `func` (Azure Functions Core
 
 ## Status
 
-v1.0 — Queues, the Azure SDK, and Azure Functions triggers covered end-to-end. See [the implementation plan](docs/PLAN.md) for the roadmap.
+v1.0 — Queues, the Azure SDK, and Azure Functions triggers covered end-to-end. See [the implementation plan](docs/PLAN.md) for the v1.0 milestones and [`docs/ROADMAP.md`](docs/ROADMAP.md) for the post-v1.0 roadmap (Topics + filters, sessions, transactions, persistence, Bicep bootstrap, …).
 
 ## License
 
