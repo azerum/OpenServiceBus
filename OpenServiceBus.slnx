@@ -8,6 +8,9 @@
     <Project Path="src/OpenServiceBus.Management/OpenServiceBus.Management.csproj" />
     <Project Path="src/OpenServiceBus.Testing/OpenServiceBus.Testing.csproj" />
   </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/OpenServiceBus.Functions.Sample/OpenServiceBus.Functions.Sample.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/OpenServiceBus.Amqp.Tests/OpenServiceBus.Amqp.Tests.csproj" />
     <Project Path="tests/OpenServiceBus.Amqp.WireTests/OpenServiceBus.Amqp.WireTests.csproj" />
@@ -15,5 +18,6 @@
     <Project Path="tests/OpenServiceBus.Core.Tests/OpenServiceBus.Core.Tests.csproj" />
     <Project Path="tests/OpenServiceBus.IntegrationTests/OpenServiceBus.IntegrationTests.csproj" />
     <Project Path="tests/OpenServiceBus.Testing.Tests/OpenServiceBus.Testing.Tests.csproj" />
+    <Project Path="tests/OpenServiceBus.AzureFunctions.IntegrationTests/OpenServiceBus.AzureFunctions.IntegrationTests.csproj" />
   </Folder>
 </Solution>
