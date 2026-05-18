@@ -1,4 +1,6 @@
-namespace OpenServiceBus.Abstractions;
+using OpenServiceBus.Core.Entities;
+
+namespace OpenServiceBus.Core.Storage;
 
 /// <summary>
 /// Tracks queue entities and emits lifecycle events the AMQP listener subscribes to

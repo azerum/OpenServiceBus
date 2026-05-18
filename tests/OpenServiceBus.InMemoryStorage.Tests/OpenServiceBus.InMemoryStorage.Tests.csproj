@@ -21,7 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\OpenServiceBus.Broker\OpenServiceBus.Broker.csproj" />
+    <ProjectReference Include="..\..\src\OpenServiceBus.InMemoryStorage\OpenServiceBus.InMemoryStorage.csproj" />
   </ItemGroup>
 
 </Project>

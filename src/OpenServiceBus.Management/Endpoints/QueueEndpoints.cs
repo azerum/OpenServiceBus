@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
-using OpenServiceBus.Abstractions;
+using OpenServiceBus.Core.Entities;
+using OpenServiceBus.Core.Messaging;
+using OpenServiceBus.Core.Storage;
 
-namespace OpenServiceBus.Management;
+namespace OpenServiceBus.Management.Endpoints;
 
 public static class QueueEndpoints
 {

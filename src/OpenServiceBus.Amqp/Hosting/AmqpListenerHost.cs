@@ -3,13 +3,15 @@ using Amqp.Listener;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using OpenServiceBus.Abstractions;
 using OpenServiceBus.Amqp.Management;
-using OpenServiceBus.Broker;
+using OpenServiceBus.Amqp.Routing;
+using OpenServiceBus.Core.Entities;
+using OpenServiceBus.Core.Messaging;
+using OpenServiceBus.Core.Storage;
 using Trace = Amqp.Trace;
 using TraceLevel = Amqp.TraceLevel;
 
-namespace OpenServiceBus.Amqp;
+namespace OpenServiceBus.Amqp.Hosting;
 
 public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
 {
@@ -55,7 +57,7 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
         {
             ServiceBusSasl.ConfigureListenerMechanisms(listener);
 
-            var handler = new ListenerOpenHandler(_options.ContainerId, _options.IdleTimeoutMs, _options.MaxFrameSize);
+            var handler = new ListenerEventHandler(_options.ContainerId, _options.IdleTimeoutMs, _options.MaxFrameSize);
             listener.HandlerFactory = _ => handler;
         }
 
@@ -116,7 +118,7 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
     private void OnQueueDeleted(object? sender, QueueDescriptor descriptor)
     {
         if (_host is null) return;
-        if (QueueManager.IsDeadLetterQueue(descriptor.Name)) return;
+        if (EntityNames.IsDeadLetterQueue(descriptor.Name)) return;
 
         try
         {
@@ -132,7 +134,7 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
     {
         if (_host is null) return;
         // DLQ siblings don't get their own $management endpoint - all management ops target the parent queue.
-        if (QueueManager.IsDeadLetterQueue(descriptor.Name)) return;
+        if (EntityNames.IsDeadLetterQueue(descriptor.Name)) return;
 
         var processor = new ManagementRequestProcessor(
             descriptor.Name,

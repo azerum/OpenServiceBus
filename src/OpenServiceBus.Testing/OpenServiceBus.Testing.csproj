@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OpenServiceBus.Amqp\OpenServiceBus.Amqp.csproj" />
+    <ProjectReference Include="..\OpenServiceBus.InMemoryStorage\OpenServiceBus.InMemoryStorage.csproj" />
     <ProjectReference Include="..\OpenServiceBus.Management\OpenServiceBus.Management.csproj" />
   </ItemGroup>
 

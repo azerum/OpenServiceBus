@@ -1,5 +1,7 @@
 using Azure.Messaging.ServiceBus;
-using OpenServiceBus.Abstractions;
+using OpenServiceBus.Core.Entities;
+using OpenServiceBus.Core.Messaging;
+using OpenServiceBus.Core.Storage;
 
 namespace OpenServiceBus.IntegrationTests;
 

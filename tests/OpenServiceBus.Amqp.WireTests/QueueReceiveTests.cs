@@ -2,7 +2,9 @@ using Amqp;
 using Amqp.Framing;
 using Amqp.Sasl;
 using Microsoft.Extensions.Time.Testing;
-using OpenServiceBus.Abstractions;
+using OpenServiceBus.Core.Entities;
+using OpenServiceBus.Core.Messaging;
+using OpenServiceBus.Core.Storage;
 
 namespace OpenServiceBus.Amqp.WireTests;
 

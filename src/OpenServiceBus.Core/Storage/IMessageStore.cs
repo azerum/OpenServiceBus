@@ -1,8 +1,10 @@
-namespace OpenServiceBus.Abstractions;
+using OpenServiceBus.Core.Messaging;
+
+namespace OpenServiceBus.Core.Storage;
 
 /// <summary>
 /// Per-entity message persistence and peek-lock boundary. The in-memory implementation
-/// lives in <c>OpenServiceBus.Broker</c>; a SQLite-backed implementation arrives post-MVP
+/// lives in <c>OpenServiceBus.InMemoryStorage</c>; a SQLite-backed implementation arrives post-MVP
 /// without breaking call sites.
 /// </summary>
 public interface IMessageStore

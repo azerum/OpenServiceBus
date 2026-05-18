@@ -1,4 +1,4 @@
-namespace OpenServiceBus.Abstractions;
+namespace OpenServiceBus.Core.Entities;
 
 /// <summary>
 /// Configuration for a single queue entity.

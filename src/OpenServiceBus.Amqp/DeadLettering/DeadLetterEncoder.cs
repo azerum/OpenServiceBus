@@ -2,7 +2,7 @@ using Amqp;
 using Amqp.Framing;
 using Amqp.Types;
 
-namespace OpenServiceBus.Amqp;
+namespace OpenServiceBus.Amqp.DeadLettering;
 
 /// <summary>
 /// Round-trips a stored AMQP-encoded message, layering on the Service Bus dead-letter headers

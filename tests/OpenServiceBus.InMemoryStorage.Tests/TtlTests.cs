@@ -1,8 +1,12 @@
 using Microsoft.Extensions.Time.Testing;
-using OpenServiceBus.Abstractions;
-using OpenServiceBus.Broker;
+using OpenServiceBus.Core.Entities;
+using OpenServiceBus.Core.Messaging;
+using OpenServiceBus.Core.Storage;
+using OpenServiceBus.InMemoryStorage.DependencyInjection;
+using OpenServiceBus.InMemoryStorage.Lifecycle;
+using OpenServiceBus.InMemoryStorage.Queues;
 
-namespace OpenServiceBus.Broker.Tests;
+namespace OpenServiceBus.InMemoryStorage.Tests;
 
 public class TtlTests
 {

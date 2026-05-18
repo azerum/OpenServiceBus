@@ -3,9 +3,11 @@ using Amqp.Framing;
 using Amqp.Listener;
 using Amqp.Types;
 using Microsoft.Extensions.Logging;
-using OpenServiceBus.Abstractions;
+using OpenServiceBus.Core.Entities;
+using OpenServiceBus.Core.Messaging;
+using OpenServiceBus.Core.Storage;
 
-namespace OpenServiceBus.Amqp;
+namespace OpenServiceBus.Amqp.Queues;
 
 /// <summary>
 /// Handles incoming AMQP sender links from clients sending messages into a queue.

@@ -2,9 +2,18 @@ using System.Net;
 using System.Net.Sockets;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using OpenServiceBus.Abstractions;
-using OpenServiceBus.Amqp;
-using OpenServiceBus.Broker;
+using OpenServiceBus.Core.Entities;
+using OpenServiceBus.Core.Messaging;
+using OpenServiceBus.Core.Storage;
+using OpenServiceBus.Amqp.DependencyInjection;
+using OpenServiceBus.Amqp.Hosting;
+using OpenServiceBus.Amqp.Lifecycle;
+using OpenServiceBus.Amqp.Queues;
+using OpenServiceBus.Amqp.Routing;
+using OpenServiceBus.InMemoryStorage;
+using OpenServiceBus.InMemoryStorage.DependencyInjection;
+using OpenServiceBus.InMemoryStorage.Lifecycle;
+using OpenServiceBus.InMemoryStorage.Queues;
 
 namespace OpenServiceBus.Amqp.WireTests;
 

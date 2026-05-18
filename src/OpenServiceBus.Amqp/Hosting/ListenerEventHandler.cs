@@ -4,7 +4,7 @@ using Amqp.Framing;
 using Amqp.Handler;
 using Amqp.Listener;
 
-namespace OpenServiceBus.Amqp;
+namespace OpenServiceBus.Amqp.Hosting;
 
 /// <summary>
 /// Per-connection handler that hooks two points in the AMQPNetLite pipeline:
@@ -19,7 +19,7 @@ namespace OpenServiceBus.Amqp;
 /// rejects messages with empty lock tokens — a non-Guid delivery-tag round-trips as
 /// <see cref="Guid.Empty"/> and Complete throws InvalidOperationException.</para>
 /// </summary>
-internal sealed class ListenerOpenHandler : IHandler
+internal sealed class ListenerEventHandler : IHandler
 {
     // Delivery.Tag and Delivery.UserToken are internal in AMQPNetLite; reflect once at startup.
     private static readonly Type DeliveryType =
@@ -37,7 +37,7 @@ internal sealed class ListenerOpenHandler : IHandler
     private readonly uint _maxFrameSize;
     private readonly string _containerId;
 
-    public ListenerOpenHandler(string containerId, uint idleTimeoutMs, uint maxFrameSize)
+    public ListenerEventHandler(string containerId, uint idleTimeoutMs, uint maxFrameSize)
     {
         _containerId = containerId;
         _idleTimeoutMs = idleTimeoutMs;

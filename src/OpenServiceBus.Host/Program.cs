@@ -1,7 +1,13 @@
 using System.Reflection;
-using OpenServiceBus.Amqp;
-using OpenServiceBus.Broker;
-using OpenServiceBus.Management;
+using OpenServiceBus.Amqp.DependencyInjection;
+using OpenServiceBus.Amqp.Hosting;
+using OpenServiceBus.Amqp.Lifecycle;
+using OpenServiceBus.Amqp.Queues;
+using OpenServiceBus.Amqp.Routing;
+using OpenServiceBus.InMemoryStorage.DependencyInjection;
+using OpenServiceBus.InMemoryStorage.Lifecycle;
+using OpenServiceBus.InMemoryStorage.Queues;
+using OpenServiceBus.Management.Endpoints;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,7 +15,7 @@ builder.Services.AddHealthChecks();
 builder.Services
     .AddOptions<AmqpListenerOptions>()
     .Bind(builder.Configuration.GetSection("OpenServiceBus:Amqp"));
-builder.Services.AddOpenServiceBusBroker();
+builder.Services.AddOpenServiceBusInMemoryStorage();
 builder.Services.AddOpenServiceBusAmqp();
 
 var app = builder.Build();

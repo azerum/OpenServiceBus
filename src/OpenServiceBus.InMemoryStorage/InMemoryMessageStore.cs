@@ -1,8 +1,10 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
-using OpenServiceBus.Abstractions;
+using OpenServiceBus.Core.Entities;
+using OpenServiceBus.Core.Messaging;
+using OpenServiceBus.Core.Storage;
 
-namespace OpenServiceBus.Broker;
+namespace OpenServiceBus.InMemoryStorage;
 
 /// <summary>
 /// In-memory message store with peek-lock semantics.

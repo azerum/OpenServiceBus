@@ -1,4 +1,4 @@
-namespace OpenServiceBus.Abstractions;
+namespace OpenServiceBus.Core.Messaging;
 
 /// <summary>
 /// A message persisted in the broker. The body is the raw, encoded AMQP message bytes

@@ -5,8 +5,4 @@
     <Description>Domain types and options for OpenServiceBus (StoredMessage, QueueDescriptor, LockToken).</Description>
   </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\OpenServiceBus.Abstractions\OpenServiceBus.Abstractions.csproj" />
-  </ItemGroup>
-
 </Project>

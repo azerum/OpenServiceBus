@@ -1,8 +1,7 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/OpenServiceBus.Abstractions/OpenServiceBus.Abstractions.csproj" />
     <Project Path="src/OpenServiceBus.Amqp/OpenServiceBus.Amqp.csproj" />
-    <Project Path="src/OpenServiceBus.Broker/OpenServiceBus.Broker.csproj" />
+    <Project Path="src/OpenServiceBus.InMemoryStorage/OpenServiceBus.InMemoryStorage.csproj" />
     <Project Path="src/OpenServiceBus.Core/OpenServiceBus.Core.csproj" />
     <Project Path="src/OpenServiceBus.Explorer/OpenServiceBus.Explorer.csproj" />
     <Project Path="src/OpenServiceBus.Host/OpenServiceBus.Host.csproj" />
@@ -12,7 +11,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/OpenServiceBus.Amqp.Tests/OpenServiceBus.Amqp.Tests.csproj" />
     <Project Path="tests/OpenServiceBus.Amqp.WireTests/OpenServiceBus.Amqp.WireTests.csproj" />
-    <Project Path="tests/OpenServiceBus.Broker.Tests/OpenServiceBus.Broker.Tests.csproj" />
+    <Project Path="tests/OpenServiceBus.InMemoryStorage.Tests/OpenServiceBus.InMemoryStorage.Tests.csproj" />
     <Project Path="tests/OpenServiceBus.Core.Tests/OpenServiceBus.Core.Tests.csproj" />
     <Project Path="tests/OpenServiceBus.IntegrationTests/OpenServiceBus.IntegrationTests.csproj" />
   </Folder>

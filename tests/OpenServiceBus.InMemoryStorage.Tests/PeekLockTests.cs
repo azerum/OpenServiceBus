@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Time.Testing;
-using OpenServiceBus.Broker;
+using OpenServiceBus.InMemoryStorage.DependencyInjection;
+using OpenServiceBus.InMemoryStorage.Lifecycle;
+using OpenServiceBus.InMemoryStorage.Queues;
 
-namespace OpenServiceBus.Broker.Tests;
+namespace OpenServiceBus.InMemoryStorage.Tests;
 
 public class PeekLockTests
 {

@@ -1,9 +1,13 @@
+using OpenServiceBus.Amqp.DeadLettering;
+using OpenServiceBus.Amqp.Queues;
+
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using OpenServiceBus.Abstractions;
-using OpenServiceBus.Broker;
+using OpenServiceBus.Core.Entities;
+using OpenServiceBus.Core.Messaging;
+using OpenServiceBus.Core.Storage;
 
-namespace OpenServiceBus.Amqp;
+namespace OpenServiceBus.Amqp.Lifecycle;
 
 /// <summary>
 /// Periodic sweeper that removes (or dead-letters) messages past their TTL deadline.
@@ -55,12 +59,12 @@ public sealed class TtlExpirationService : BackgroundService
                 var expired = _store.ExpireMessages(queue.Name, now);
                 if (expired.Count == 0) continue;
 
-                var routeToDlq = !QueueManager.IsDeadLetterQueue(queue.Name)
+                var routeToDlq = !EntityNames.IsDeadLetterQueue(queue.Name)
                     && queue.DeadLetteringOnMessageExpiration;
 
                 if (routeToDlq)
                 {
-                    var dlqName = queue.Name + QueueManager.DeadLetterSuffix;
+                    var dlqName = queue.Name + EntityNames.DeadLetterSuffix;
                     foreach (var msg in expired)
                     {
                         var dlqBytes = DeadLetterEncoder.AppendDeadLetterHeaders(

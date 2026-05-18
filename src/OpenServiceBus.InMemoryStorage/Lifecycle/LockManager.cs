@@ -1,8 +1,10 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using OpenServiceBus.Abstractions;
+using OpenServiceBus.Core.Entities;
+using OpenServiceBus.Core.Messaging;
+using OpenServiceBus.Core.Storage;
 
-namespace OpenServiceBus.Broker;
+namespace OpenServiceBus.InMemoryStorage.Lifecycle;
 
 /// <summary>
 /// Periodically sweeps the store for expired peek-locks and abandons them, returning their

@@ -1,4 +1,4 @@
-namespace OpenServiceBus.Abstractions;
+namespace OpenServiceBus.Core.Messaging;
 
 /// <summary>
 /// A message handed to a consumer under peek-lock. The lock token uniquely identifies

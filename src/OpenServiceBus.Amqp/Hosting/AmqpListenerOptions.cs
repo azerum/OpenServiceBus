@@ -1,4 +1,4 @@
-namespace OpenServiceBus.Amqp;
+namespace OpenServiceBus.Amqp.Hosting;
 
 public sealed class AmqpListenerOptions
 {

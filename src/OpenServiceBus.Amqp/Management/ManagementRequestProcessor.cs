@@ -3,7 +3,9 @@ using Amqp.Framing;
 using Amqp.Listener;
 using Amqp.Types;
 using Microsoft.Extensions.Logging;
-using OpenServiceBus.Abstractions;
+using OpenServiceBus.Core.Entities;
+using OpenServiceBus.Core.Messaging;
+using OpenServiceBus.Core.Storage;
 
 namespace OpenServiceBus.Amqp.Management;
 

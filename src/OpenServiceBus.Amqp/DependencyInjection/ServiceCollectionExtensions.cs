@@ -1,7 +1,10 @@
+using OpenServiceBus.Amqp.Hosting;
+using OpenServiceBus.Amqp.Lifecycle;
+
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace OpenServiceBus.Amqp;
+namespace OpenServiceBus.Amqp.DependencyInjection;
 
 public static class ServiceCollectionExtensions
 {

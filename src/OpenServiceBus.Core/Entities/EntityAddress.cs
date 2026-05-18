@@ -1,17 +1,17 @@
-namespace OpenServiceBus.Amqp;
+namespace OpenServiceBus.Core.Entities;
 
 /// <summary>
-/// Parses an AMQP link address into the entity name and the sub-resource it targets.
+/// Parses a Service Bus entity address into the parent entity name and the sub-resource it targets.
 /// Examples:
 ///   <c>orders</c>                       → <c>("orders", Main)</c>
 ///   <c>orders/$DeadLetterQueue</c>      → <c>("orders", DeadLetterQueue)</c>
 ///   <c>orders/$management</c>           → <c>("orders", Management)</c>
+///
+/// Lives in Core because both the AMQP link router and the REST management surface need to
+/// recognise these patterns.
 /// </summary>
-internal readonly record struct EntityAddress(string Entity, EntitySubResource SubResource)
+public readonly record struct EntityAddress(string Entity, EntitySubResource SubResource)
 {
-    private const string DeadLetterSuffix = "/$DeadLetterQueue";
-    private const string ManagementSuffix = "/$management";
-
     public static bool TryParse(string? address, out EntityAddress result)
     {
         result = default;
@@ -23,17 +23,17 @@ internal readonly record struct EntityAddress(string Entity, EntitySubResource S
         var normalized = address.TrimStart('/');
         if (string.IsNullOrEmpty(normalized)) return false;
 
-        if (normalized.EndsWith(DeadLetterSuffix, StringComparison.Ordinal))
+        if (normalized.EndsWith(EntityNames.DeadLetterSuffix, StringComparison.Ordinal))
         {
-            var entity = normalized[..^DeadLetterSuffix.Length];
+            var entity = normalized[..^EntityNames.DeadLetterSuffix.Length];
             if (string.IsNullOrEmpty(entity)) return false;
             result = new EntityAddress(entity, EntitySubResource.DeadLetterQueue);
             return true;
         }
 
-        if (normalized.EndsWith(ManagementSuffix, StringComparison.Ordinal))
+        if (normalized.EndsWith(EntityNames.ManagementSuffix, StringComparison.Ordinal))
         {
-            var entity = normalized[..^ManagementSuffix.Length];
+            var entity = normalized[..^EntityNames.ManagementSuffix.Length];
             if (string.IsNullOrEmpty(entity)) return false;
             result = new EntityAddress(entity, EntitySubResource.Management);
             return true;
@@ -44,7 +44,7 @@ internal readonly record struct EntityAddress(string Entity, EntitySubResource S
     }
 }
 
-internal enum EntitySubResource
+public enum EntitySubResource
 {
     Main,
     DeadLetterQueue,

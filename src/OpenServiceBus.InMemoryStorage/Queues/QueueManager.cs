@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
-using OpenServiceBus.Abstractions;
+using OpenServiceBus.Core.Entities;
+using OpenServiceBus.Core.Messaging;
+using OpenServiceBus.Core.Storage;
 
-namespace OpenServiceBus.Broker;
+namespace OpenServiceBus.InMemoryStorage.Queues;
 
 public sealed class QueueManager : IQueueRegistry
 {

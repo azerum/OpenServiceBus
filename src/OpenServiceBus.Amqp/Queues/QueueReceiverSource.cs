@@ -1,12 +1,15 @@
+using OpenServiceBus.Amqp.DeadLettering;
+
 using Amqp;
 using Amqp.Framing;
 using Amqp.Listener;
 using Amqp.Types;
 using Microsoft.Extensions.Logging;
-using OpenServiceBus.Abstractions;
-using OpenServiceBus.Broker;
+using OpenServiceBus.Core.Entities;
+using OpenServiceBus.Core.Messaging;
+using OpenServiceBus.Core.Storage;
 
-namespace OpenServiceBus.Amqp;
+namespace OpenServiceBus.Amqp.Queues;
 
 /// <summary>
 /// Implements the broker-side of a receive link: pulls the next available message from
@@ -53,7 +56,7 @@ public sealed class QueueReceiverSource : IMessageSource
         _store = store;
         _timeProvider = timeProvider;
         _logger = logger;
-        _isDlq = QueueManager.IsDeadLetterQueue(entityName);
+        _isDlq = EntityNames.IsDeadLetterQueue(entityName);
     }
 
     public async Task<ReceiveContext> GetMessageAsync(ListenerLink link)
@@ -161,7 +164,7 @@ public sealed class QueueReceiverSource : IMessageSource
         if (removed is null) return;
 
         var dlqBytes = DeadLetterEncoder.AppendDeadLetterHeaders(removed.EncodedMessage, _entityName, reason, description);
-        var dlqName = _entityName + QueueManager.DeadLetterSuffix;
+        var dlqName = _entityName + EntityNames.DeadLetterSuffix;
         await _store.EnqueueAsync(dlqName, dlqBytes, expiresAt: null, cancellationToken).ConfigureAwait(false);
 
         _logger.LogDebug("Dead-lettered seq#{Seq} from {Entity} to {Dlq} (reason={Reason})",

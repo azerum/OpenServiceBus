@@ -3,7 +3,7 @@ using Amqp.Listener;
 using Amqp.Sasl;
 using Amqp.Types;
 
-namespace OpenServiceBus.Amqp;
+namespace OpenServiceBus.Amqp.Hosting;
 
 /// <summary>
 /// Enables the SASL mechanisms an Azure Service Bus client expects:

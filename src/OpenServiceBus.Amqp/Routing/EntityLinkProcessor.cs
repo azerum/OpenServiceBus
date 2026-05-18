@@ -1,3 +1,6 @@
+using OpenServiceBus.Amqp.Hosting;
+using OpenServiceBus.Amqp.Queues;
+
 using System.Collections.Concurrent;
 using Amqp;
 using Amqp.Framing;
@@ -5,9 +8,11 @@ using Amqp.Listener;
 using Amqp.Types;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using OpenServiceBus.Abstractions;
+using OpenServiceBus.Core.Entities;
+using OpenServiceBus.Core.Messaging;
+using OpenServiceBus.Core.Storage;
 
-namespace OpenServiceBus.Amqp;
+namespace OpenServiceBus.Amqp.Routing;
 
 /// <summary>
 /// Single <see cref="ILinkProcessor"/> registered with the <see cref="ContainerHost"/>.
