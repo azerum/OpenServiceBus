@@ -122,6 +122,12 @@ public sealed class QueueReceiverSource : IMessageSource
                     _store.TryCompleteAsync(_entityName, lockToken).GetAwaiter().GetResult();
                     break;
 
+                // M8: Modified with UndeliverableHere=true is the SDK's DeferAsync wire signal —
+                // park the message in Deferred state instead of returning it to the active pool.
+                case Modified modified when modified.UndeliverableHere:
+                    _store.TryDeferAsync(_entityName, lockToken).GetAwaiter().GetResult();
+                    break;
+
                 case Released:
                 case Modified:
                     _store.TryAbandonAsync(_entityName, lockToken).GetAwaiter().GetResult();

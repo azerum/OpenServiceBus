@@ -35,14 +35,26 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
     private const string ScheduleMessageOperation = "com.microsoft:schedule-message";
     private const string CancelScheduledMessageOperation = "com.microsoft:cancel-scheduled-message";
     private const string PeekMessageOperation = "com.microsoft:peek-message";
+    private const string ReceiveBySequenceNumberOperation = "com.microsoft:receive-by-sequence-number";
+    private const string UpdateDispositionOperation = "com.microsoft:update-disposition";
 
     private const string LockTokensBodyKey = "lock-tokens";
+    private const string LockTokenBodyKey = "lock-token";
     private const string ExpirationsBodyKey = "expirations";
     private const string MessagesBodyKey = "messages";
     private const string MessageBodyKey = "message";
     private const string SequenceNumbersBodyKey = "sequence-numbers";
     private const string FromSequenceNumberBodyKey = "from-sequence-number";
     private const string MessageCountBodyKey = "message-count";
+    private const string DispositionStatusBodyKey = "disposition-status";
+    private const string DeadLetterReasonBodyKey = "deadletter-reason";
+    private const string DeadLetterDescriptionBodyKey = "deadletter-description";
+
+    // Wire values for disposition-status (lowercased Enum.ToString() from the SDK's DispositionStatus).
+    private const string DispositionCompleted = "completed";
+    private const string DispositionAbandoned = "abandoned";
+    private const string DispositionDeferred = "defered";          // SDK enum is mis-spelled — match it on the wire
+    private const string DispositionSuspended = "suspended";       // = dead-letter
 
     private static readonly Symbol ScheduledEnqueueTimeSymbol = new("x-opt-scheduled-enqueue-time");
     private static readonly Symbol MessageStateSymbol = new("x-opt-message-state");
@@ -90,6 +102,8 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
                 ScheduleMessageOperation => HandleScheduleMessage(request),
                 CancelScheduledMessageOperation => HandleCancelScheduledMessage(request),
                 PeekMessageOperation => HandlePeekMessage(request),
+                ReceiveBySequenceNumberOperation => HandleReceiveBySequenceNumber(request),
+                UpdateDispositionOperation => HandleUpdateDisposition(request),
                 _ => BuildResponse(request, statusCode: 501, statusDescription: $"NotImplemented: {operation}"),
             };
         }
@@ -225,7 +239,9 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
             amqp.MessageAnnotations.Map[EnqueuedTimeUtcSymbol] = stored.EnqueuedAt.UtcDateTime;
             amqp.MessageAnnotations.Map[MessageStateSymbol] = stored.ScheduledEnqueueTime is not null
                 ? MessageStateScheduled
-                : MessageStateActive;
+                : stored.IsDeferred
+                    ? MessageStateDeferred
+                    : MessageStateActive;
 
             var rebytes = ReEncode(amqp);
             entries.Add(new Map { [MessageBodyKey] = rebytes });
@@ -243,6 +259,131 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
         var copy = new byte[buf.Length];
         Array.Copy(buf.Buffer, buf.Offset, copy, 0, buf.Length);
         return copy;
+    }
+
+    /// <summary>
+    /// Retrieve deferred messages by sequence number. Each retrieved message gets a fresh
+    /// peek-lock; abandon via update-disposition returns it to Deferred state.
+    /// Request body: <c>sequence-numbers</c> (long[]), optional <c>receiver-settle-mode</c>.
+    /// Response body: <c>messages</c> array, each entry with <c>message</c> bytes + <c>lock-token</c> Guid.
+    /// </summary>
+    private Message HandleReceiveBySequenceNumber(Message request)
+    {
+        if (request.Body is not Map body || !body.TryGetValue(SequenceNumbersBodyKey, out var seqsObj))
+        {
+            return BuildResponse(request, 400, "BadRequest: missing 'sequence-numbers'");
+        }
+        var sequenceNumbers = ExtractLongArray(seqsObj);
+        if (sequenceNumbers.Length == 0)
+        {
+            return BuildResponse(request, 400, "BadRequest: empty 'sequence-numbers'");
+        }
+        var requestingLink = request.ApplicationProperties?[AssociatedLinkNameKey] as string;
+
+        var entries = new List<Map>(sequenceNumbers.Length);
+        foreach (var seq in sequenceNumbers)
+        {
+            var locked = _store.TryReceiveDeferredAsync(_entityName, seq, _descriptor.LockDuration, requestingLink)
+                .GetAwaiter().GetResult();
+            if (locked is null) continue; // Silently skip non-deferred / unknown seq numbers.
+
+            var amqp = DecodeMessage(locked.Message.EncodedMessage);
+            // Stamp the same broker-authoritative annotations a normal delivery carries.
+            amqp.Header ??= new Header();
+            amqp.Header.DeliveryCount = (uint)locked.Message.DeliveryCount;
+            amqp.MessageAnnotations ??= new MessageAnnotations();
+            amqp.MessageAnnotations.Map[SequenceNumberSymbol] = locked.Message.SequenceNumber;
+            amqp.MessageAnnotations.Map[EnqueuedTimeUtcSymbol] = locked.Message.EnqueuedAt.UtcDateTime;
+            amqp.MessageAnnotations.Map[new Symbol("x-opt-locked-until")] = locked.LockedUntil.UtcDateTime;
+
+            entries.Add(new Map
+            {
+                [MessageBodyKey] = ReEncode(amqp),
+                [LockTokenBodyKey] = locked.LockToken,
+            });
+        }
+
+        if (entries.Count == 0)
+        {
+            return BuildResponse(request, 204, "NoContent");
+        }
+
+        var responseBody = new Map { [MessagesBodyKey] = entries };
+        var response = BuildResponse(request, 200, "OK");
+        response.BodySection = new AmqpValue { Value = responseBody };
+        return response;
+    }
+
+    /// <summary>
+    /// Settle a message previously retrieved via receive-by-sequence-number.
+    /// Request body: <c>lock-tokens</c> (Guid[]), <c>disposition-status</c> string,
+    /// optional <c>deadletter-reason</c> / <c>deadletter-description</c>.
+    /// Status values (lower-case <c>Enum.ToString()</c> from the SDK):
+    /// "completed", "abandoned", "defered" (SDK typo, preserved on the wire), "suspended" (= dead-letter).
+    /// </summary>
+    private Message HandleUpdateDisposition(Message request)
+    {
+        if (request.Body is not Map body || !body.TryGetValue(LockTokensBodyKey, out var lockTokensObj))
+        {
+            return BuildResponse(request, 400, "BadRequest: missing 'lock-tokens'");
+        }
+        var lockTokens = ExtractGuidArray(lockTokensObj);
+        if (lockTokens.Length == 0)
+        {
+            return BuildResponse(request, 400, "BadRequest: empty 'lock-tokens'");
+        }
+        var status = (body.TryGetValue(DispositionStatusBodyKey, out var s) ? s as string : null)?.ToLowerInvariant();
+        if (status is null)
+        {
+            return BuildResponse(request, 400, "BadRequest: missing 'disposition-status'");
+        }
+
+        var reason = body.TryGetValue(DeadLetterReasonBodyKey, out var r) ? r as string : null;
+        var description = body.TryGetValue(DeadLetterDescriptionBodyKey, out var d) ? d as string : null;
+
+        foreach (var token in lockTokens)
+        {
+            switch (status)
+            {
+                case DispositionCompleted:
+                    _store.TryCompleteAsync(_entityName, token).GetAwaiter().GetResult();
+                    break;
+                case DispositionAbandoned:
+                    _store.TryAbandonAsync(_entityName, token).GetAwaiter().GetResult();
+                    break;
+                case DispositionDeferred:
+                    _store.TryDeferAsync(_entityName, token).GetAwaiter().GetResult();
+                    break;
+                case DispositionSuspended:
+                    DeadLetterViaManagementAsync(token, reason, description).GetAwaiter().GetResult();
+                    break;
+                default:
+                    return BuildResponse(request, 400, $"BadRequest: unknown disposition-status '{status}'");
+            }
+        }
+
+        return BuildResponse(request, 200, "OK");
+    }
+
+    /// <summary>
+    /// Move a locked message to the DLQ via the management path (when the original receiver link
+    /// is no longer in scope — e.g. for a message retrieved via receive-by-sequence-number).
+    /// Mirrors <c>QueueReceiverSource.DeadLetterAsync</c> at this layer.
+    /// </summary>
+    private async Task DeadLetterViaManagementAsync(Guid lockToken, string? reason, string? description)
+    {
+        if (EntityNames.IsDeadLetterQueue(_entityName))
+        {
+            await _store.TryAbandonAsync(_entityName, lockToken).ConfigureAwait(false);
+            return;
+        }
+
+        var removed = await _store.TryRemoveLockedAsync(_entityName, lockToken).ConfigureAwait(false);
+        if (removed is null) return;
+
+        var dlqBytes = DeadLettering.DeadLetterEncoder.AppendDeadLetterHeaders(removed.EncodedMessage, _entityName, reason, description);
+        var dlqName = _entityName + EntityNames.DeadLetterSuffix;
+        await _store.EnqueueAsync(dlqName, dlqBytes).ConfigureAwait(false);
     }
 
     private Message HandleCancelScheduledMessage(Message request)

@@ -37,4 +37,11 @@ public sealed record StoredMessage
 
     /// <summary>True when this message is scheduled and its activation time has not yet arrived.</summary>
     public bool IsScheduled(DateTimeOffset now) => ScheduledEnqueueTime is not null && ScheduledEnqueueTime.Value > now;
+
+    /// <summary>
+    /// True when this message has been deferred via <c>DeferAsync</c> (M8). Deferred messages
+    /// are invisible to the normal receive path and can only be retrieved by sequence number
+    /// via <c>ReceiveDeferredMessagesAsync</c>.
+    /// </summary>
+    public bool IsDeferred { get; init; }
 }

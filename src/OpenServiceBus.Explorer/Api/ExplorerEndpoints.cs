@@ -124,6 +124,17 @@ public static class ExplorerEndpoints
             return Results.Ok(new { renewedUntil = msg.LockedUntil });
         });
 
+        api.MapPost("/defer", async (DispositionRequest req, SessionManager sessions, CancellationToken ct) =>
+        {
+            var session = sessions.GetOrCreate(req.ConnectionString);
+            if (!session.TryTakeLocked(req.LockToken, out var msg) || msg is null)
+            {
+                return Results.NotFound(new { error = "Unknown lock token." });
+            }
+            await session.Receiver(req.Queue).DeferMessageAsync(msg, cancellationToken: ct);
+            return Results.Ok(new { deferred = true, sequenceNumber = msg.SequenceNumber });
+        });
+
         // --- Connectivity check ---
         api.MapPost("/ping", async (PingRequest req, SessionManager sessions, IHttpClientFactory httpFactory, CancellationToken ct) =>
         {

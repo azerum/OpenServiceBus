@@ -124,4 +124,24 @@ public interface IMessageStore
     /// to consumers. Locked messages ARE visible to Peek.
     /// </summary>
     IReadOnlyList<StoredMessage> Peek(string queueName, long fromSequenceNumber, int maxCount);
+
+    /// <summary>
+    /// Defer a locked message (M8). Removes the lock, marks the message as deferred, and keeps
+    /// it in storage. Deferred messages are invisible to <see cref="TryDequeueAsync"/>; the only
+    /// way to retrieve one is by sequence number via <see cref="TryReceiveDeferredAsync"/>.
+    /// </summary>
+    Task<bool> TryDeferAsync(string queueName, Guid lockToken, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieve a deferred message by sequence number and place it under a fresh peek-lock.
+    /// Returns <c>null</c> if no deferred message with that sequence number exists.
+    /// Dispositions on the returned lock token go through the <c>$management</c> update-disposition
+    /// path (the original receiver link is long gone); abandon brings the message back to Deferred.
+    /// </summary>
+    Task<LockedMessage?> TryReceiveDeferredAsync(
+        string queueName,
+        long sequenceNumber,
+        TimeSpan lockDuration,
+        string? associatedLinkName = null,
+        CancellationToken cancellationToken = default);
 }

@@ -220,6 +220,16 @@ public sealed class InMemoryMessageStore : IMessageStore
             return Task.FromResult(false);
         }
 
+        if (entry.WasDeferred)
+        {
+            // Message was deferred before lock — abandon returns it to Deferred state, not Active.
+            if (state.Messages.TryGetValue(entry.SequenceNumber, out var msg))
+            {
+                state.Messages[entry.SequenceNumber] = msg with { IsDeferred = true };
+            }
+            return Task.FromResult(true);
+        }
+
         ReturnToAvailableWithIncrementedDeliveryCount(state, entry.SequenceNumber);
         return Task.FromResult(true);
     }
@@ -232,11 +242,21 @@ public sealed class InMemoryMessageStore : IMessageStore
         foreach (var (token, entry) in state.Locks)
         {
             if (entry.LockedUntil > now) continue;
-            if (state.Locks.TryRemove(token, out _))
+            if (!state.Locks.TryRemove(token, out _)) continue;
+
+            if (entry.WasDeferred)
+            {
+                // Deferred-then-locked messages return to Deferred on expiry, not to Active.
+                if (state.Messages.TryGetValue(entry.SequenceNumber, out var msg))
+                {
+                    state.Messages[entry.SequenceNumber] = msg with { IsDeferred = true };
+                }
+            }
+            else
             {
                 ReturnToAvailableWithIncrementedDeliveryCount(state, entry.SequenceNumber);
-                expired++;
             }
+            expired++;
         }
         return expired;
     }
@@ -297,6 +317,64 @@ public sealed class InMemoryMessageStore : IMessageStore
         return Task.FromResult<StoredMessage?>(msg);
     }
 
+    public Task<bool> TryDeferAsync(
+        string queueName,
+        Guid lockToken,
+        CancellationToken cancellationToken = default)
+    {
+        var state = GetQueue(queueName);
+        if (!state.Locks.TryRemove(lockToken, out var entry))
+        {
+            return Task.FromResult(false);
+        }
+        if (state.Messages.TryGetValue(entry.SequenceNumber, out var msg))
+        {
+            state.Messages[entry.SequenceNumber] = msg with { IsDeferred = true };
+        }
+        // Don't write to Available — deferred messages are only retrievable by sequence number.
+        return Task.FromResult(true);
+    }
+
+    public Task<LockedMessage?> TryReceiveDeferredAsync(
+        string queueName,
+        long sequenceNumber,
+        TimeSpan lockDuration,
+        string? associatedLinkName = null,
+        CancellationToken cancellationToken = default)
+    {
+        var state = GetQueue(queueName);
+        if (!state.Messages.TryGetValue(sequenceNumber, out var stored) || !stored.IsDeferred)
+        {
+            return Task.FromResult<LockedMessage?>(null);
+        }
+
+        // Atomically clear the IsDeferred flag and place under a new lock with WasDeferred=true,
+        // so abandon brings it back to Deferred (not Active).
+        var unmarked = stored with { IsDeferred = false };
+        if (!state.Messages.TryUpdate(sequenceNumber, unmarked, stored))
+        {
+            // Lost the race — someone else grabbed it concurrently.
+            return Task.FromResult<LockedMessage?>(null);
+        }
+
+        var lockToken = Guid.NewGuid();
+        var lockedUntil = _timeProvider.GetUtcNow() + lockDuration;
+        state.Locks[lockToken] = new LockEntry
+        {
+            SequenceNumber = sequenceNumber,
+            LockedUntil = lockedUntil,
+            AssociatedLink = associatedLinkName,
+            WasDeferred = true,
+        };
+
+        return Task.FromResult<LockedMessage?>(new LockedMessage
+        {
+            Message = unmarked,
+            LockToken = lockToken,
+            LockedUntil = lockedUntil,
+        });
+    }
+
     public IReadOnlyList<StoredMessage> Peek(string queueName, long fromSequenceNumber, int maxCount)
     {
         if (maxCount <= 0 || !_queues.TryGetValue(queueName, out var state))
@@ -341,5 +419,8 @@ public sealed class InMemoryMessageStore : IMessageStore
         public required long SequenceNumber { get; init; }
         public required DateTimeOffset LockedUntil { get; set; }
         public string? AssociatedLink { get; init; }
+        /// <summary>True when this lock was acquired via receive-by-sequence-number on a deferred
+        /// message — abandon returns it to Deferred state, not the Active pool.</summary>
+        public bool WasDeferred { get; init; }
     }
 }

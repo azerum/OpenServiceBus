@@ -583,6 +583,7 @@
               <button class="btn btn-success" data-complete="${escapeHtml(tok)}">Complete</button>
               <button class="btn btn-warning" data-abandon="${escapeHtml(tok)}">Abandon</button>
               <button class="btn btn-outline-secondary" data-renew="${escapeHtml(tok)}" title="Renew lock">⟳ Renew</button>
+              <button class="btn btn-outline-primary" data-defer="${escapeHtml(tok)}" title="Defer — retrieve later by sequence number">Defer</button>
               <button class="btn btn-danger" data-deadletter="${escapeHtml(tok)}">DLQ</button>
             </div>
           </div>
@@ -598,6 +599,23 @@
       out.querySelectorAll("[data-abandon]").forEach(b => b.addEventListener("click", () => disposeMessage(b.dataset.abandon, "abandon")));
       out.querySelectorAll("[data-deadletter]").forEach(b => b.addEventListener("click", () => deadLetterMessage(b.dataset.deadletter)));
       out.querySelectorAll("[data-renew]").forEach(b => b.addEventListener("click", () => renewLock(b.dataset.renew)));
+      out.querySelectorAll("[data-defer]").forEach(b => b.addEventListener("click", () => deferMessage(b.dataset.defer)));
+    }
+
+    async function deferMessage(lockToken) {
+      const found = findLocked(lockToken);
+      if (!found) { toast("Lock token no longer tracked locally", "err"); return; }
+      try {
+        const r = await api("POST", "/api/defer", {
+          connectionString: $("#connStr").value,
+          queue: found.queue,
+          lockToken,
+        });
+        lockedFor(found.queue).delete(found.key);
+        renderReceived();
+        toast(`Deferred (seq=${r.sequenceNumber}). Retrieve via ReceiveDeferredMessagesAsync.`, "ok");
+        loadQueues();
+      } catch (e) { toast(e.message, "err"); }
     }
 
     /**
