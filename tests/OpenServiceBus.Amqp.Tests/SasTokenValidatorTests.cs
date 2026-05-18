@@ -25,57 +25,89 @@ public class SasTokenValidatorTests
     }
 
     [Fact]
-    public void Validate_accepts_a_correctly_signed_unexpired_token()
+    public void Validate_CorrectlySignedUnexpiredToken_ReturnsValidResultWithKeyNameAndAudience()
     {
+        // Arrange
         var token = BuildToken(Audience, KeyName, Key, DateTimeOffset.UtcNow.AddMinutes(20));
         var keys = new Dictionary<string, string> { [KeyName] = Key };
+
+        // Act
         var result = SasTokenValidator.Validate(token, keys, DateTimeOffset.UtcNow);
+
+        // Assert
         result.IsValid.ShouldBeTrue(result.FailureReason);
         result.KeyName.ShouldBe(KeyName);
         result.Audience.ShouldBe(Audience);
     }
 
     [Fact]
-    public void Validate_rejects_an_expired_token()
+    public void Validate_ExpiredToken_ReturnsInvalidWithExpiredReason()
     {
+        // Arrange
         var token = BuildToken(Audience, KeyName, Key, DateTimeOffset.UtcNow.AddMinutes(-1));
         var keys = new Dictionary<string, string> { [KeyName] = Key };
+
+        // Act
         var result = SasTokenValidator.Validate(token, keys, DateTimeOffset.UtcNow);
+
+        // Assert
         result.IsValid.ShouldBeFalse();
         result.FailureReason!.ShouldContain("expired");
     }
 
     [Fact]
-    public void Validate_rejects_a_token_signed_with_the_wrong_key()
+    public void Validate_TokenSignedWithWrongKey_ReturnsSignatureMismatch()
     {
+        // Arrange
         var token = BuildToken(Audience, KeyName, "WRONG-KEY", DateTimeOffset.UtcNow.AddMinutes(20));
         var keys = new Dictionary<string, string> { [KeyName] = Key };
+
+        // Act
         var result = SasTokenValidator.Validate(token, keys, DateTimeOffset.UtcNow);
+
+        // Assert
         result.IsValid.ShouldBeFalse();
         result.FailureReason.ShouldBe("Signature mismatch");
     }
 
     [Fact]
-    public void Validate_rejects_when_key_name_is_unknown()
+    public void Validate_UnknownKeyName_ReturnsInvalidWithUnknownKeyNameReason()
     {
+        // Arrange
         var token = BuildToken(Audience, "SomeOtherPolicy", Key, DateTimeOffset.UtcNow.AddMinutes(20));
         var keys = new Dictionary<string, string> { [KeyName] = Key };
+
+        // Act
         var result = SasTokenValidator.Validate(token, keys, DateTimeOffset.UtcNow);
+
+        // Assert
         result.IsValid.ShouldBeFalse();
         result.FailureReason!.ShouldContain("Unknown key name");
     }
 
     [Fact]
-    public void Validate_rejects_a_malformed_token()
+    public void Validate_MalformedToken_ReturnsInvalid()
     {
+        // Arrange + Act
         var result = SasTokenValidator.Validate("not-a-sas-token", new Dictionary<string, string>(), DateTimeOffset.UtcNow);
+
+        // Assert
         result.IsValid.ShouldBeFalse();
     }
 
     [Fact]
-    public void Validate_rejects_a_null_or_empty_token()
+    public void Validate_NullOrEmptyToken_ReturnsInvalid()
     {
-        SasTokenValidator.Validate(null, new Dictionary<string, string>(), DateTimeOffset.UtcNow).IsValid.ShouldBeFalse();
-        SasTokenValidator.Validate("", new Dictionary<string, string>(), DateTimeOffset.UtcNow).IsValid.ShouldBeFalse();
+        // Arrange
+        var keys = new Dictionary<string, string>();
+        var now = DateTimeOffset.UtcNow;
+
+        // Act
+        var nullResult = SasTokenValidator.Validate(null, keys, now);
+        var emptyResult = SasTokenValidator.Validate("", keys, now);
+
+        // Assert
+        nullResult.IsValid.ShouldBeFalse();
+        emptyResult.IsValid.ShouldBeFalse();
     }
 }

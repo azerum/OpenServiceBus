@@ -1,5 +1,3 @@
-using OpenServiceBus.InMemoryStorage;
-
 namespace OpenServiceBus.InMemoryStorage.Tests;
 
 /// <summary>
@@ -10,44 +8,53 @@ namespace OpenServiceBus.InMemoryStorage.Tests;
 public class LinkAffinityTests
 {
     [Fact]
-    public async Task TryRenewLock_succeeds_when_requesting_link_matches_associated_link()
+    public async Task TryRenewLockAsync_RequestingLinkMatchesAssociatedLink_Succeeds()
     {
+        // Arrange
         var store = new InMemoryMessageStore();
         await store.CreateQueueAsync("q");
         await store.EnqueueAsync("q", [1]);
-
         var locked = await store.TryDequeueAsync("q", TimeSpan.FromSeconds(30), associatedLinkName: "receiver-A");
         locked.ShouldNotBeNull();
 
+        // Act
         var renewed = await store.TryRenewLockAsync("q", locked.LockToken, TimeSpan.FromSeconds(60), requestingLinkName: "receiver-A");
+
+        // Assert
         renewed.ShouldNotBeNull();
     }
 
     [Fact]
-    public async Task TryRenewLock_returns_null_when_a_different_link_attempts_to_renew()
+    public async Task TryRenewLockAsync_DifferentLinkAttemptsToRenew_ReturnsNull()
     {
+        // Arrange
         var store = new InMemoryMessageStore();
         await store.CreateQueueAsync("q");
         await store.EnqueueAsync("q", [1]);
-
         var locked = await store.TryDequeueAsync("q", TimeSpan.FromSeconds(30), associatedLinkName: "receiver-A");
         locked.ShouldNotBeNull();
 
+        // Act
         var renewed = await store.TryRenewLockAsync("q", locked.LockToken, TimeSpan.FromSeconds(60), requestingLinkName: "receiver-B");
+
+        // Assert
         renewed.ShouldBeNull("a different receiver link must not be able to renew another link's lock");
     }
 
     [Fact]
-    public async Task TryRenewLock_works_when_neither_side_specifies_a_link_name()
+    public async Task TryRenewLockAsync_NeitherSideSpecifiesLinkName_Succeeds()
     {
+        // Arrange
         var store = new InMemoryMessageStore();
         await store.CreateQueueAsync("q");
         await store.EnqueueAsync("q", [1]);
-
         var locked = await store.TryDequeueAsync("q", TimeSpan.FromSeconds(30));
         locked.ShouldNotBeNull();
 
+        // Act
         var renewed = await store.TryRenewLockAsync("q", locked.LockToken, TimeSpan.FromSeconds(60));
+
+        // Assert
         renewed.ShouldNotBeNull("backwards-compat: no link affinity when neither side provides a name");
     }
 }

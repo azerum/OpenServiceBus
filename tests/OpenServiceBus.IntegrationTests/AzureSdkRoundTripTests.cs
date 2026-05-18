@@ -1,7 +1,5 @@
 using Azure.Messaging.ServiceBus;
 using OpenServiceBus.Core.Entities;
-using OpenServiceBus.Core.Messaging;
-using OpenServiceBus.Core.Storage;
 
 namespace OpenServiceBus.IntegrationTests;
 
@@ -12,13 +10,12 @@ namespace OpenServiceBus.IntegrationTests;
 public class AzureSdkRoundTripTests
 {
     [Fact]
-    public async Task ServiceBusClient_can_send_and_receive_and_complete_a_message()
+    public async Task CompleteMessageAsync_AfterReceive_RemovesMessageFromQueue()
     {
+        // Arrange
         await using var harness = await IntegrationHarness.StartAsync();
         await harness.Queues.CreateAsync(new QueueDescriptor { Name = "orders" });
-
         await using var client = new ServiceBusClient(harness.ConnectionString);
-
         var sender = client.CreateSender("orders");
         await sender.SendMessageAsync(new ServiceBusMessage("hello-from-sdk")
         {
@@ -26,48 +23,46 @@ public class AzureSdkRoundTripTests
             CorrelationId = "corr-1",
             Subject = "the-subject",
         });
-
         var receiver = client.CreateReceiver("orders", new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.PeekLock,
         });
 
+        // Act
         var received = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        await receiver.CompleteMessageAsync(received);
+        for (var i = 0; i < 20 && await harness.Store.CountAsync("orders") > 0; i++)
+        {
+            await Task.Delay(50);
+        }
+
+        // Assert
         received.ShouldNotBeNull("the Azure SDK should have received the message");
         received.MessageId.ShouldBe("id-1");
         received.CorrelationId.ShouldBe("corr-1");
         received.Subject.ShouldBe("the-subject");
         received.Body.ToString().ShouldBe("hello-from-sdk");
-
-        await receiver.CompleteMessageAsync(received);
-
-        // Allow disposition to settle, then assert.
-        for (var i = 0; i < 20 && await harness.Store.CountAsync("orders") > 0; i++)
-        {
-            await Task.Delay(50);
-        }
         (await harness.Store.CountAsync("orders")).ShouldBe(0L);
     }
 
     [Fact]
-    public async Task ServiceBusClient_can_send_and_receive_many_messages_in_order()
+    public async Task ReceiveMessageAsync_25MessagesSentInOrder_AreReceivedInTheSameOrder()
     {
+        // Arrange
         await using var harness = await IntegrationHarness.StartAsync();
         await harness.Queues.CreateAsync(new QueueDescriptor { Name = "stream" });
-
         await using var client = new ServiceBusClient(harness.ConnectionString);
-
         var sender = client.CreateSender("stream");
         for (var i = 0; i < 25; i++)
         {
             await sender.SendMessageAsync(new ServiceBusMessage($"msg-{i}") { MessageId = $"id-{i}" });
         }
-
         var receiver = client.CreateReceiver("stream", new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.PeekLock,
         });
 
+        // Act
         var received = new List<string>();
         for (var i = 0; i < 25; i++)
         {
@@ -77,32 +72,34 @@ public class AzureSdkRoundTripTests
             await receiver.CompleteMessageAsync(msg);
         }
 
+        // Assert
         received.ShouldBe(Enumerable.Range(0, 25).Select(i => $"id-{i}"));
     }
 
     [Fact]
-    public async Task Abandoned_message_is_redelivered_by_the_SDK()
+    public async Task AbandonMessageAsync_AfterReceive_RedeliversTheSameMessage()
     {
+        // Arrange
         await using var harness = await IntegrationHarness.StartAsync();
         await harness.Queues.CreateAsync(new QueueDescriptor { Name = "abandon-test" });
-
         await using var client = new ServiceBusClient(harness.ConnectionString);
         var sender = client.CreateSender("abandon-test");
         await sender.SendMessageAsync(new ServiceBusMessage("retry-me") { MessageId = "m-1" });
-
         var receiver = client.CreateReceiver("abandon-test", new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.PeekLock,
         });
 
+        // Act
         var first = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        await receiver.AbandonMessageAsync(first);
+        var second = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        await receiver.CompleteMessageAsync(second);
+
+        // Assert
         first.ShouldNotBeNull();
         first.MessageId.ShouldBe("m-1");
-        await receiver.AbandonMessageAsync(first);
-
-        var second = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
         second.ShouldNotBeNull("abandoned message must be redelivered");
         second.MessageId.ShouldBe("m-1");
-        await receiver.CompleteMessageAsync(second);
     }
 }

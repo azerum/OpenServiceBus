@@ -1,101 +1,126 @@
 using Microsoft.Extensions.Time.Testing;
-using OpenServiceBus.InMemoryStorage.DependencyInjection;
-using OpenServiceBus.InMemoryStorage.Lifecycle;
-using OpenServiceBus.InMemoryStorage.Queues;
 
 namespace OpenServiceBus.InMemoryStorage.Tests;
 
 public class PeekLockTests
 {
     [Fact]
-    public async Task TryDequeue_returns_message_in_FIFO_order_and_assigns_a_lock_token()
+    public async Task TryDequeueAsync_MultipleEnqueuedMessages_ReturnsInFifoOrderWithUniqueLockTokens()
     {
+        // Arrange
         var store = new InMemoryMessageStore();
         await store.CreateQueueAsync("q");
-
         await store.EnqueueAsync("q", new byte[] { 1 });
         await store.EnqueueAsync("q", new byte[] { 2 });
 
-        var a = await store.TryDequeueAsync("q", TimeSpan.FromSeconds(30));
-        var b = await store.TryDequeueAsync("q", TimeSpan.FromSeconds(30));
+        // Act
+        var first = await store.TryDequeueAsync("q", TimeSpan.FromSeconds(30));
+        var second = await store.TryDequeueAsync("q", TimeSpan.FromSeconds(30));
 
-        a.ShouldNotBeNull();
-        b.ShouldNotBeNull();
-        a.Message.SequenceNumber.ShouldBe(1L);
-        b.Message.SequenceNumber.ShouldBe(2L);
-        a.LockToken.ShouldNotBe(b.LockToken);
-        a.LockToken.ShouldNotBe(Guid.Empty);
+        // Assert
+        first.ShouldNotBeNull();
+        second.ShouldNotBeNull();
+        first.Message.SequenceNumber.ShouldBe(1L);
+        second.Message.SequenceNumber.ShouldBe(2L);
+        first.LockToken.ShouldNotBe(second.LockToken);
+        first.LockToken.ShouldNotBe(Guid.Empty);
     }
 
     [Fact]
-    public async Task TryComplete_removes_the_locked_message_from_storage()
+    public async Task TryCompleteAsync_OnLockedMessage_RemovesItFromStorage()
     {
+        // Arrange
         var store = new InMemoryMessageStore();
         await store.CreateQueueAsync("q");
         await store.EnqueueAsync("q", new byte[] { 1 });
-
         var locked = await store.TryDequeueAsync("q", TimeSpan.FromSeconds(30));
         locked.ShouldNotBeNull();
 
-        (await store.TryCompleteAsync("q", locked.LockToken)).ShouldBeTrue();
-        (await store.CountAsync("q")).ShouldBe(0L);
+        // Act
+        var completed = await store.TryCompleteAsync("q", locked.LockToken);
 
-        // Completing the same token twice is a no-op.
-        (await store.TryCompleteAsync("q", locked.LockToken)).ShouldBeFalse();
+        // Assert
+        completed.ShouldBeTrue();
+        (await store.CountAsync("q")).ShouldBe(0L);
     }
 
     [Fact]
-    public async Task TryAbandon_returns_the_message_to_the_available_pool()
+    public async Task TryCompleteAsync_SameTokenTwice_ReturnsFalseOnSecondCall()
     {
+        // Arrange
         var store = new InMemoryMessageStore();
         await store.CreateQueueAsync("q");
         await store.EnqueueAsync("q", new byte[] { 1 });
+        var locked = await store.TryDequeueAsync("q", TimeSpan.FromSeconds(30));
+        locked.ShouldNotBeNull();
+        await store.TryCompleteAsync("q", locked.LockToken);
 
-        var locked1 = await store.TryDequeueAsync("q", TimeSpan.FromSeconds(30));
-        locked1.ShouldNotBeNull();
+        // Act
+        var secondCompletion = await store.TryCompleteAsync("q", locked.LockToken);
 
-        (await store.TryAbandonAsync("q", locked1.LockToken)).ShouldBeTrue();
-        (await store.CountAsync("q")).ShouldBe(1L);
-
-        var locked2 = await store.TryDequeueAsync("q", TimeSpan.FromSeconds(30));
-        locked2.ShouldNotBeNull();
-        locked2.Message.SequenceNumber.ShouldBe(locked1.Message.SequenceNumber);
-        locked2.LockToken.ShouldNotBe(locked1.LockToken, "redelivery must use a fresh lock token");
+        // Assert
+        secondCompletion.ShouldBeFalse();
     }
 
     [Fact]
-    public async Task ExpireLocks_releases_locks_whose_deadlines_have_passed()
+    public async Task TryAbandonAsync_OnLockedMessage_ReturnsMessageToAvailablePoolWithFreshLockToken()
     {
+        // Arrange
+        var store = new InMemoryMessageStore();
+        await store.CreateQueueAsync("q");
+        await store.EnqueueAsync("q", new byte[] { 1 });
+        var firstLock = await store.TryDequeueAsync("q", TimeSpan.FromSeconds(30));
+        firstLock.ShouldNotBeNull();
+
+        // Act
+        var abandoned = await store.TryAbandonAsync("q", firstLock.LockToken);
+        var secondLock = await store.TryDequeueAsync("q", TimeSpan.FromSeconds(30));
+
+        // Assert
+        abandoned.ShouldBeTrue();
+        (await store.CountAsync("q")).ShouldBe(1L);
+        secondLock.ShouldNotBeNull();
+        secondLock.Message.SequenceNumber.ShouldBe(firstLock.Message.SequenceNumber);
+        secondLock.LockToken.ShouldNotBe(firstLock.LockToken, "redelivery must use a fresh lock token");
+    }
+
+    [Fact]
+    public async Task ExpireLocks_PastDeadline_ReleasesOnlyExpiredLocks()
+    {
+        // Arrange
         var fakeTime = new FakeTimeProvider(DateTimeOffset.UtcNow);
         var store = new InMemoryMessageStore(fakeTime);
         await store.CreateQueueAsync("q");
         await store.EnqueueAsync("q", new byte[] { 1 });
         await store.EnqueueAsync("q", new byte[] { 2 });
-
-        var a = await store.TryDequeueAsync("q", TimeSpan.FromSeconds(10));
-        var b = await store.TryDequeueAsync("q", TimeSpan.FromMinutes(5));
-
-        a.ShouldNotBeNull();
-        b.ShouldNotBeNull();
-
+        var shortLock = await store.TryDequeueAsync("q", TimeSpan.FromSeconds(10));
+        var longLock = await store.TryDequeueAsync("q", TimeSpan.FromMinutes(5));
+        shortLock.ShouldNotBeNull();
+        longLock.ShouldNotBeNull();
         fakeTime.Advance(TimeSpan.FromSeconds(30));
 
-        store.ExpireLocks("q", fakeTime.GetUtcNow()).ShouldBe(1, "only the 10s lock should have expired");
-
-        // The 10s-locked message comes back; the 5min one stays locked.
+        // Act
+        var expiredCount = store.ExpireLocks("q", fakeTime.GetUtcNow());
         var redelivered = await store.TryDequeueAsync("q", TimeSpan.FromSeconds(10));
-        redelivered.ShouldNotBeNull();
-        redelivered.Message.SequenceNumber.ShouldBe(a.Message.SequenceNumber);
 
-        // b is still locked - completing it works.
-        (await store.TryCompleteAsync("q", b.LockToken)).ShouldBeTrue();
+        // Assert
+        expiredCount.ShouldBe(1, "only the 10s lock should have expired");
+        redelivered.ShouldNotBeNull();
+        redelivered.Message.SequenceNumber.ShouldBe(shortLock.Message.SequenceNumber);
+        (await store.TryCompleteAsync("q", longLock.LockToken)).ShouldBeTrue("the 5-minute lock is still held and completable");
     }
 
     [Fact]
-    public async Task ExpireLocks_is_a_no_op_for_a_queue_with_no_locks()
+    public async Task ExpireLocks_QueueWithNoLocks_ReturnsZero()
     {
+        // Arrange
         var store = new InMemoryMessageStore();
         await store.CreateQueueAsync("q");
-        store.ExpireLocks("q", DateTimeOffset.UtcNow).ShouldBe(0);
+
+        // Act
+        var expiredCount = store.ExpireLocks("q", DateTimeOffset.UtcNow);
+
+        // Assert
+        expiredCount.ShouldBe(0);
     }
 }

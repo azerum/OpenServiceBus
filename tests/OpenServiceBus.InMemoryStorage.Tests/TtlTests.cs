@@ -1,77 +1,75 @@
 using Microsoft.Extensions.Time.Testing;
-using OpenServiceBus.Core.Entities;
 using OpenServiceBus.Core.Messaging;
-using OpenServiceBus.Core.Storage;
-using OpenServiceBus.InMemoryStorage.DependencyInjection;
-using OpenServiceBus.InMemoryStorage.Lifecycle;
-using OpenServiceBus.InMemoryStorage.Queues;
 
 namespace OpenServiceBus.InMemoryStorage.Tests;
 
 public class TtlTests
 {
     [Fact]
-    public async Task ExpireMessages_returns_and_removes_only_messages_past_their_deadline()
+    public async Task ExpireMessages_SomeMessagesPastDeadline_RemovesAndReturnsOnlyExpiredOnes()
     {
+        // Arrange
         var time = new FakeTimeProvider(DateTimeOffset.UtcNow);
         var store = new InMemoryMessageStore(time);
         await store.CreateQueueAsync("q");
-
-        // Two messages: one expires in 10s, one in 5min.
         var soon = time.GetUtcNow() + TimeSpan.FromSeconds(10);
         var later = time.GetUtcNow() + TimeSpan.FromMinutes(5);
         await store.EnqueueAsync("q", [1], expiresAt: soon);
         await store.EnqueueAsync("q", [2], expiresAt: later);
-
         time.Advance(TimeSpan.FromSeconds(30));
 
+        // Act
         var expired = store.ExpireMessages("q", time.GetUtcNow());
+
+        // Assert
         expired.Count.ShouldBe(1);
         expired[0].EncodedMessage.ShouldBe(new byte[] { 1 });
-
         (await store.CountAsync("q")).ShouldBe(1L, "only the not-yet-expired message remains");
     }
 
     [Fact]
-    public async Task ExpireMessages_never_touches_a_currently_locked_message()
+    public async Task ExpireMessages_LockedMessage_DoesNotExpireWhileLocked()
     {
+        // Arrange
         var time = new FakeTimeProvider(DateTimeOffset.UtcNow);
         var store = new InMemoryMessageStore(time);
         await store.CreateQueueAsync("q");
-
         var soon = time.GetUtcNow() + TimeSpan.FromSeconds(10);
         await store.EnqueueAsync("q", [1], expiresAt: soon);
-
-        // Lock it before TTL passes.
         var locked = await store.TryDequeueAsync("q", TimeSpan.FromMinutes(5));
         locked.ShouldNotBeNull();
-
-        // Now advance past the TTL deadline.
         time.Advance(TimeSpan.FromSeconds(30));
 
+        // Act
         var expired = store.ExpireMessages("q", time.GetUtcNow());
-        expired.Count.ShouldBe(0, "locked messages must NOT be expired by the sweeper - the lock holder owns them");
+
+        // Assert
+        expired.Count.ShouldBe(0, "locked messages must NOT be expired by the sweeper — the lock holder owns them");
         (await store.CountAsync("q")).ShouldBe(1L);
     }
 
     [Fact]
-    public async Task ExpireMessages_is_a_noop_when_no_TTL_was_set()
+    public async Task ExpireMessages_MessageHasNoTtl_ReturnsEmptyAndRetainsMessage()
     {
+        // Arrange
         var time = new FakeTimeProvider(DateTimeOffset.UtcNow);
         var store = new InMemoryMessageStore(time);
         await store.CreateQueueAsync("q");
         await store.EnqueueAsync("q", [1], expiresAt: null);
-
         time.Advance(TimeSpan.FromHours(24));
 
+        // Act
         var expired = store.ExpireMessages("q", time.GetUtcNow());
+
+        // Assert
         expired.Count.ShouldBe(0);
         (await store.CountAsync("q")).ShouldBe(1L);
     }
 
     [Fact]
-    public void IsExpired_returns_false_for_messages_with_no_deadline()
+    public void IsExpired_NoExpiresAt_ReturnsFalse()
     {
+        // Arrange
         var msg = new StoredMessage
         {
             SequenceNumber = 1,
@@ -79,12 +77,18 @@ public class TtlTests
             EncodedMessage = [1],
             ExpiresAt = null,
         };
-        msg.IsExpired(DateTimeOffset.UtcNow.AddYears(10)).ShouldBeFalse();
+
+        // Act
+        var expired = msg.IsExpired(DateTimeOffset.UtcNow.AddYears(10));
+
+        // Assert
+        expired.ShouldBeFalse();
     }
 
     [Fact]
-    public void IsExpired_is_inclusive_of_the_exact_deadline()
+    public void IsExpired_NowEqualsDeadline_ReturnsTrueInclusiveOfDeadline()
     {
+        // Arrange
         var deadline = DateTimeOffset.UtcNow;
         var msg = new StoredMessage
         {
@@ -93,7 +97,13 @@ public class TtlTests
             EncodedMessage = [1],
             ExpiresAt = deadline,
         };
-        msg.IsExpired(deadline).ShouldBeTrue();
-        msg.IsExpired(deadline.AddSeconds(-1)).ShouldBeFalse();
+
+        // Act
+        var atDeadline = msg.IsExpired(deadline);
+        var oneSecondBefore = msg.IsExpired(deadline.AddSeconds(-1));
+
+        // Assert
+        atDeadline.ShouldBeTrue();
+        oneSecondBefore.ShouldBeFalse();
     }
 }

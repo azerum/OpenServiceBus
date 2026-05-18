@@ -1,46 +1,52 @@
-using OpenServiceBus.Core.Entities;
-using OpenServiceBus.Core.Messaging;
-using OpenServiceBus.Core.Storage;
-using OpenServiceBus.InMemoryStorage.DependencyInjection;
-using OpenServiceBus.InMemoryStorage.Lifecycle;
-using OpenServiceBus.InMemoryStorage.Queues;
-
 namespace OpenServiceBus.InMemoryStorage.Tests;
 
 public class InMemoryMessageStoreTests
 {
     [Fact]
-    public async Task Enqueue_assigns_monotonic_sequence_numbers_starting_at_1()
+    public async Task EnqueueAsync_ThreeMessagesInOrder_AssignsMonotonicSequenceNumbersStartingAtOne()
     {
+        // Arrange
         var store = new InMemoryMessageStore();
         await store.CreateQueueAsync("q");
 
-        var a = await store.EnqueueAsync("q", new byte[] { 1 });
-        var b = await store.EnqueueAsync("q", new byte[] { 2 });
-        var c = await store.EnqueueAsync("q", new byte[] { 3 });
+        // Act
+        var first = await store.EnqueueAsync("q", new byte[] { 1 });
+        var second = await store.EnqueueAsync("q", new byte[] { 2 });
+        var third = await store.EnqueueAsync("q", new byte[] { 3 });
 
-        a.SequenceNumber.ShouldBe(1L);
-        b.SequenceNumber.ShouldBe(2L);
-        c.SequenceNumber.ShouldBe(3L);
+        // Assert
+        first.SequenceNumber.ShouldBe(1L);
+        second.SequenceNumber.ShouldBe(2L);
+        third.SequenceNumber.ShouldBe(3L);
         (await store.CountAsync("q")).ShouldBe(3L);
     }
 
     [Fact]
-    public async Task Enqueue_to_unknown_queue_throws()
+    public async Task EnqueueAsync_QueueDoesNotExist_ThrowsInvalidOperationException()
     {
+        // Arrange
         var store = new InMemoryMessageStore();
-        await Should.ThrowAsync<InvalidOperationException>(
-            () => store.EnqueueAsync("missing", new byte[] { 0 }));
+
+        // Act
+        var enqueue = () => store.EnqueueAsync("missing", new byte[] { 0 });
+
+        // Assert
+        await Should.ThrowAsync<InvalidOperationException>(enqueue);
     }
 
     [Fact]
-    public async Task DeleteQueue_removes_messages()
+    public async Task DeleteQueueAsync_QueueHasMessages_DiscardsAllStoredMessages()
     {
+        // Arrange
         var store = new InMemoryMessageStore();
         await store.CreateQueueAsync("temp");
         await store.EnqueueAsync("temp", new byte[] { 1 });
+
+        // Act
         await store.DeleteQueueAsync("temp");
         await store.CreateQueueAsync("temp");
+
+        // Assert
         (await store.CountAsync("temp")).ShouldBe(0L);
     }
 }

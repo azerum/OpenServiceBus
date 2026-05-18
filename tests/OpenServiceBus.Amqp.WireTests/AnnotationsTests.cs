@@ -3,8 +3,6 @@ using Amqp.Framing;
 using Amqp.Sasl;
 using Amqp.Types;
 using OpenServiceBus.Core.Entities;
-using OpenServiceBus.Core.Messaging;
-using OpenServiceBus.Core.Storage;
 
 namespace OpenServiceBus.Amqp.WireTests;
 
@@ -18,25 +16,26 @@ public class AnnotationsTests
     }
 
     [Fact]
-    public async Task Broker_stamps_sequence_number_enqueued_time_and_locked_until_annotations()
+    public async Task Receive_NewlyEnqueuedMessage_CarriesSequenceNumberEnqueuedTimeAndLockedUntilAnnotations()
     {
+        // Arrange
         await using var harness = await TestListenerHarness.StartAsync();
         await harness.Queues.CreateAsync(new QueueDescriptor { Name = "annotated", LockDuration = TimeSpan.FromMinutes(2) });
-
         var factory = CreateClientFactory();
         var conn = await factory.CreateAsync(new Address(harness.AmqpUri));
         try
         {
             var session = new Session(conn);
             var sender = new SenderLink(session, "s", "annotated");
-
             var beforeSend = DateTimeOffset.UtcNow;
             await sender.SendAsync(new Message("payload") { Properties = new Properties { MessageId = "m-1" } });
-
             var receiver = new ReceiverLink(session, "r", "annotated");
-            var received = await receiver.ReceiveAsync(TimeSpan.FromSeconds(5));
-            received.ShouldNotBeNull();
 
+            // Act
+            var received = await receiver.ReceiveAsync(TimeSpan.FromSeconds(5));
+
+            // Assert
+            received.ShouldNotBeNull();
             received.MessageAnnotations.ShouldNotBeNull();
 
             var seqKey = new Symbol("x-opt-sequence-number");
@@ -69,11 +68,11 @@ public class AnnotationsTests
     }
 
     [Fact]
-    public async Task Broker_stamps_header_delivery_count_and_increments_on_redelivery()
+    public async Task Receive_RepeatedReleasesOnSameMessage_IncrementsHeaderDeliveryCountEachRedelivery()
     {
+        // Arrange
         await using var harness = await TestListenerHarness.StartAsync();
         await harness.Queues.CreateAsync(new QueueDescriptor { Name = "retries" });
-
         var factory = CreateClientFactory();
         var conn = await factory.CreateAsync(new Address(harness.AmqpUri));
         try
@@ -81,25 +80,25 @@ public class AnnotationsTests
             var session = new Session(conn);
             var sender = new SenderLink(session, "s", "retries");
             await sender.SendAsync(new Message("body") { Properties = new Properties { MessageId = "m-1" } });
-
             var receiver = new ReceiverLink(session, "r", "retries");
 
+            // Act
             var first = await receiver.ReceiveAsync(TimeSpan.FromSeconds(5));
             first.ShouldNotBeNull();
-            first.Header.ShouldNotBeNull();
-            first.Header.DeliveryCount.ShouldBe(0u, "initial delivery must be count 0");
             receiver.Release(first);
-
             var second = await receiver.ReceiveAsync(TimeSpan.FromSeconds(5));
             second.ShouldNotBeNull();
-            second.Header.ShouldNotBeNull();
-            second.Header.DeliveryCount.ShouldBe(1u, "redelivery after release must be count 1");
             receiver.Release(second);
-
             var third = await receiver.ReceiveAsync(TimeSpan.FromSeconds(5));
             third.ShouldNotBeNull();
-            third.Header.DeliveryCount.ShouldBe(2u);
             receiver.Accept(third);
+
+            // Assert
+            first.Header.ShouldNotBeNull();
+            first.Header.DeliveryCount.ShouldBe(0u, "initial delivery must be count 0");
+            second.Header.ShouldNotBeNull();
+            second.Header.DeliveryCount.ShouldBe(1u, "redelivery after release must be count 1");
+            third.Header.DeliveryCount.ShouldBe(2u);
 
             await receiver.CloseAsync();
             await sender.CloseAsync();

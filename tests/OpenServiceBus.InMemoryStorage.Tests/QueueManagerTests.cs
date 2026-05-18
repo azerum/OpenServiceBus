@@ -1,8 +1,4 @@
 using OpenServiceBus.Core.Entities;
-using OpenServiceBus.Core.Messaging;
-using OpenServiceBus.Core.Storage;
-using OpenServiceBus.InMemoryStorage.DependencyInjection;
-using OpenServiceBus.InMemoryStorage.Lifecycle;
 using OpenServiceBus.InMemoryStorage.Queues;
 
 namespace OpenServiceBus.InMemoryStorage.Tests;
@@ -10,17 +6,19 @@ namespace OpenServiceBus.InMemoryStorage.Tests;
 public class QueueManagerTests
 {
     [Fact]
-    public async Task Create_then_Get_returns_the_descriptor_and_raises_QueueCreated()
+    public async Task CreateAsync_NewQueue_PersistsDescriptorAndRaisesQueueCreatedForMainAndDlqSibling()
     {
+        // Arrange
         var store = new InMemoryMessageStore();
         var manager = new QueueManager(store);
-
         var raised = new List<string>();
         manager.QueueCreated += (_, q) => raised.Add(q.Name);
 
+        // Act
         var created = await manager.CreateAsync(new QueueDescriptor { Name = "orders", MaxDeliveryCount = 5 });
         var fetched = await manager.GetAsync("orders");
 
+        // Assert
         created.MaxDeliveryCount.ShouldBe(5);
         fetched.ShouldBe(created);
         raised.ShouldContain("orders");
@@ -28,38 +26,52 @@ public class QueueManagerTests
     }
 
     [Fact]
-    public async Task Create_is_idempotent_for_same_name()
+    public async Task CreateAsync_QueueAlreadyExists_ReturnsOriginalDescriptorWithoutOverwriting()
     {
+        // Arrange
         var manager = new QueueManager(new InMemoryMessageStore());
-        var a = await manager.CreateAsync(new QueueDescriptor { Name = "dup", MaxDeliveryCount = 3 });
-        var b = await manager.CreateAsync(new QueueDescriptor { Name = "dup", MaxDeliveryCount = 99 });
-        b.MaxDeliveryCount.ShouldBe(3, "second create should not overwrite the first");
-        a.ShouldBe(b);
+        var original = await manager.CreateAsync(new QueueDescriptor { Name = "dup", MaxDeliveryCount = 3 });
+
+        // Act
+        var second = await manager.CreateAsync(new QueueDescriptor { Name = "dup", MaxDeliveryCount = 99 });
+
+        // Assert
+        second.MaxDeliveryCount.ShouldBe(3, "second create should not overwrite the first");
+        second.ShouldBe(original);
     }
 
     [Fact]
-    public async Task Delete_returns_true_then_false_and_raises_QueueDeleted()
+    public async Task DeleteAsync_ExistingQueue_RaisesQueueDeletedForMainAndDlqSibling()
     {
+        // Arrange
         var manager = new QueueManager(new InMemoryMessageStore());
         await manager.CreateAsync(new QueueDescriptor { Name = "gone" });
-
         var raised = new List<string>();
         manager.QueueDeleted += (_, q) => raised.Add(q.Name);
 
-        (await manager.DeleteAsync("gone")).ShouldBeTrue();
-        (await manager.DeleteAsync("gone")).ShouldBeFalse();
+        // Act
+        var firstDelete = await manager.DeleteAsync("gone");
+        var secondDelete = await manager.DeleteAsync("gone");
+
+        // Assert
+        firstDelete.ShouldBeTrue();
+        secondDelete.ShouldBeFalse();
         raised.ShouldContain("gone");
         raised.ShouldContain("gone/$DeadLetterQueue", "deleting a main queue cascades to its DLQ sibling");
     }
 
     [Fact]
-    public async Task List_returns_main_queues_and_their_DLQ_siblings()
+    public async Task ListAsync_TwoMainQueuesCreated_ReturnsBothMainsAndTheirDlqSiblings()
     {
+        // Arrange
         var manager = new QueueManager(new InMemoryMessageStore());
         await manager.CreateAsync(new QueueDescriptor { Name = "a" });
         await manager.CreateAsync(new QueueDescriptor { Name = "b" });
 
+        // Act
         var all = await manager.ListAsync();
+
+        // Assert
         all.Select(q => q.Name).OrderBy(n => n).ShouldBe(new[]
         {
             "a", "a/$DeadLetterQueue",
@@ -68,33 +80,46 @@ public class QueueManagerTests
     }
 
     [Fact]
-    public async Task Creating_a_main_queue_implicitly_creates_its_DLQ_sibling()
+    public async Task CreateAsync_MainQueue_ImplicitlyCreatesDlqSiblingWithUnboundedDeliveryCount()
     {
+        // Arrange
         var manager = new QueueManager(new InMemoryMessageStore());
-        await manager.CreateAsync(new QueueDescriptor { Name = "orders", MaxDeliveryCount = 3 });
 
+        // Act
+        await manager.CreateAsync(new QueueDescriptor { Name = "orders", MaxDeliveryCount = 3 });
         var dlq = await manager.GetAsync("orders/$DeadLetterQueue");
+
+        // Assert
         dlq.ShouldNotBeNull();
         dlq!.MaxDeliveryCount.ShouldBe(int.MaxValue, "the DLQ should not itself dead-letter further");
     }
 
     [Fact]
-    public async Task Creating_a_DLQ_directly_does_not_create_a_DLQ_for_the_DLQ()
+    public async Task CreateAsync_DlqQueueDirectly_DoesNotRecurseToCreateDlqOfDlq()
     {
+        // Arrange
         var manager = new QueueManager(new InMemoryMessageStore());
+
+        // Act
         await manager.CreateAsync(new QueueDescriptor { Name = "raw/$DeadLetterQueue" });
 
+        // Assert
         (await manager.GetAsync("raw/$DeadLetterQueue/$DeadLetterQueue")).ShouldBeNull();
     }
 
     [Fact]
-    public async Task Deleting_a_main_queue_also_deletes_its_DLQ()
+    public async Task DeleteAsync_MainQueue_CascadesToDlqSibling()
     {
+        // Arrange
         var manager = new QueueManager(new InMemoryMessageStore());
         await manager.CreateAsync(new QueueDescriptor { Name = "ephemeral" });
         (await manager.GetAsync("ephemeral/$DeadLetterQueue")).ShouldNotBeNull();
 
-        (await manager.DeleteAsync("ephemeral")).ShouldBeTrue();
+        // Act
+        var deleted = await manager.DeleteAsync("ephemeral");
+
+        // Assert
+        deleted.ShouldBeTrue();
         (await manager.GetAsync("ephemeral/$DeadLetterQueue")).ShouldBeNull();
     }
 }

@@ -12,92 +12,85 @@ namespace OpenServiceBus.IntegrationTests;
 public class DeferTests
 {
     [Fact]
-    public async Task DeferMessageAsync_hides_the_message_from_normal_receive_and_ReceiveDeferred_finds_it()
+    public async Task DeferMessageAsync_AfterReceive_HidesMessageFromNormalReceiveButReceiveDeferredFindsIt()
     {
+        // Arrange
         await using var harness = await IntegrationHarness.StartAsync();
         await harness.Queues.CreateAsync(new QueueDescriptor { Name = "defer-flow" });
-
         await using var client = new ServiceBusClient(harness.ConnectionString);
         var sender = client.CreateSender("defer-flow");
         await sender.SendMessageAsync(new ServiceBusMessage("payload") { MessageId = "m-1" });
-
         var receiver = client.CreateReceiver("defer-flow");
         var first = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(5));
         first.ShouldNotBeNull();
         var deferredSeq = first.SequenceNumber;
 
+        // Act
         await receiver.DeferMessageAsync(first);
-
-        // Normal receive must NOT return the deferred message.
         var ghost = await receiver.ReceiveMessageAsync(TimeSpan.FromMilliseconds(500));
-        ghost.ShouldBeNull("deferred messages are invisible to the normal receive path");
-
-        // ReceiveDeferred by sequence number brings it back.
         var deferred = await receiver.ReceiveDeferredMessagesAsync(new[] { deferredSeq });
+        await receiver.CompleteMessageAsync(deferred[0]);
+
+        // Assert
+        ghost.ShouldBeNull("deferred messages are invisible to the normal receive path");
         deferred.Count.ShouldBe(1);
         deferred[0].MessageId.ShouldBe("m-1");
-
-        await receiver.CompleteMessageAsync(deferred[0]);
         (await harness.Store.CountAsync("defer-flow")).ShouldBe(0L);
     }
 
     [Fact]
-    public async Task Abandoning_a_deferred_received_message_keeps_it_in_Deferred_state()
+    public async Task AbandonMessageAsync_OnDeferredReceivedMessage_KeepsItInDeferredState()
     {
+        // Arrange
         await using var harness = await IntegrationHarness.StartAsync();
         await harness.Queues.CreateAsync(new QueueDescriptor { Name = "defer-abandon" });
-
         await using var client = new ServiceBusClient(harness.ConnectionString);
         var sender = client.CreateSender("defer-abandon");
         await sender.SendMessageAsync(new ServiceBusMessage("p") { MessageId = "id" });
-
         var receiver = client.CreateReceiver("defer-abandon");
         var msg = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(5));
         msg.ShouldNotBeNull();
         var seq = msg.SequenceNumber;
         await receiver.DeferMessageAsync(msg);
-
-        // Retrieve, then abandon (via update-disposition).
         var deferred = await receiver.ReceiveDeferredMessagesAsync(new[] { seq });
+
+        // Act
         await receiver.AbandonMessageAsync(deferred[0]);
-
-        // Normal receive still doesn't return it.
         var ghost = await receiver.ReceiveMessageAsync(TimeSpan.FromMilliseconds(500));
-        ghost.ShouldBeNull();
-
-        // ReceiveDeferred still does.
         var again = await receiver.ReceiveDeferredMessagesAsync(new[] { seq });
+
+        // Assert
+        ghost.ShouldBeNull();
         again.Count.ShouldBe(1);
         await receiver.CompleteMessageAsync(again[0]);
     }
 
     [Fact]
-    public async Task Dead_lettering_a_deferred_received_message_routes_it_to_the_DLQ()
+    public async Task DeadLetterMessageAsync_OnDeferredReceivedMessage_RoutesItToDlq()
     {
+        // Arrange
         await using var harness = await IntegrationHarness.StartAsync();
         await harness.Queues.CreateAsync(new QueueDescriptor { Name = "defer-dlq" });
-
         await using var client = new ServiceBusClient(harness.ConnectionString);
         var sender = client.CreateSender("defer-dlq");
         await sender.SendMessageAsync(new ServiceBusMessage("p") { MessageId = "doomed" });
-
         var receiver = client.CreateReceiver("defer-dlq");
         var msg = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(5));
         msg.ShouldNotBeNull();
         var seq = msg.SequenceNumber;
         await receiver.DeferMessageAsync(msg);
-
         var deferred = await receiver.ReceiveDeferredMessagesAsync(new[] { seq });
+
+        // Act
         await receiver.DeadLetterMessageAsync(deferred[0], "DeferredAndRejected", "Manual reject after defer");
-
-        // Main queue empty, DLQ has the message with reason populated.
-        (await harness.Store.CountAsync("defer-dlq")).ShouldBe(0L);
-
         var dlqReceiver = client.CreateReceiver("defer-dlq", new ServiceBusReceiverOptions
         {
             SubQueue = SubQueue.DeadLetter,
         });
         var dlqMsg = await dlqReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(5));
+
+        // Assert
+        (await harness.Store.CountAsync("defer-dlq")).ShouldBe(0L);
         dlqMsg.ShouldNotBeNull();
         dlqMsg.MessageId.ShouldBe("doomed");
         dlqMsg.DeadLetterReason.ShouldBe("DeferredAndRejected");

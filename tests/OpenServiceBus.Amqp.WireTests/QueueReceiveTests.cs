@@ -3,7 +3,6 @@ using Amqp.Framing;
 using Amqp.Sasl;
 using Microsoft.Extensions.Time.Testing;
 using OpenServiceBus.Core.Entities;
-using OpenServiceBus.Core.Messaging;
 using OpenServiceBus.Core.Storage;
 
 namespace OpenServiceBus.Amqp.WireTests;
@@ -18,11 +17,11 @@ public class QueueReceiveTests
     }
 
     [Fact]
-    public async Task Send_then_receive_then_complete_removes_the_message_from_the_queue()
+    public async Task Accept_AfterReceive_RemovesMessageFromTheQueue()
     {
+        // Arrange
         await using var harness = await TestListenerHarness.StartAsync();
         await harness.Queues.CreateAsync(new QueueDescriptor { Name = "orders" });
-
         var factory = CreateClientFactory();
         var conn = await factory.CreateAsync(new Address(harness.AmqpUri));
         try
@@ -30,19 +29,19 @@ public class QueueReceiveTests
             var session = new Session(conn);
             var sender = new SenderLink(session, "sender", "orders");
             await sender.SendAsync(new Message("payload") { Properties = new Properties { MessageId = "m-1" } });
-
             (await harness.Store.CountAsync("orders")).ShouldBe(1L);
-
             var receiver = new ReceiverLink(session, "receiver", "orders");
+
+            // Act
             var received = await receiver.ReceiveAsync(TimeSpan.FromSeconds(5));
             received.ShouldNotBeNull("expected the message to be delivered");
+            receiver.Accept(received);
+            await WaitForCountAsync(harness.Store, "orders", expected: 0L, TimeSpan.FromSeconds(2));
+
+            // Assert
             received.Properties?.MessageId.ShouldBe("m-1");
             (received.Body as string).ShouldBe("payload");
-
-            receiver.Accept(received);
-
-            // Wait briefly for the disposition to propagate to the store, then assert.
-            await WaitForCountAsync(harness.Store, "orders", expected: 0L, TimeSpan.FromSeconds(2));
+            (await harness.Store.CountAsync("orders")).ShouldBe(0L);
 
             await receiver.CloseAsync();
             await sender.CloseAsync();
@@ -55,11 +54,11 @@ public class QueueReceiveTests
     }
 
     [Fact]
-    public async Task Release_disposition_makes_the_message_available_for_redelivery()
+    public async Task Release_AfterReceive_MakesMessageAvailableForRedelivery()
     {
+        // Arrange
         await using var harness = await TestListenerHarness.StartAsync();
         await harness.Queues.CreateAsync(new QueueDescriptor { Name = "redo" });
-
         var factory = CreateClientFactory();
         var conn = await factory.CreateAsync(new Address(harness.AmqpUri));
         try
@@ -67,20 +66,21 @@ public class QueueReceiveTests
             var session = new Session(conn);
             var sender = new SenderLink(session, "sender", "redo");
             await sender.SendAsync(new Message("retry-me") { Properties = new Properties { MessageId = "m-1" } });
-
             var receiver = new ReceiverLink(session, "receiver", "redo");
 
+            // Act
             var first = await receiver.ReceiveAsync(TimeSpan.FromSeconds(5));
             first.ShouldNotBeNull();
-            first.Properties?.MessageId.ShouldBe("m-1");
             receiver.Release(first);
-
             var second = await receiver.ReceiveAsync(TimeSpan.FromSeconds(5));
             second.ShouldNotBeNull("released message should be redelivered");
-            second.Properties?.MessageId.ShouldBe("m-1");
             receiver.Accept(second);
-
             await WaitForCountAsync(harness.Store, "redo", expected: 0L, TimeSpan.FromSeconds(2));
+
+            // Assert
+            first.Properties?.MessageId.ShouldBe("m-1");
+            second.Properties?.MessageId.ShouldBe("m-1");
+            (await harness.Store.CountAsync("redo")).ShouldBe(0L);
 
             await receiver.CloseAsync();
             await sender.CloseAsync();
@@ -93,18 +93,17 @@ public class QueueReceiveTests
     }
 
     [Fact]
-    public async Task Standard_AMQP_properties_round_trip_end_to_end()
+    public async Task Send_FullyPopulatedAmqpProperties_RoundTripsAllStandardAndApplicationProperties()
     {
+        // Arrange
         await using var harness = await TestListenerHarness.StartAsync();
         await harness.Queues.CreateAsync(new QueueDescriptor { Name = "props" });
-
         var factory = CreateClientFactory();
         var conn = await factory.CreateAsync(new Address(harness.AmqpUri));
         try
         {
             var session = new Session(conn);
             var sender = new SenderLink(session, "sender", "props");
-
             var sent = new Message("body")
             {
                 Properties = new Properties
@@ -122,11 +121,13 @@ public class QueueReceiveTests
             sent.ApplicationProperties["custom-string"] = "value";
             sent.ApplicationProperties["custom-int"] = 123;
             await sender.SendAsync(sent);
-
             var receiver = new ReceiverLink(session, "receiver", "props");
-            var received = await receiver.ReceiveAsync(TimeSpan.FromSeconds(5));
-            received.ShouldNotBeNull();
 
+            // Act
+            var received = await receiver.ReceiveAsync(TimeSpan.FromSeconds(5));
+
+            // Assert
+            received.ShouldNotBeNull();
             received.Properties.MessageId.ShouldBe("id-42");
             received.Properties.CorrelationId.ShouldBe("corr-7");
             ((string)received.Properties.ContentType).ShouldBe("application/json");
@@ -134,12 +135,10 @@ public class QueueReceiveTests
             received.Properties.ReplyTo.ShouldBe("reply-here");
             received.Properties.To.ShouldBe("props");
             received.Properties.GroupId.ShouldBe("session-A");
-
             received.ApplicationProperties["custom-string"].ShouldBe("value");
             Convert.ToInt32(received.ApplicationProperties["custom-int"]).ShouldBe(123);
 
             receiver.Accept(received);
-
             await receiver.CloseAsync();
             await sender.CloseAsync();
             await session.CloseAsync();
@@ -151,17 +150,16 @@ public class QueueReceiveTests
     }
 
     [Fact]
-    public async Task Expired_locks_make_the_message_available_again()
+    public async Task ExpireLocks_AfterLockDurationPasses_MakesMessageAvailableAgain()
     {
+        // Arrange
         var fakeTime = new FakeTimeProvider(DateTimeOffset.UtcNow);
         await using var harness = await TestListenerHarness.StartAsync(timeProvider: fakeTime);
-
         await harness.Queues.CreateAsync(new QueueDescriptor
         {
             Name = "expiring",
             LockDuration = TimeSpan.FromSeconds(30),
         });
-
         var factory = CreateClientFactory();
         var conn = await factory.CreateAsync(new Address(harness.AmqpUri));
         try
@@ -169,18 +167,17 @@ public class QueueReceiveTests
             var session = new Session(conn);
             var sender = new SenderLink(session, "sender", "expiring");
             await sender.SendAsync(new Message("body") { Properties = new Properties { MessageId = "m-1" } });
-
             var receiver = new ReceiverLink(session, "receiver", "expiring");
             var first = await receiver.ReceiveAsync(TimeSpan.FromSeconds(5));
             first.ShouldNotBeNull();
             first.Properties?.MessageId.ShouldBe("m-1");
-            // Note: deliberately NOT calling Accept/Release -- let the lock expire.
 
-            // Advance fake time past lock duration and trigger expiration (no LockManager in harness).
+            // Act
             fakeTime.Advance(TimeSpan.FromMinutes(1));
             harness.Store.ExpireLocks("expiring", fakeTime.GetUtcNow()).ShouldBe(1);
-
             var redelivered = await receiver.ReceiveAsync(TimeSpan.FromSeconds(5));
+
+            // Assert
             redelivered.ShouldNotBeNull("lock expired → message must be redelivered");
             redelivered.Properties?.MessageId.ShouldBe("m-1");
             receiver.Accept(redelivered);

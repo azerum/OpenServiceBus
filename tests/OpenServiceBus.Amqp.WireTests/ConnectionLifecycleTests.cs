@@ -14,31 +14,38 @@ public class ConnectionLifecycleTests
     }
 
     [Fact]
-    public async Task Client_can_open_and_close_a_connection()
+    public async Task CreateAsync_HarnessRunning_OpensAndClosesConnectionCleanly()
     {
+        // Arrange
         await using var harness = await TestListenerHarness.StartAsync();
         var factory = CreateClientFactory();
 
+        // Act
         var conn = await factory.CreateAsync(new Address(harness.AmqpUri));
+        ConnectionState openedState;
         try
         {
-            conn.ConnectionState.ShouldBe(ConnectionState.Opened);
+            openedState = conn.ConnectionState;
         }
         finally
         {
             await conn.CloseAsync();
         }
 
+        // Assert
+        openedState.ShouldBe(ConnectionState.Opened);
         conn.ConnectionState.ShouldBe(ConnectionState.End);
         conn.Error.ShouldBeNull();
     }
 
     [Fact]
-    public async Task Multiple_connections_in_parallel_all_succeed()
+    public async Task CreateAsync_TwentyFiveParallelConnections_AllReachOpenedState()
     {
+        // Arrange
         await using var harness = await TestListenerHarness.StartAsync();
         var factory = CreateClientFactory();
 
+        // Act
         var openTasks = Enumerable.Range(0, 25).Select(async _ =>
         {
             var conn = await factory.CreateAsync(new Address(harness.AmqpUri));
@@ -52,21 +59,21 @@ public class ConnectionLifecycleTests
             }
         });
 
+        // Assert
         await Task.WhenAll(openTasks);
     }
 
     [Fact]
-    public async Task Client_observes_broker_container_id_and_idle_timeout()
+    public async Task CreateAsync_BrokerConfiguredContainerIdAndIdleTimeout_ClientObservesBothInRemoteOpen()
     {
+        // Arrange
         var observedContainerId = string.Empty;
         uint observedIdleTimeout = 0;
-
         await using var harness = await TestListenerHarness.StartAsync(o =>
         {
             o.ContainerId = "OpenServiceBus.Wire";
             o.IdleTimeoutMs = 12_345;
         });
-
         var factory = CreateClientFactory();
         var open = new Open
         {
@@ -74,6 +81,7 @@ public class ConnectionLifecycleTests
             HostName = "127.0.0.1",
         };
 
+        // Act
         var conn = await factory.CreateAsync(
             new Address(harness.AmqpUri),
             open,
@@ -83,6 +91,7 @@ public class ConnectionLifecycleTests
                 observedIdleTimeout = remoteOpen.IdleTimeOut;
             });
 
+        // Assert
         try
         {
             observedContainerId.ShouldBe("OpenServiceBus.Wire");
@@ -95,12 +104,14 @@ public class ConnectionLifecycleTests
     }
 
     [Fact]
-    public async Task Session_can_be_opened_and_closed()
+    public async Task Session_OpenedAndClosedOnLiveConnection_CompletesWithoutError()
     {
+        // Arrange
         await using var harness = await TestListenerHarness.StartAsync();
         var factory = CreateClientFactory();
-
         var conn = await factory.CreateAsync(new Address(harness.AmqpUri));
+
+        // Act + Assert (no exception means success)
         try
         {
             var session = new Session(conn);
@@ -113,13 +124,17 @@ public class ConnectionLifecycleTests
     }
 
     [Fact]
-    public async Task Listener_stops_cleanly_with_no_clients()
+    public async Task DisposeAsync_ListenerWithNoClients_ReleasesPortForRebinding()
     {
+        // Arrange
         var harness = await TestListenerHarness.StartAsync();
-        await harness.DisposeAsync();
+        var port = harness.Port;
 
-        // Re-binding the same port should succeed after a clean shutdown.
-        var harness2 = await TestListenerHarness.StartAsync(o => o.Port = harness.Port);
+        // Act
+        await harness.DisposeAsync();
+        var harness2 = await TestListenerHarness.StartAsync(o => o.Port = port);
         await harness2.DisposeAsync();
+
+        // Assert: rebinding succeeded — implicit, would have thrown otherwise.
     }
 }
