@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using OpenServiceBus.Amqp.Diagnostics;
 using OpenServiceBus.Amqp.Hosting;
 using OpenServiceBus.Amqp.Lifecycle;
+using OpenServiceBus.Amqp.WebSockets;
 using OpenServiceBus.Core.Entities;
 using OpenServiceBus.Core.Storage;
 using OpenServiceBus.InMemoryStorage;
@@ -34,29 +35,46 @@ public sealed class OpenServiceBusTestHost : IAsyncDisposable
     private readonly AmqpListenerHost _listener;
     private readonly TtlExpirationService _ttlSweeper;
     private readonly ScheduledMessageActivator _scheduledActivator;
+    private readonly WebSocketBridgeService? _wsBridge;
     private bool _disposed;
 
     private OpenServiceBusTestHost(
         AmqpListenerHost listener,
         TtlExpirationService ttlSweeper,
         ScheduledMessageActivator scheduledActivator,
+        WebSocketBridgeService? wsBridge,
         IQueueRegistry queues,
         ITopicRegistry topics,
         IMessageStore store,
         TimeProvider timeProvider,
         int port,
-        string connectionString)
+        int? webSocketPort,
+        string connectionString,
+        string? webSocketConnectionString)
     {
         _listener = listener;
         _ttlSweeper = ttlSweeper;
         _scheduledActivator = scheduledActivator;
+        _wsBridge = wsBridge;
         Queues = queues;
         Topics = topics;
         Store = store;
         TimeProvider = timeProvider;
         Port = port;
+        WebSocketPort = webSocketPort;
         ConnectionString = connectionString;
+        WebSocketConnectionString = webSocketConnectionString;
     }
+
+    /// <summary>Port the WebSocket bridge is listening on, or null when the bridge isn't enabled.</summary>
+    public int? WebSocketPort { get; }
+
+    /// <summary>
+    /// Connection string that targets the WebSocket bridge instead of the raw AMQP port.
+    /// Pair with <c>ServiceBusClientOptions { TransportType = AmqpWebSockets }</c>. Null when
+    /// the bridge isn't enabled.
+    /// </summary>
+    public string? WebSocketConnectionString { get; }
 
     /// <summary>Service Bus SDK connection string with <c>UseDevelopmentEmulator=true</c>.</summary>
     public string ConnectionString { get; }
@@ -152,16 +170,47 @@ public sealed class OpenServiceBusTestHost : IAsyncDisposable
         var connectionString =
             $"Endpoint=sb://{opts.Host}:{port};SharedAccessKeyName={opts.SasKeyName};SharedAccessKey={opts.SasKey};UseDevelopmentEmulator=true";
 
+        // M21: optionally start the AMQP-over-WebSocket bridge on a free port pointing at
+        // the listener we just started. The SDK connects to the bridge port instead of the
+        // raw AMQP port when TransportType=AmqpWebSockets.
+        WebSocketBridgeService? wsBridge = null;
+        int? wsPort = null;
+        string? wsConnectionString = null;
+        if (opts.EnableWebSocketBridge)
+        {
+            wsPort = GetFreePort();
+            // HttpListener can't bind to "+" on macOS without root, but loopback is fine and
+            // matches the test's use case (client + bridge are in the same process).
+            var wsOptions = new WebSocketBridgeOptions
+            {
+                Enabled = true,
+                Host = opts.Host,
+                Port = wsPort.Value,
+                UpstreamHost = "127.0.0.1",
+                UpstreamPort = port,
+            };
+            wsBridge = new WebSocketBridgeService(
+                Options.Create(wsOptions),
+                Options.Create(listenerOptions),
+                NullLogger<WebSocketBridgeService>.Instance);
+            await wsBridge.StartAsync(CancellationToken.None);
+            wsConnectionString =
+                $"Endpoint=sb://{opts.Host}:{wsPort};SharedAccessKeyName={opts.SasKeyName};SharedAccessKey={opts.SasKey};UseDevelopmentEmulator=true";
+        }
+
         return new OpenServiceBusTestHost(
             listener,
             ttlSweeper,
             scheduledActivator,
+            wsBridge,
             queues,
             topics,
             storeAsIface,
             opts.TimeProvider,
             port,
-            connectionString);
+            wsPort,
+            connectionString,
+            wsConnectionString);
     }
 
     /// <summary>Create a queue with default settings. Returns the resulting descriptor.</summary>
@@ -177,6 +226,10 @@ public sealed class OpenServiceBusTestHost : IAsyncDisposable
         if (_disposed) return;
         _disposed = true;
 
+        if (_wsBridge is not null)
+        {
+            await _wsBridge.DisposeAsync();
+        }
         await _scheduledActivator.StopAsync(CancellationToken.None);
         _scheduledActivator.Dispose();
         await _ttlSweeper.StopAsync(CancellationToken.None);

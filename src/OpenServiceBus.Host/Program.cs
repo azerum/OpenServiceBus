@@ -4,6 +4,7 @@ using OpenServiceBus.Amqp.Hosting;
 using OpenServiceBus.Amqp.Lifecycle;
 using OpenServiceBus.Amqp.Queues;
 using OpenServiceBus.Amqp.Routing;
+using OpenServiceBus.Amqp.WebSockets;
 using OpenServiceBus.Host;
 using OpenServiceBus.InMemoryStorage.DependencyInjection;
 using OpenServiceBus.InMemoryStorage.Lifecycle;
@@ -17,6 +18,9 @@ builder.Services.AddHealthChecks();
 builder.Services
     .AddOptions<AmqpListenerOptions>()
     .Bind(builder.Configuration.GetSection("OpenServiceBus:Amqp"));
+builder.Services
+    .AddOptions<WebSocketBridgeOptions>()
+    .Bind(builder.Configuration.GetSection("OpenServiceBus:WebSockets"));
 
 // M19: storage mode selectable via OpenServiceBus:Storage:Mode (defaults to InMemory). When
 // set to Sqlite the SQLite store registers IMessageStore first; the in-memory DI's TryAdd

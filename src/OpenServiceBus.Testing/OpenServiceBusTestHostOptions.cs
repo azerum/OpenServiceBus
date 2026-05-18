@@ -81,4 +81,12 @@ public sealed class OpenServiceBusTestHostOptions
     /// <c>OpenServiceBus.Testing</c> package to <c>OpenServiceBus.SqliteStorage</c>.
     /// </summary>
     public Func<TimeProvider, IMessageStore>? StoreFactory { get; set; }
+
+    /// <summary>
+    /// M21: when true the test host also starts an AMQP-over-WebSocket bridge on a free port
+    /// and exposes <see cref="OpenServiceBusTestHost.WebSocketPort"/>. The resulting
+    /// <see cref="OpenServiceBusTestHost.WebSocketConnectionString"/> is what
+    /// <c>ServiceBusClient</c> with <c>TransportType=AmqpWebSockets</c> should target.
+    /// </summary>
+    public bool EnableWebSocketBridge { get; set; }
 }

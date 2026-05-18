@@ -22,13 +22,17 @@ internal sealed class IntegrationHarness : IAsyncDisposable
     public int Port => _host.Port;
     public string AmqpUri => _host.AmqpUri;
     public string ConnectionString => _host.ConnectionString;
+    public string? WebSocketConnectionString => _host.WebSocketConnectionString;
 
-    public static async Task<IntegrationHarness> StartAsync(Action<AmqpListenerOptions>? configure = null)
+    public static async Task<IntegrationHarness> StartAsync(
+        Action<AmqpListenerOptions>? configure = null,
+        bool enableWebSocketBridge = false)
     {
         var host = await OpenServiceBusTestHost.StartAsync(o =>
         {
             o.ContainerId = "OpenServiceBus.Integration";
             o.EnableFrameTracing = Environment.GetEnvironmentVariable("OSB_TRACE_FRAMES") == "1";
+            o.EnableWebSocketBridge = enableWebSocketBridge;
 
             if (configure is not null)
             {

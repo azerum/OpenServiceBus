@@ -1,6 +1,7 @@
 using OpenServiceBus.Amqp.Diagnostics;
 using OpenServiceBus.Amqp.Hosting;
 using OpenServiceBus.Amqp.Lifecycle;
+using OpenServiceBus.Amqp.WebSockets;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -28,6 +29,13 @@ public static class ServiceCollectionExtensions
         services.AddHostedService<TtlExpirationService>();
         services.AddHostedService<ScheduledMessageActivator>();
         services.AddHostedService<DiagnosticsHostedService>();
+
+        // M21: AMQP-over-WebSocket bridge. Stays off until either an Options binding sets Enabled
+        // (e.g. the Host's "OpenServiceBus:WebSockets" config section) or the caller opts in via
+        // AddOpenServiceBusAmqpWebSockets below. The hosted service early-returns when disabled,
+        // so this registration is essentially free.
+        services.AddOptions<WebSocketBridgeOptions>();
+        services.AddHostedService<WebSocketBridgeService>();
 
         return services;
     }
