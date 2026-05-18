@@ -50,6 +50,16 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
     private const string EnumerateTopKey = "top";
     private const string EnumerateSkipKey = "skip";
 
+    // M14.3 — session ops, available on every queue/subscription $management endpoint.
+    private const string SetSessionStateOperation = "com.microsoft:set-session-state";
+    private const string GetSessionStateOperation = "com.microsoft:get-session-state";
+    private const string RenewSessionLockOperation = "com.microsoft:renew-session-lock";
+    private const string GetMessageSessionsOperation = "com.microsoft:get-message-sessions";
+    private const string SessionIdBodyKey = "session-id";
+    private const string SessionStateBodyKey = "session-state";
+    private const string ExpirationBodyKey = "expiration";
+    private const string SessionsIdsBodyKey = "sessions-ids";
+
     private const string LockTokensBodyKey = "lock-tokens";
     private const string LockTokenBodyKey = "lock-token";
     private const string ExpirationsBodyKey = "expirations";
@@ -149,6 +159,10 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
                 EnumerateRulesOperation when _topics is not null => HandleEnumerateRules(request),
                 AddRuleOperation or RemoveRuleOperation or EnumerateRulesOperation =>
                     BuildResponse(request, 404, "NotFound: rule operations are only available on subscription $management endpoints."),
+                SetSessionStateOperation => HandleSetSessionState(request),
+                GetSessionStateOperation => HandleGetSessionState(request),
+                RenewSessionLockOperation => HandleRenewSessionLock(request),
+                GetMessageSessionsOperation => HandleGetMessageSessions(request),
                 _ => BuildResponse(request, statusCode: 501, statusDescription: $"NotImplemented: {operation}"),
             };
         }
@@ -239,8 +253,9 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
             var amqp = DecodeMessage(encoded);
             var scheduledTime = ReadScheduledEnqueueTime(amqp) ?? _timeProvider.GetUtcNow();
             var expiresAt = ComputeExpiresAt(amqp);
+            var sessionId = amqp.Properties?.GroupId;
 
-            var stored = _store.EnqueueAsync(_entityName, encoded, expiresAt, scheduledTime).GetAwaiter().GetResult();
+            var stored = _store.EnqueueAsync(_entityName, encoded, expiresAt, scheduledTime, sessionId).GetAwaiter().GetResult();
             sequenceNumbers[i] = stored.SequenceNumber;
         }
 
@@ -522,6 +537,68 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
         }
 
         var responseBody = new Map { [RulesResponseKey] = entries };
+        var response = BuildResponse(request, 200, "OK");
+        response.BodySection = new AmqpValue { Value = responseBody };
+        return response;
+    }
+
+    private Message HandleSetSessionState(Message request)
+    {
+        if (request.Body is not Map body || !body.TryGetValue(SessionIdBodyKey, out var idObj) || idObj is not string sessionId || string.IsNullOrEmpty(sessionId))
+        {
+            return BuildResponse(request, 400, "BadRequest: missing or empty 'session-id'");
+        }
+        var stateObj = body.TryGetValue(SessionStateBodyKey, out var s) ? s : null;
+        var stateBytes = stateObj switch
+        {
+            byte[] bytes => bytes,
+            ArraySegment<byte> seg => seg.ToArray(),
+            null => null,
+            _ => null,
+        };
+        _store.SetSessionStateAsync(_entityName, sessionId, stateBytes).GetAwaiter().GetResult();
+        return BuildResponse(request, 200, "OK");
+    }
+
+    private Message HandleGetSessionState(Message request)
+    {
+        if (request.Body is not Map body || !body.TryGetValue(SessionIdBodyKey, out var idObj) || idObj is not string sessionId || string.IsNullOrEmpty(sessionId))
+        {
+            return BuildResponse(request, 400, "BadRequest: missing or empty 'session-id'");
+        }
+        var state = _store.GetSessionStateAsync(_entityName, sessionId).GetAwaiter().GetResult();
+        var responseBody = new Map { [SessionStateBodyKey] = state };
+        var response = BuildResponse(request, 200, "OK");
+        response.BodySection = new AmqpValue { Value = responseBody };
+        return response;
+    }
+
+    private Message HandleRenewSessionLock(Message request)
+    {
+        if (request.Body is not Map body || !body.TryGetValue(SessionIdBodyKey, out var idObj) || idObj is not string sessionId || string.IsNullOrEmpty(sessionId))
+        {
+            return BuildResponse(request, 400, "BadRequest: missing or empty 'session-id'");
+        }
+        var requestingLink = request.ApplicationProperties?[AssociatedLinkNameKey] as string;
+        var newUntil = _store.TryRenewSessionLockAsync(_entityName, sessionId, _descriptor.LockDuration, requestingLink).GetAwaiter().GetResult();
+        if (newUntil is null)
+        {
+            return BuildResponse(request, 410, $"Gone: session lock for '{sessionId}' is unknown, expired, or held by a different link");
+        }
+        var responseBody = new Map { [ExpirationBodyKey] = newUntil.Value.UtcDateTime };
+        var response = BuildResponse(request, 200, "OK");
+        response.BodySection = new AmqpValue { Value = responseBody };
+        return response;
+    }
+
+    private Message HandleGetMessageSessions(Message request)
+    {
+        var sessions = _store.ListSessions(_entityName);
+        if (sessions.Count == 0)
+        {
+            return BuildResponse(request, 204, "NoContent");
+        }
+        var responseBody = new Map { [SessionsIdsBodyKey] = sessions.ToArray() };
         var response = BuildResponse(request, 200, "OK");
         response.BodySection = new AmqpValue { Value = responseBody };
         return response;

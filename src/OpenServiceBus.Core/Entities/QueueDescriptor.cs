@@ -32,4 +32,10 @@ public sealed record QueueDescriptor
     /// Per-queue default message TTL. Per-message TTL still wins when shorter. Enforced in M6.
     /// </summary>
     public TimeSpan? DefaultMessageTimeToLive { get; init; }
+
+    /// <summary>
+    /// When true, the queue is session-enabled: messages must carry a <c>SessionId</c>
+    /// (AMQP <c>group-id</c>) and receivers must attach with a session filter. Enforced in M14.
+    /// </summary>
+    public bool RequiresSession { get; init; }
 }

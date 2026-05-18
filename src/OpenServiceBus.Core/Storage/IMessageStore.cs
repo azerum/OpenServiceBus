@@ -32,6 +32,7 @@ public interface IMessageStore
         byte[] encodedMessage,
         DateTimeOffset? expiresAt = null,
         DateTimeOffset? scheduledEnqueueTime = null,
+        string? sessionId = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -144,4 +145,71 @@ public interface IMessageStore
         TimeSpan lockDuration,
         string? associatedLinkName = null,
         CancellationToken cancellationToken = default);
+
+    // ── Sessions (M14) ──
+
+    /// <summary>
+    /// Claim an exclusive lock on a specific session. Returns the lock on success, or null
+    /// if another receiver already holds it. The lock makes only messages with this
+    /// <paramref name="sessionId"/> visible to subsequent <see cref="TryDequeueFromSessionAsync"/>
+    /// calls under the same lock.
+    /// </summary>
+    Task<SessionLock?> TryAcceptSessionAsync(
+        string queueName,
+        string sessionId,
+        TimeSpan lockDuration,
+        string? linkName = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Claim a lock on the next session that has at least one available message and isn't
+    /// already locked. Returns null if no such session exists.
+    /// </summary>
+    Task<SessionLock?> TryAcceptNextSessionAsync(
+        string queueName,
+        TimeSpan lockDuration,
+        string? linkName = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Wait for and lock the next message belonging to <paramref name="sessionId"/>. Only
+    /// callable while a session lock is held; returns null on cancellation or if the lock
+    /// has expired / been released.
+    /// </summary>
+    Task<LockedMessage?> TryDequeueFromSessionAsync(
+        string queueName,
+        string sessionId,
+        TimeSpan messageLockDuration,
+        string? linkName = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Extend a session lock. Returns the new locked-until, or null if the lock is unknown / mismatched link.</summary>
+    Task<DateTimeOffset?> TryRenewSessionLockAsync(
+        string queueName,
+        string sessionId,
+        TimeSpan lockDuration,
+        string? requestingLinkName = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Release a session lock so another receiver can claim the session. No-op if not held.</summary>
+    Task ReleaseSessionAsync(
+        string queueName,
+        string sessionId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Set the opaque per-session state blob. Passing null clears the state.</summary>
+    Task SetSessionStateAsync(
+        string queueName,
+        string sessionId,
+        byte[]? state,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Read the per-session state blob. Returns null when never set or after a clear.</summary>
+    Task<byte[]?> GetSessionStateAsync(
+        string queueName,
+        string sessionId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Enumerate session ids on the queue that have at least one available message OR a stored state.</summary>
+    IReadOnlyList<string> ListSessions(string queueName);
 }

@@ -49,6 +49,7 @@ public sealed class InMemoryMessageStore : IMessageStore
         byte[] encodedMessage,
         DateTimeOffset? expiresAt = null,
         DateTimeOffset? scheduledEnqueueTime = null,
+        string? sessionId = null,
         CancellationToken cancellationToken = default)
     {
         var state = GetQueue(queueName);
@@ -63,13 +64,20 @@ public sealed class InMemoryMessageStore : IMessageStore
             EncodedMessage = encodedMessage,
             ExpiresAt = expiresAt,
             ScheduledEnqueueTime = effectiveSchedule,
+            SessionId = sessionId,
         };
 
         state.Messages[seq] = message;
         if (effectiveSchedule is null)
         {
-            // Immediately available for delivery.
-            if (!state.Available.Writer.TryWrite(seq))
+            if (sessionId is not null)
+            {
+                // Session messages go to the per-session channel; only a session-locked receiver
+                // can read them, and ordering inside a session is preserved.
+                var session = state.GetOrAddSession(sessionId);
+                session.Available.Writer.TryWrite(seq);
+            }
+            else if (!state.Available.Writer.TryWrite(seq))
             {
                 throw new InvalidOperationException($"Queue '{queueName}' is closed.");
             }
@@ -230,7 +238,7 @@ public sealed class InMemoryMessageStore : IMessageStore
             return Task.FromResult(true);
         }
 
-        ReturnToAvailableWithIncrementedDeliveryCount(state, entry.SequenceNumber);
+        ReturnToAvailableWithIncrementedDeliveryCount(state, entry.SequenceNumber, entry.SessionId);
         return Task.FromResult(true);
     }
 
@@ -254,7 +262,7 @@ public sealed class InMemoryMessageStore : IMessageStore
             }
             else
             {
-                ReturnToAvailableWithIncrementedDeliveryCount(state, entry.SequenceNumber);
+                ReturnToAvailableWithIncrementedDeliveryCount(state, entry.SequenceNumber, entry.SessionId);
             }
             expired++;
         }
@@ -264,15 +272,23 @@ public sealed class InMemoryMessageStore : IMessageStore
     /// <summary>
     /// Bump <see cref="StoredMessage.DeliveryCount"/> and re-queue. Because <c>StoredMessage</c>
     /// is immutable we write a new record with <c>DeliveryCount + 1</c>; the next delivery attempt
-    /// will stamp it onto the AMQP header.
+    /// will stamp it onto the AMQP header. Session-bound messages go back to the per-session
+    /// channel so only the session-locked receiver can re-receive them.
     /// </summary>
-    private static void ReturnToAvailableWithIncrementedDeliveryCount(QueueState state, long sequenceNumber)
+    private static void ReturnToAvailableWithIncrementedDeliveryCount(QueueState state, long sequenceNumber, string? sessionId)
     {
         if (state.Messages.TryGetValue(sequenceNumber, out var existing))
         {
             state.Messages[sequenceNumber] = existing with { DeliveryCount = existing.DeliveryCount + 1 };
         }
-        state.Available.Writer.TryWrite(sequenceNumber);
+        if (sessionId is not null && state.Sessions.TryGetValue(sessionId, out var session))
+        {
+            session.Available.Writer.TryWrite(sequenceNumber);
+        }
+        else
+        {
+            state.Available.Writer.TryWrite(sequenceNumber);
+        }
     }
 
     public Task<DateTimeOffset?> TryRenewLockAsync(
@@ -393,6 +409,180 @@ public sealed class InMemoryMessageStore : IMessageStore
         return result;
     }
 
+    // ── M14: Sessions ──
+
+    public Task<SessionLock?> TryAcceptSessionAsync(
+        string queueName,
+        string sessionId,
+        TimeSpan lockDuration,
+        string? linkName = null,
+        CancellationToken cancellationToken = default)
+    {
+        var state = GetQueue(queueName);
+        var session = state.GetOrAddSession(sessionId);
+        var now = _timeProvider.GetUtcNow();
+        lock (session)
+        {
+            if (session.Lock is not null && session.Lock.LockedUntil > now)
+            {
+                return Task.FromResult<SessionLock?>(null); // already locked by someone
+            }
+            session.Lock = new SessionLockEntry
+            {
+                LockedUntil = now + lockDuration,
+                LinkName = linkName,
+            };
+            return Task.FromResult<SessionLock?>(new SessionLock
+            {
+                SessionId = sessionId,
+                LockedUntil = session.Lock.LockedUntil,
+                LinkName = linkName,
+            });
+        }
+    }
+
+    public Task<SessionLock?> TryAcceptNextSessionAsync(
+        string queueName,
+        TimeSpan lockDuration,
+        string? linkName = null,
+        CancellationToken cancellationToken = default)
+    {
+        var state = GetQueue(queueName);
+        var now = _timeProvider.GetUtcNow();
+
+        foreach (var (sessionId, session) in state.Sessions)
+        {
+            // Skip sessions that are already locked or have no available messages.
+            if (session.Available.Reader.Count == 0) continue;
+            lock (session)
+            {
+                if (session.Lock is not null && session.Lock.LockedUntil > now) continue;
+                session.Lock = new SessionLockEntry
+                {
+                    LockedUntil = now + lockDuration,
+                    LinkName = linkName,
+                };
+                return Task.FromResult<SessionLock?>(new SessionLock
+                {
+                    SessionId = sessionId,
+                    LockedUntil = session.Lock.LockedUntil,
+                    LinkName = linkName,
+                });
+            }
+        }
+        return Task.FromResult<SessionLock?>(null);
+    }
+
+    public async Task<LockedMessage?> TryDequeueFromSessionAsync(
+        string queueName,
+        string sessionId,
+        TimeSpan messageLockDuration,
+        string? linkName = null,
+        CancellationToken cancellationToken = default)
+    {
+        var state = GetQueue(queueName);
+        if (!state.Sessions.TryGetValue(sessionId, out var session)) return null;
+
+        long seq;
+        try
+        {
+            seq = await session.Available.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
+        }
+        catch (ChannelClosedException)
+        {
+            return null;
+        }
+
+        if (!state.Messages.TryGetValue(seq, out var stored))
+        {
+            // Out-of-band removal — recurse.
+            return await TryDequeueFromSessionAsync(queueName, sessionId, messageLockDuration, linkName, cancellationToken).ConfigureAwait(false);
+        }
+
+        var lockToken = Guid.NewGuid();
+        var lockedUntil = _timeProvider.GetUtcNow() + messageLockDuration;
+        state.Locks[lockToken] = new LockEntry
+        {
+            SequenceNumber = seq,
+            LockedUntil = lockedUntil,
+            AssociatedLink = linkName,
+            SessionId = sessionId,
+        };
+
+        return new LockedMessage
+        {
+            Message = stored,
+            LockToken = lockToken,
+            LockedUntil = lockedUntil,
+        };
+    }
+
+    public Task<DateTimeOffset?> TryRenewSessionLockAsync(
+        string queueName,
+        string sessionId,
+        TimeSpan lockDuration,
+        string? requestingLinkName = null,
+        CancellationToken cancellationToken = default)
+    {
+        var state = GetQueue(queueName);
+        if (!state.Sessions.TryGetValue(sessionId, out var session)) return Task.FromResult<DateTimeOffset?>(null);
+
+        lock (session)
+        {
+            if (session.Lock is null) return Task.FromResult<DateTimeOffset?>(null);
+            if (requestingLinkName is not null
+                && session.Lock.LinkName is not null
+                && !string.Equals(session.Lock.LinkName, requestingLinkName, StringComparison.Ordinal))
+            {
+                return Task.FromResult<DateTimeOffset?>(null);
+            }
+            session.Lock.LockedUntil = _timeProvider.GetUtcNow() + lockDuration;
+            return Task.FromResult<DateTimeOffset?>(session.Lock.LockedUntil);
+        }
+    }
+
+    public Task ReleaseSessionAsync(string queueName, string sessionId, CancellationToken cancellationToken = default)
+    {
+        var state = GetQueue(queueName);
+        if (state.Sessions.TryGetValue(sessionId, out var session))
+        {
+            lock (session) { session.Lock = null; }
+        }
+        return Task.CompletedTask;
+    }
+
+    public Task SetSessionStateAsync(string queueName, string sessionId, byte[]? state, CancellationToken cancellationToken = default)
+    {
+        var queue = GetQueue(queueName);
+        var session = queue.GetOrAddSession(sessionId);
+        session.State = state;
+        return Task.CompletedTask;
+    }
+
+    public Task<byte[]?> GetSessionStateAsync(string queueName, string sessionId, CancellationToken cancellationToken = default)
+    {
+        var state = GetQueue(queueName);
+        if (state.Sessions.TryGetValue(sessionId, out var session))
+        {
+            return Task.FromResult(session.State);
+        }
+        return Task.FromResult<byte[]?>(null);
+    }
+
+    public IReadOnlyList<string> ListSessions(string queueName)
+    {
+        if (!_queues.TryGetValue(queueName, out var state)) return Array.Empty<string>();
+        // Surface sessions that still hold messages OR carry state.
+        return state.Sessions
+            .Where(kv => kv.Value.Available.Reader.Count > 0 || kv.Value.State is not null)
+            .Select(kv => kv.Key)
+            .ToArray();
+    }
+
     private QueueState GetQueue(string queueName)
     {
         if (!_queues.TryGetValue(queueName, out var state))
@@ -412,6 +602,12 @@ public sealed class InMemoryMessageStore : IMessageStore
             SingleReader = false,
             SingleWriter = false,
         });
+
+        // M14 — sessions. Lazy per-session state container keyed by SessionId.
+        public readonly ConcurrentDictionary<string, SessionState> Sessions = new(StringComparer.Ordinal);
+
+        public SessionState GetOrAddSession(string sessionId) =>
+            Sessions.GetOrAdd(sessionId, _ => new SessionState());
     }
 
     private sealed class LockEntry
@@ -422,5 +618,29 @@ public sealed class InMemoryMessageStore : IMessageStore
         /// <summary>True when this lock was acquired via receive-by-sequence-number on a deferred
         /// message — abandon returns it to Deferred state, not the Active pool.</summary>
         public bool WasDeferred { get; init; }
+        /// <summary>The session id this message came from, if any. Locking continues to hold
+        /// the session lock alongside the message lock; release on message disposition.</summary>
+        public string? SessionId { get; init; }
+    }
+
+    private sealed class SessionState
+    {
+        public readonly Channel<long> Available = Channel.CreateUnbounded<long>(new UnboundedChannelOptions
+        {
+            SingleReader = false,
+            SingleWriter = false,
+        });
+
+        /// <summary>Opaque user-supplied state blob. Null means no state has been set (or it was cleared).</summary>
+        public byte[]? State;
+
+        /// <summary>The current session lock, or null if the session is unlocked.</summary>
+        public SessionLockEntry? Lock;
+    }
+
+    private sealed class SessionLockEntry
+    {
+        public required DateTimeOffset LockedUntil { get; set; }
+        public required string? LinkName { get; init; }
     }
 }

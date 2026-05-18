@@ -18,6 +18,9 @@ public sealed record SubscriptionDescriptor
 
     public TimeSpan? DefaultMessageTimeToLive { get; init; }
 
+    /// <summary>Session-enabled subscription. See <see cref="QueueDescriptor.RequiresSession"/>.</summary>
+    public bool RequiresSession { get; init; }
+
     /// <summary>
     /// The backing queue address: <c>&lt;TopicName&gt;/subscriptions/&lt;Name&gt;</c>.
     /// This is what AMQP receivers attach to and what the in-memory store keys on.

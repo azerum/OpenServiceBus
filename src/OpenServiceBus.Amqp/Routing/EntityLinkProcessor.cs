@@ -10,6 +10,7 @@ using Amqp.Types;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenServiceBus.Core.Entities;
+using OpenServiceBus.Core.Messaging;
 using OpenServiceBus.Core.Storage;
 
 namespace OpenServiceBus.Amqp.Routing;
@@ -194,12 +195,82 @@ public sealed class EntityLinkProcessor : ILinkProcessor
         }
         else
         {
+            // M14: receivers carrying a session filter get an exclusive session-locked source.
+            var sessionFilter = SessionFilter.TryReadFromAttach(attachContext.Attach);
+            if (sessionFilter.IsSet)
+            {
+                WireSessionReceiver(attachContext, descriptor, sessionFilter);
+                return;
+            }
+
             var source = _receiverSources.GetOrAdd(descriptor.Name, name => new QueueReceiverSource(
                 name, descriptor, _store, _timeProvider, _loggerFactory.CreateLogger<QueueReceiverSource>()));
             var endpoint = new SourceLinkEndpoint(source, attachContext.Link);
             attachContext.Complete(endpoint, 0);
             _logger.LogDebug("Wired receiver attach to {Entity}", descriptor.Name);
         }
+    }
+
+    private void WireSessionReceiver(AttachContext attachContext, QueueDescriptor descriptor, SessionFilter filter)
+    {
+        // Acquire (or take next-available) session lock at attach time, BEFORE completing the
+        // attach. The SDK reads the resolved session id from the attach response's filter set
+        // (via Source.FilterSet on the reply) — so we must know which session was picked.
+        var linkName = attachContext.Link.Name;
+        SessionLock? sessionLock;
+        if (filter.SessionId is not null)
+        {
+            sessionLock = _store.TryAcceptSessionAsync(descriptor.Name, filter.SessionId, descriptor.LockDuration, linkName)
+                .GetAwaiter().GetResult();
+            if (sessionLock is null)
+            {
+                Reject(attachContext, "com.microsoft:session-cannot-be-locked",
+                    $"Session '{filter.SessionId}' is already locked by another receiver.");
+                return;
+            }
+        }
+        else
+        {
+            sessionLock = _store.TryAcceptNextSessionAsync(descriptor.Name, descriptor.LockDuration, linkName)
+                .GetAwaiter().GetResult();
+            if (sessionLock is null)
+            {
+                Reject(attachContext, "com.microsoft:no-sessions-available",
+                    $"No unlocked session is available on '{descriptor.Name}'.");
+                return;
+            }
+        }
+
+        // Echo the resolved session id + lock deadline back to the client. The SDK reads both
+        // from the attach response to populate ServiceBusSessionReceiver.SessionLockedUntil.
+        SessionFilter.WriteAcceptedSessionFilter(attachContext.Attach, sessionLock.SessionId, sessionLock.LockedUntil);
+
+        // When the link closes (clean detach OR network drop), release the session lock so
+        // another receiver can pick the session up.
+        attachContext.Link.Closed += (sender, error) =>
+        {
+            try
+            {
+                _store.ReleaseSessionAsync(descriptor.Name, sessionLock.SessionId).GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to release session lock on detach for {Entity}/{Session}",
+                    descriptor.Name, sessionLock.SessionId);
+            }
+        };
+
+        var source = new SessionReceiverSource(
+            descriptor.Name,
+            descriptor,
+            _store,
+            _timeProvider,
+            _loggerFactory.CreateLogger<SessionReceiverSource>(),
+            sessionLock.SessionId,
+            linkName);
+        var endpoint = new SourceLinkEndpoint(source, attachContext.Link);
+        attachContext.Complete(endpoint, 0);
+        _logger.LogDebug("Wired session receiver attach to {Entity}/{Session}", descriptor.Name, sessionLock.SessionId);
     }
 
     private static void Reject(AttachContext attachContext, string code, string description)

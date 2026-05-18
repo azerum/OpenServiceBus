@@ -44,4 +44,11 @@ public sealed record StoredMessage
     /// via <c>ReceiveDeferredMessagesAsync</c>.
     /// </summary>
     public bool IsDeferred { get; init; }
+
+    /// <summary>
+    /// Session id for this message (mirrors AMQP <c>properties.group-id</c>). On session-enabled
+    /// entities the broker groups messages by this value and only delivers messages with a
+    /// matching id to a receiver that holds the session lock. Null on non-session messages.
+    /// </summary>
+    public string? SessionId { get; init; }
 }

@@ -58,7 +58,10 @@ public sealed class TopicSenderProcessor : IMessageProcessor
             var expiresAt = ComputeExpiresAt(msg);
             var scheduledFor = ReadScheduledEnqueueTime(msg);
             var filterContext = BuildFilterContext(msg, _timeProvider.GetUtcNow());
-            _ = FanOutAndCompleteAsync(messageContext, encoded, expiresAt, scheduledFor, filterContext);
+            // Note: M14 doesn't yet thread session routing through topic fan-out; subscriptions
+            // with RequiresSession are accepted at creation time but messages pass via the
+            // regular channel. Lifted when EvaluateSubscribers returns descriptors.
+            _ = FanOutAndCompleteAsync(messageContext, encoded, expiresAt, scheduledFor, filterContext, sessionId: null);
         }
         catch (Exception ex)
         {
@@ -75,14 +78,15 @@ public sealed class TopicSenderProcessor : IMessageProcessor
         byte[] encoded,
         DateTimeOffset? expiresAt,
         DateTimeOffset? scheduledFor,
-        MessageFilterContext filterContext)
+        MessageFilterContext filterContext,
+        string? sessionId)
     {
         try
         {
             var subscribers = _topics.EvaluateSubscribers(_topic.Name, filterContext);
             foreach (var queue in subscribers)
             {
-                await _store.EnqueueAsync(queue, encoded, expiresAt, scheduledFor).ConfigureAwait(false);
+                await _store.EnqueueAsync(queue, encoded, expiresAt, scheduledFor, sessionId).ConfigureAwait(false);
             }
             _logger.LogDebug("Fanned out 1 message on topic {Topic} to {Count} subscriber(s)", _topic.Name, subscribers.Count);
             context.Complete();
@@ -111,7 +115,7 @@ public sealed class TopicSenderProcessor : IMessageProcessor
                 var subscribers = _topics.EvaluateSubscribers(_topic.Name, filterContext);
                 foreach (var queue in subscribers)
                 {
-                    await _store.EnqueueAsync(queue, innerBytes, expiresAt, scheduledFor).ConfigureAwait(false);
+                    await _store.EnqueueAsync(queue, innerBytes, expiresAt, scheduledFor, sessionId: null).ConfigureAwait(false);
                 }
             }
             context.Complete();

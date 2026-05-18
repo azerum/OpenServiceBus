@@ -67,7 +67,11 @@ public sealed class QueueSenderProcessor : IMessageProcessor
             // x-opt-scheduled-enqueue-time annotation; or via the dedicated ScheduleMessageAsync
             // which goes through $management. Both end up at IMessageStore.EnqueueAsync(..., scheduledEnqueueTime).
             var scheduledFor = ReadScheduledEnqueueTime(msg);
-            _ = EnqueueAndCompleteAsync(messageContext, encoded, expiresAt, scheduledFor);
+            // M14: AMQP properties.group-id IS Service Bus's SessionId — but only route by it
+            // when the queue is session-enabled; on a plain queue the GroupId is preserved as
+            // metadata via the encoded bytes and the message stays on the regular delivery path.
+            var sessionId = _descriptor.RequiresSession ? msg.Properties?.GroupId : null;
+            _ = EnqueueAndCompleteAsync(messageContext, encoded, expiresAt, scheduledFor, sessionId);
         }
         catch (Exception ex)
         {
@@ -94,8 +98,9 @@ public sealed class QueueSenderProcessor : IMessageProcessor
                 var inner = DecodeMessage(innerBytes);
                 var expiresAt = ComputeExpiresAt(inner);
                 var scheduledFor = ReadScheduledEnqueueTime(inner);
+                var sessionId = _descriptor.RequiresSession ? inner.Properties?.GroupId : null;
 
-                await _store.EnqueueAsync(_queueName, innerBytes, expiresAt, scheduledFor).ConfigureAwait(false);
+                await _store.EnqueueAsync(_queueName, innerBytes, expiresAt, scheduledFor, sessionId).ConfigureAwait(false);
             }
             _logger.LogDebug("Split batched envelope into {Count} message(s) on {Queue}", dataList.Count, _queueName);
             context.Complete();
@@ -113,11 +118,11 @@ public sealed class QueueSenderProcessor : IMessageProcessor
         return Message.Decode(buf);
     }
 
-    private async Task EnqueueAndCompleteAsync(MessageContext context, byte[] encoded, DateTimeOffset? expiresAt, DateTimeOffset? scheduledFor)
+    private async Task EnqueueAndCompleteAsync(MessageContext context, byte[] encoded, DateTimeOffset? expiresAt, DateTimeOffset? scheduledFor, string? sessionId)
     {
         try
         {
-            var stored = await _store.EnqueueAsync(_queueName, encoded, expiresAt, scheduledFor).ConfigureAwait(false);
+            var stored = await _store.EnqueueAsync(_queueName, encoded, expiresAt, scheduledFor, sessionId).ConfigureAwait(false);
             _logger.LogDebug("Enqueued message #{Seq} ({Bytes} bytes) to {Queue} (expiresAt={Expires}, scheduledFor={Scheduled})",
                 stored.SequenceNumber, encoded.Length, _queueName,
                 expiresAt?.ToString("O") ?? "never",
