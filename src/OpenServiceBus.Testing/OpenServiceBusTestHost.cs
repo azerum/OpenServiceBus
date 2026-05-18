@@ -9,6 +9,7 @@ using OpenServiceBus.Core.Storage;
 using OpenServiceBus.InMemoryStorage;
 using OpenServiceBus.InMemoryStorage.Lifecycle;
 using OpenServiceBus.InMemoryStorage.Queues;
+using OpenServiceBus.InMemoryStorage.Topics;
 
 namespace OpenServiceBus.Testing;
 
@@ -37,6 +38,7 @@ public sealed class OpenServiceBusTestHost : IAsyncDisposable
         TtlExpirationService ttlSweeper,
         ScheduledMessageActivator scheduledActivator,
         IQueueRegistry queues,
+        ITopicRegistry topics,
         IMessageStore store,
         TimeProvider timeProvider,
         int port,
@@ -46,6 +48,7 @@ public sealed class OpenServiceBusTestHost : IAsyncDisposable
         _ttlSweeper = ttlSweeper;
         _scheduledActivator = scheduledActivator;
         Queues = queues;
+        Topics = topics;
         Store = store;
         TimeProvider = timeProvider;
         Port = port;
@@ -63,6 +66,9 @@ public sealed class OpenServiceBusTestHost : IAsyncDisposable
 
     /// <summary>Queue registry — use to create/list/delete queues from inside tests.</summary>
     public IQueueRegistry Queues { get; }
+
+    /// <summary>Topic registry — use to create/list/delete topics, subscriptions, and rules.</summary>
+    public ITopicRegistry Topics { get; }
 
     /// <summary>In-memory message store — exposed for direct test inspection.</summary>
     public IMessageStore Store { get; }
@@ -100,13 +106,15 @@ public sealed class OpenServiceBusTestHost : IAsyncDisposable
         var store = new InMemoryMessageStore(opts.TimeProvider);
         IMessageStore storeAsIface = store;
         var queues = new QueueManager(storeAsIface);
+        var topics = new TopicManager(queues);
 
         var listener = new AmqpListenerHost(
             Options.Create(listenerOptions),
             queues,
             storeAsIface,
             opts.TimeProvider,
-            NullLoggerFactory.Instance);
+            NullLoggerFactory.Instance,
+            topics);
 
         var ttlSweeper = new TtlExpirationService(
             storeAsIface,
@@ -132,6 +140,7 @@ public sealed class OpenServiceBusTestHost : IAsyncDisposable
             ttlSweeper,
             scheduledActivator,
             queues,
+            topics,
             storeAsIface,
             opts.TimeProvider,
             port,

@@ -17,6 +17,7 @@ internal sealed class IntegrationHarness : IAsyncDisposable
     private IntegrationHarness(OpenServiceBusTestHost host) => _host = host;
 
     public IQueueRegistry Queues => _host.Queues;
+    public ITopicRegistry Topics => _host.Topics;
     public IMessageStore Store => _host.Store;
     public int Port => _host.Port;
     public string AmqpUri => _host.AmqpUri;

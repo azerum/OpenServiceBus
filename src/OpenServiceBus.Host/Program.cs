@@ -34,6 +34,7 @@ app.MapGet("/", () => Results.Json(new
 app.MapHealthChecks("/health");
 
 app.MapQueueEndpoints();
+app.MapTopicEndpoints();
 
 app.Run();
 

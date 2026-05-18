@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using OpenServiceBus.Core.Storage;
 using OpenServiceBus.InMemoryStorage.Lifecycle;
 using OpenServiceBus.InMemoryStorage.Queues;
+using OpenServiceBus.InMemoryStorage.Topics;
 
 namespace OpenServiceBus.InMemoryStorage.DependencyInjection;
 
@@ -11,8 +12,8 @@ public static class ServiceCollectionExtensions
 {
     /// <summary>
     /// Registers the in-memory storage adapter: <see cref="InMemoryMessageStore"/>, <see cref="QueueManager"/>,
-    /// a singleton <see cref="TimeProvider"/> (system clock by default; tests can replace with FakeTimeProvider),
-    /// and the <see cref="LockManager"/> background sweeper.
+    /// <see cref="TopicManager"/>, a singleton <see cref="TimeProvider"/> (system clock by default;
+    /// tests can replace with FakeTimeProvider), and the <see cref="LockManager"/> background sweeper.
     /// </summary>
     public static IServiceCollection AddOpenServiceBusInMemoryStorage(this IServiceCollection services)
     {
@@ -21,6 +22,8 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IMessageStore>(sp => sp.GetRequiredService<InMemoryMessageStore>());
         services.TryAddSingleton<QueueManager>();
         services.TryAddSingleton<IQueueRegistry>(sp => sp.GetRequiredService<QueueManager>());
+        services.TryAddSingleton<TopicManager>();
+        services.TryAddSingleton<ITopicRegistry>(sp => sp.GetRequiredService<TopicManager>());
         services.AddHostedService<LockManager>();
         return services;
     }

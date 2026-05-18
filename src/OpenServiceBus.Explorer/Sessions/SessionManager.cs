@@ -39,14 +39,38 @@ public sealed class Session : IAsyncDisposable
         _client = new ServiceBusClient(connectionString);
     }
 
-    public ServiceBusSender Sender(string queue) => _client.CreateSender(queue);
+    public ServiceBusSender Sender(string queueOrTopic) => _client.CreateSender(queueOrTopic);
 
-    public ServiceBusReceiver Receiver(string queue) => _receivers.GetOrAdd(queue, q =>
-        _client.CreateReceiver(q, new ServiceBusReceiverOptions
+    /// <summary>
+    /// Get (or create) a peek-lock receiver for the entity address. Subscription paths of the
+    /// form <c>&lt;topic&gt;/Subscriptions/&lt;sub&gt;</c> are split into the SDK's two-arg
+    /// overload so the AMQP attach lands on the subscription backing queue correctly.
+    /// </summary>
+    public ServiceBusReceiver Receiver(string queueOrSubscription) => _receivers.GetOrAdd(queueOrSubscription, q =>
+    {
+        var options = new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.PeekLock,
             PrefetchCount = 0,
-        }));
+        };
+        const string segment = "/Subscriptions/";
+        var idx = q.IndexOf(segment, StringComparison.OrdinalIgnoreCase);
+        if (idx > 0)
+        {
+            var topic = q[..idx];
+            var sub = q[(idx + segment.Length)..];
+            // The Azure SDK expects bare topic + sub names (no DLQ suffix). If the receiver
+            // is for the subscription's DLQ, pass it via the SubQueue option instead.
+            const string dlq = "/$DeadLetterQueue";
+            if (sub.EndsWith(dlq, StringComparison.Ordinal))
+            {
+                sub = sub[..^dlq.Length];
+                options.SubQueue = SubQueue.DeadLetter;
+            }
+            return _client.CreateReceiver(topic, sub, options);
+        }
+        return _client.CreateReceiver(q, options);
+    });
 
     /// <summary>Stash a received message so a later Complete/Abandon call can find it by lock-token.</summary>
     public void TrackLocked(ServiceBusReceivedMessage message)

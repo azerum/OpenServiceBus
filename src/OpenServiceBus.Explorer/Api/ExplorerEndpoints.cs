@@ -135,6 +135,75 @@ public static class ExplorerEndpoints
             return Results.Ok(new { deferred = true, sequenceNumber = msg.SequenceNumber });
         });
 
+        // --- Topic CRUD (proxied) ---
+        api.MapGet("/topics", async (string managementUrl, IHttpClientFactory httpFactory, CancellationToken ct) =>
+        {
+            var http = httpFactory.CreateClient();
+            var resp = await http.GetAsync(Combine(managementUrl, "/topics/"), ct);
+            return Results.Content(await resp.Content.ReadAsStringAsync(ct), "application/json", statusCode: (int)resp.StatusCode);
+        });
+
+        api.MapPut("/topics/{name}", async (string name, CreateTopicProxyRequest body, IHttpClientFactory httpFactory, CancellationToken ct) =>
+        {
+            var http = httpFactory.CreateClient();
+            var payload = JsonContent.Create(body.Options ?? new());
+            var resp = await http.PutAsync(Combine(body.ManagementUrl, $"/topics/{name}"), payload, ct);
+            return Results.Content(await resp.Content.ReadAsStringAsync(ct), "application/json", statusCode: (int)resp.StatusCode);
+        });
+
+        api.MapDelete("/topics/{name}", async (string name, string managementUrl, IHttpClientFactory httpFactory, CancellationToken ct) =>
+        {
+            var http = httpFactory.CreateClient();
+            var resp = await http.DeleteAsync(Combine(managementUrl, $"/topics/{name}"), ct);
+            return Results.StatusCode((int)resp.StatusCode);
+        });
+
+        // --- Subscription CRUD (proxied) ---
+        api.MapGet("/topics/{topic}/subscriptions", async (string topic, string managementUrl, IHttpClientFactory httpFactory, CancellationToken ct) =>
+        {
+            var http = httpFactory.CreateClient();
+            var resp = await http.GetAsync(Combine(managementUrl, $"/topics/{topic}/subscriptions"), ct);
+            return Results.Content(await resp.Content.ReadAsStringAsync(ct), "application/json", statusCode: (int)resp.StatusCode);
+        });
+
+        api.MapPut("/topics/{topic}/subscriptions/{name}", async (string topic, string name, CreateSubscriptionProxyRequest body, IHttpClientFactory httpFactory, CancellationToken ct) =>
+        {
+            var http = httpFactory.CreateClient();
+            var payload = JsonContent.Create(body.Options ?? new());
+            var resp = await http.PutAsync(Combine(body.ManagementUrl, $"/topics/{topic}/subscriptions/{name}"), payload, ct);
+            return Results.Content(await resp.Content.ReadAsStringAsync(ct), "application/json", statusCode: (int)resp.StatusCode);
+        });
+
+        api.MapDelete("/topics/{topic}/subscriptions/{name}", async (string topic, string name, string managementUrl, IHttpClientFactory httpFactory, CancellationToken ct) =>
+        {
+            var http = httpFactory.CreateClient();
+            var resp = await http.DeleteAsync(Combine(managementUrl, $"/topics/{topic}/subscriptions/{name}"), ct);
+            return Results.StatusCode((int)resp.StatusCode);
+        });
+
+        // --- Rule CRUD (proxied) ---
+        api.MapGet("/topics/{topic}/subscriptions/{sub}/rules", async (string topic, string sub, string managementUrl, IHttpClientFactory httpFactory, CancellationToken ct) =>
+        {
+            var http = httpFactory.CreateClient();
+            var resp = await http.GetAsync(Combine(managementUrl, $"/topics/{topic}/subscriptions/{sub}/rules"), ct);
+            return Results.Content(await resp.Content.ReadAsStringAsync(ct), "application/json", statusCode: (int)resp.StatusCode);
+        });
+
+        api.MapPut("/topics/{topic}/subscriptions/{sub}/rules/{name}", async (string topic, string sub, string name, CreateRuleProxyRequest body, IHttpClientFactory httpFactory, CancellationToken ct) =>
+        {
+            var http = httpFactory.CreateClient();
+            var payload = JsonContent.Create(body.Rule);
+            var resp = await http.PutAsync(Combine(body.ManagementUrl, $"/topics/{topic}/subscriptions/{sub}/rules/{name}"), payload, ct);
+            return Results.Content(await resp.Content.ReadAsStringAsync(ct), "application/json", statusCode: (int)resp.StatusCode);
+        });
+
+        api.MapDelete("/topics/{topic}/subscriptions/{sub}/rules/{name}", async (string topic, string sub, string name, string managementUrl, IHttpClientFactory httpFactory, CancellationToken ct) =>
+        {
+            var http = httpFactory.CreateClient();
+            var resp = await http.DeleteAsync(Combine(managementUrl, $"/topics/{topic}/subscriptions/{sub}/rules/{name}"), ct);
+            return Results.StatusCode((int)resp.StatusCode);
+        });
+
         // --- Connectivity check ---
         api.MapPost("/ping", async (PingRequest req, SessionManager sessions, IHttpClientFactory httpFactory, CancellationToken ct) =>
         {
@@ -227,6 +296,9 @@ public static class ExplorerEndpoints
 }
 
 public sealed record CreateQueueRequest(string ManagementUrl, Dictionary<string, object>? Options);
+public sealed record CreateTopicProxyRequest(string ManagementUrl, Dictionary<string, object>? Options);
+public sealed record CreateSubscriptionProxyRequest(string ManagementUrl, Dictionary<string, object>? Options);
+public sealed record CreateRuleProxyRequest(string ManagementUrl, Dictionary<string, object?> Rule);
 public sealed record SendRequest(
     string ConnectionString,
     string Queue,

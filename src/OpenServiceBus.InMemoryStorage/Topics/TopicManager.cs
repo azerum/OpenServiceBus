@@ -1,0 +1,212 @@
+using System.Collections.Concurrent;
+using OpenServiceBus.Core.Entities;
+using OpenServiceBus.Core.Filters;
+using OpenServiceBus.Core.Storage;
+
+namespace OpenServiceBus.InMemoryStorage.Topics;
+
+/// <summary>
+/// In-memory <see cref="ITopicRegistry"/>. Each subscription is modelled as a regular queue
+/// (created via <see cref="IQueueRegistry"/>) named <c>&lt;topic&gt;/Subscriptions/&lt;sub&gt;</c>;
+/// that reuses every queue feature the broker already has — peek-lock, DLQ, lock renewal,
+/// TTL, scheduled messages, defer, dead-letter, etc.
+/// </summary>
+public sealed class TopicManager : ITopicRegistry
+{
+    /// <summary>Service Bus auto-installs this rule with a <see cref="TrueFilter"/> on every fresh subscription.</summary>
+    public const string DefaultRuleName = "$Default";
+
+    private readonly IQueueRegistry _queues;
+
+    private readonly ConcurrentDictionary<string, TopicDescriptor> _topics = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, SubscriptionDescriptor> _subscriptions = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, RuleDescriptor>> _rules = new(StringComparer.OrdinalIgnoreCase);
+
+    public TopicManager(IQueueRegistry queues)
+    {
+        _queues = queues;
+    }
+
+    public event EventHandler<TopicDescriptor>? TopicCreated;
+    public event EventHandler<TopicDescriptor>? TopicDeleted;
+    public event EventHandler<SubscriptionDescriptor>? SubscriptionCreated;
+    public event EventHandler<SubscriptionDescriptor>? SubscriptionDeleted;
+
+    event EventHandler<TopicDescriptor> ITopicRegistry.TopicCreated { add => TopicCreated += value; remove => TopicCreated -= value; }
+    event EventHandler<TopicDescriptor> ITopicRegistry.TopicDeleted { add => TopicDeleted += value; remove => TopicDeleted -= value; }
+    event EventHandler<SubscriptionDescriptor> ITopicRegistry.SubscriptionCreated { add => SubscriptionCreated += value; remove => SubscriptionCreated -= value; }
+    event EventHandler<SubscriptionDescriptor> ITopicRegistry.SubscriptionDeleted { add => SubscriptionDeleted += value; remove => SubscriptionDeleted -= value; }
+
+    public Task<TopicDescriptor> CreateTopicAsync(TopicDescriptor descriptor, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+        ArgumentException.ThrowIfNullOrWhiteSpace(descriptor.Name);
+        var stored = _topics.GetOrAdd(descriptor.Name, descriptor);
+        if (ReferenceEquals(stored, descriptor))
+        {
+            TopicCreated?.Invoke(this, descriptor);
+        }
+        return Task.FromResult(stored);
+    }
+
+    public Task<TopicDescriptor?> GetTopicAsync(string name, CancellationToken cancellationToken = default)
+    {
+        _topics.TryGetValue(name, out var topic);
+        return Task.FromResult(topic);
+    }
+
+    public Task<IReadOnlyList<TopicDescriptor>> ListTopicsAsync(CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<TopicDescriptor> snapshot = _topics.Values.ToArray();
+        return Task.FromResult(snapshot);
+    }
+
+    public async Task<bool> DeleteTopicAsync(string name, CancellationToken cancellationToken = default)
+    {
+        if (!_topics.TryRemove(name, out var topic))
+        {
+            return false;
+        }
+        TopicDeleted?.Invoke(this, topic);
+
+        // Tear down all subscriptions on this topic. Snapshot first so we mutate safely.
+        var subKeys = _subscriptions.Keys.Where(k => k.StartsWith($"{name}/", StringComparison.OrdinalIgnoreCase)).ToArray();
+        foreach (var key in subKeys)
+        {
+            if (_subscriptions.TryGetValue(key, out var sub))
+            {
+                await DeleteSubscriptionAsync(sub.TopicName, sub.Name, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        return true;
+    }
+
+    public async Task<SubscriptionDescriptor> CreateSubscriptionAsync(SubscriptionDescriptor descriptor, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+        ArgumentException.ThrowIfNullOrWhiteSpace(descriptor.TopicName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(descriptor.Name);
+        if (!_topics.ContainsKey(descriptor.TopicName))
+        {
+            throw new InvalidOperationException($"Cannot create subscription '{descriptor.Name}' — topic '{descriptor.TopicName}' does not exist.");
+        }
+
+        var key = SubKey(descriptor.TopicName, descriptor.Name);
+        var stored = _subscriptions.GetOrAdd(key, descriptor);
+        if (!ReferenceEquals(stored, descriptor))
+        {
+            return stored;
+        }
+
+        // The backing queue gives us all the queue-level machinery for free.
+        await _queues.CreateAsync(new QueueDescriptor
+        {
+            Name = descriptor.BackingQueueName,
+            LockDuration = descriptor.LockDuration,
+            MaxDeliveryCount = descriptor.MaxDeliveryCount,
+            DefaultMessageTimeToLive = descriptor.DefaultMessageTimeToLive,
+            DeadLetteringOnMessageExpiration = descriptor.DeadLetteringOnMessageExpiration,
+        }, cancellationToken).ConfigureAwait(false);
+
+        // Every fresh subscription gets a $Default rule with a TrueFilter — same as Azure SB.
+        var rules = _rules.GetOrAdd(key, _ => new ConcurrentDictionary<string, RuleDescriptor>(StringComparer.OrdinalIgnoreCase));
+        rules[DefaultRuleName] = new RuleDescriptor
+        {
+            TopicName = descriptor.TopicName,
+            SubscriptionName = descriptor.Name,
+            Name = DefaultRuleName,
+            Filter = TrueFilter.Instance,
+        };
+
+        SubscriptionCreated?.Invoke(this, descriptor);
+        return descriptor;
+    }
+
+    public Task<SubscriptionDescriptor?> GetSubscriptionAsync(string topicName, string subscriptionName, CancellationToken cancellationToken = default)
+    {
+        _subscriptions.TryGetValue(SubKey(topicName, subscriptionName), out var sub);
+        return Task.FromResult(sub);
+    }
+
+    public Task<IReadOnlyList<SubscriptionDescriptor>> ListSubscriptionsAsync(string topicName, CancellationToken cancellationToken = default)
+    {
+        var prefix = $"{topicName}/";
+        IReadOnlyList<SubscriptionDescriptor> snapshot = _subscriptions
+            .Where(kv => kv.Key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            .Select(kv => kv.Value)
+            .ToArray();
+        return Task.FromResult(snapshot);
+    }
+
+    public async Task<bool> DeleteSubscriptionAsync(string topicName, string subscriptionName, CancellationToken cancellationToken = default)
+    {
+        var key = SubKey(topicName, subscriptionName);
+        if (!_subscriptions.TryRemove(key, out var sub))
+        {
+            return false;
+        }
+        _rules.TryRemove(key, out _);
+        await _queues.DeleteAsync(sub.BackingQueueName, cancellationToken).ConfigureAwait(false);
+        SubscriptionDeleted?.Invoke(this, sub);
+        return true;
+    }
+
+    public Task<RuleDescriptor> CreateOrReplaceRuleAsync(RuleDescriptor rule, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(rule);
+        var key = SubKey(rule.TopicName, rule.SubscriptionName);
+        if (!_subscriptions.ContainsKey(key))
+        {
+            throw new InvalidOperationException($"Cannot add rule to '{rule.TopicName}/{rule.SubscriptionName}' — subscription does not exist.");
+        }
+        var rules = _rules.GetOrAdd(key, _ => new ConcurrentDictionary<string, RuleDescriptor>(StringComparer.OrdinalIgnoreCase));
+        rules[rule.Name] = rule;
+        return Task.FromResult(rule);
+    }
+
+    public Task<bool> DeleteRuleAsync(string topicName, string subscriptionName, string ruleName, CancellationToken cancellationToken = default)
+    {
+        var key = SubKey(topicName, subscriptionName);
+        if (!_rules.TryGetValue(key, out var rules))
+        {
+            return Task.FromResult(false);
+        }
+        return Task.FromResult(rules.TryRemove(ruleName, out _));
+    }
+
+    public Task<IReadOnlyList<RuleDescriptor>> ListRulesAsync(string topicName, string subscriptionName, CancellationToken cancellationToken = default)
+    {
+        var key = SubKey(topicName, subscriptionName);
+        if (!_rules.TryGetValue(key, out var rules))
+        {
+            return Task.FromResult<IReadOnlyList<RuleDescriptor>>(Array.Empty<RuleDescriptor>());
+        }
+        IReadOnlyList<RuleDescriptor> snapshot = rules.Values.ToArray();
+        return Task.FromResult(snapshot);
+    }
+
+    public IReadOnlyList<string> EvaluateSubscribers(string topicName, MessageFilterContext message)
+    {
+        if (!_topics.ContainsKey(topicName)) return Array.Empty<string>();
+
+        var prefix = $"{topicName}/";
+        var matched = new List<string>();
+        foreach (var (key, sub) in _subscriptions)
+        {
+            if (!key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
+            if (!_rules.TryGetValue(key, out var rules) || rules.IsEmpty) continue;
+
+            foreach (var rule in rules.Values)
+            {
+                if (rule.Filter.Matches(message))
+                {
+                    matched.Add(sub.BackingQueueName);
+                    break;
+                }
+            }
+        }
+        return matched;
+    }
+
+    private static string SubKey(string topic, string sub) => $"{topic}/{sub}";
+}

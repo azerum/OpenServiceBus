@@ -10,10 +10,17 @@
     .navbar-brand { font-weight: 600; letter-spacing: -0.01em; }
     .pill { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8em; }
     pre.body { white-space: pre-wrap; word-break: break-all; background: #f1f3f5; padding: 0.6em; border-radius: 6px; max-height: 12em; overflow: auto; }
-    .queue-item.active { background: #0d6efd; color: white; }
-    .queue-item { cursor: pointer; }
-    .queue-item.dlq { padding-left: 2.2rem; font-style: italic; color: #6c757d; }
-    .queue-item.dlq.active { color: white; }
+    .entity-item { cursor: pointer; user-select: none; }
+    .entity-item.active { background: #0d6efd; color: white; }
+    .entity-item.dlq { padding-left: 2.2rem; font-style: italic; color: #6c757d; }
+    .entity-item.dlq.active { color: white; }
+    .entity-item.sub { padding-left: 1.5rem; }
+    .entity-item.sub-dlq { padding-left: 3rem; font-style: italic; color: #6c757d; }
+    .entity-item.sub-dlq.active { color: white; }
+    .topic-header { background: #fff8e1; font-weight: 600; }
+    .topic-header.active { background: #0d6efd; color: white; }
+    .topic-toggle { display: inline-block; width: 1.2em; text-align: center; cursor: pointer; }
+    .section-header { background: #f1f3f5; color: #495057; font-size: 0.75em; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; padding: 0.4rem 1rem; }
     .dlq-info { background: #fff3cd; border-left: 3px solid #ffc107; padding: 0.5em 0.7em; border-radius: 4px; font-size: 0.85em; margin: 0.5em 0; }
     .toast-stack { position: fixed; top: 1rem; right: 1rem; z-index: 1080; max-width: 28rem; }
     code { color: #6f42c1; }
@@ -21,6 +28,10 @@
     .settings-row dt { color: #6c757d; font-weight: 400; }
     .settings-row dd { margin-bottom: 0.2rem; }
     .app-prop-row input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; }
+    .rule-card { border-left: 3px solid #6f42c1; }
+    .rule-card.default { border-left-color: #adb5bd; }
+    .filter-type-badge { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.75em; }
+    .filter-expr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; background: #f1f3f5; padding: 0.4em 0.6em; border-radius: 4px; }
   </style>
 </head>
 <body>
@@ -54,38 +65,49 @@
     </div>
 
     <div class="row g-3">
-      <!-- Queues sidebar -->
+      <!-- Sidebar -->
       <div class="col-md-3">
         <div class="card">
           <div class="card-header d-flex justify-content-between align-items-center">
-            <span>Queues</span>
+            <span>Entities</span>
             <div class="d-flex gap-1">
               <button class="btn btn-sm btn-outline-secondary" id="btnRefresh" title="Refresh">↻</button>
-              <button class="btn btn-sm btn-success" id="btnOpenCreate">+ Create</button>
+              <div class="dropdown">
+                <button class="btn btn-sm btn-success dropdown-toggle" data-bs-toggle="dropdown">+ Create</button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                  <li><a class="dropdown-item" href="#" id="btnOpenCreateQueue">Queue</a></li>
+                  <li><a class="dropdown-item" href="#" id="btnOpenCreateTopic">Topic</a></li>
+                  <li><a class="dropdown-item" href="#" id="btnOpenCreateSubscription">Subscription on topic…</a></li>
+                </ul>
+              </div>
             </div>
           </div>
+          <div class="section-header">Queues</div>
           <ul id="queueList" class="list-group list-group-flush"></ul>
+          <div class="section-header">Topics</div>
+          <ul id="topicList" class="list-group list-group-flush"></ul>
         </div>
       </div>
 
       <!-- Main panel -->
       <div class="col-md-9">
-        <!-- Queue settings card -->
-        <div class="card mb-3" id="queueSettingsCard" style="display:none">
+        <!-- Entity settings card -->
+        <div class="card mb-3" id="entitySettingsCard" style="display:none">
           <div class="card-header d-flex justify-content-between align-items-center">
-            <span><span class="text-muted">Selected:</span> <span id="selectedQueue" class="fw-semibold">—</span></span>
-            <span id="queueSettingsBadges"></span>
+            <span><span class="text-muted" id="selectedKindLabel">Selected:</span> <span id="selectedEntity" class="fw-semibold">—</span></span>
+            <span id="entitySettingsBadges"></span>
           </div>
           <div class="card-body py-2">
-            <dl class="row settings-row mb-0" id="queueSettings"></dl>
+            <dl class="row settings-row mb-0" id="entitySettings"></dl>
           </div>
         </div>
 
         <div class="card">
           <div class="card-body">
-            <ul class="nav nav-tabs mb-3">
+            <ul class="nav nav-tabs mb-3" id="mainTabs">
               <li class="nav-item"><a class="nav-link active" data-tab="send" href="#">Send</a></li>
               <li class="nav-item"><a class="nav-link" data-tab="receive" href="#">Receive (peek-lock)</a></li>
+              <li class="nav-item d-none" id="rulesTabItem"><a class="nav-link" data-tab="rules" href="#">Rules</a></li>
             </ul>
 
             <!-- Send tab -->
@@ -111,7 +133,7 @@
                 </div>
                 <div class="mt-3">
                   <div class="d-flex justify-content-between align-items-center mb-1">
-                    <label class="form-label small text-muted mb-0">Application properties (custom key/value)</label>
+                    <label class="form-label small text-muted mb-0">Application properties (custom key/value — also used by filter rules)</label>
                     <button id="btnAddProp" class="btn btn-sm btn-outline-secondary">+ Add row</button>
                   </div>
                   <div id="appProps"></div>
@@ -119,7 +141,7 @@
               </details>
 
               <div class="d-flex justify-content-between align-items-center">
-                <small class="text-muted">Sent via <code>Azure.Messaging.ServiceBus</code> SDK.</small>
+                <small class="text-muted" id="sendHint">Sent via <code>Azure.Messaging.ServiceBus</code> SDK.</small>
                 <button id="btnSend" class="btn btn-primary" disabled>Send</button>
               </div>
             </div>
@@ -132,6 +154,18 @@
               </div>
               <div id="receivedList"></div>
             </div>
+
+            <!-- Rules tab (subscriptions only) -->
+            <div class="tab-pane d-none" id="tab-rules">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                  <h6 class="mb-0">Filter rules</h6>
+                  <small class="text-muted">Rules decide which messages published to the parent topic flow into this subscription. <strong>Any rule matches</strong>, and a subscription with no rules matches nothing.</small>
+                </div>
+                <button id="btnAddRule" class="btn btn-primary btn-sm">+ Add rule</button>
+              </div>
+              <div id="rulesList"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -142,48 +176,135 @@
   <div class="modal fade" id="createQueueModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Create Queue</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
+        <div class="modal-header"><h5 class="modal-title">Create Queue</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
           <div class="mb-3">
             <label class="form-label">Queue name</label>
             <input id="cqName" class="form-control" autofocus>
             <div class="form-text">A sibling <code>&lt;name&gt;/$DeadLetterQueue</code> is created automatically.</div>
           </div>
-
           <div class="row g-3">
-            <div class="col-md-6">
-              <label class="form-label">Max delivery count</label>
-              <input id="cqMaxDelivery" type="number" class="form-control" min="1" value="10">
-              <div class="form-text">Messages auto-dead-letter after this many delivery attempts.</div>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Lock duration (seconds)</label>
-              <input id="cqLockDuration" type="number" class="form-control" min="1" value="60">
-              <div class="form-text">Peek-lock timeout per delivery (renewable).</div>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Default message TTL (seconds)</label>
-              <input id="cqDefaultTtl" type="number" class="form-control" min="1" placeholder="(unlimited)">
-              <div class="form-text">Per-message TTL still wins if shorter.</div>
-            </div>
-            <div class="col-md-6 d-flex align-items-end">
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" id="cqDleOnExpiration">
-                <label class="form-check-label" for="cqDleOnExpiration">Dead-letter on message expiration</label>
-              </div>
-            </div>
-          </div>
-
-          <div class="alert alert-light border mt-3 mb-0 small">
-            <strong>Enforced by the broker:</strong> name, max-delivery-count, lock-duration, default-ttl, dead-letter-on-expiration.
+            <div class="col-md-6"><label class="form-label">Max delivery count</label><input id="cqMaxDelivery" type="number" class="form-control" min="1" value="10"></div>
+            <div class="col-md-6"><label class="form-label">Lock duration (seconds)</label><input id="cqLockDuration" type="number" class="form-control" min="1" value="60"></div>
+            <div class="col-md-6"><label class="form-label">Default message TTL (seconds)</label><input id="cqDefaultTtl" type="number" class="form-control" min="1" placeholder="(unlimited)"></div>
+            <div class="col-md-6 d-flex align-items-end"><div class="form-check"><input class="form-check-input" type="checkbox" id="cqDleOnExpiration"><label class="form-check-label" for="cqDleOnExpiration">Dead-letter on message expiration</label></div></div>
           </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
           <button type="button" class="btn btn-success" id="btnCreate">Create</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create-topic modal -->
+  <div class="modal fade" id="createTopicModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Create Topic</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Topic name</label>
+            <input id="ctName" class="form-control" autofocus>
+            <div class="form-text">Topics fan out to subscriptions; each subscription has its own peek-lock queue and DLQ.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Default message TTL (seconds)</label>
+            <input id="ctDefaultTtl" type="number" class="form-control" min="1" placeholder="(unlimited)">
+            <div class="form-text">Used for any message that doesn't carry its own TTL.</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-success" id="btnCreateTopic">Create</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create-subscription modal -->
+  <div class="modal fade" id="createSubscriptionModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Create Subscription</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Topic</label>
+            <select id="csTopic" class="form-select"></select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Subscription name</label>
+            <input id="csName" class="form-control">
+            <div class="form-text">A <code>$Default</code> rule with a TrueFilter is installed automatically — replace it on the Rules tab to filter incoming messages.</div>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6"><label class="form-label">Max delivery count</label><input id="csMaxDelivery" type="number" class="form-control" min="1" value="10"></div>
+            <div class="col-md-6"><label class="form-label">Lock duration (seconds)</label><input id="csLockDuration" type="number" class="form-control" min="1" value="60"></div>
+            <div class="col-md-6"><label class="form-label">Default TTL (seconds)</label><input id="csDefaultTtl" type="number" class="form-control" min="1" placeholder="(unlimited)"></div>
+            <div class="col-md-6 d-flex align-items-end"><div class="form-check"><input class="form-check-input" type="checkbox" id="csDleOnExpiration"><label class="form-check-label" for="csDleOnExpiration">Dead-letter on expiration</label></div></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-success" id="btnCreateSubscription">Create</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/edit-rule modal -->
+  <div class="modal fade" id="ruleModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title" id="ruleModalTitle">Add Rule</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Rule name</label>
+              <input id="ruleName" class="form-control">
+              <div class="form-text"><code>$Default</code> is the auto-installed catch-all on a fresh subscription.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Filter type</label>
+              <select id="ruleFilterType" class="form-select">
+                <option value="sql">SQL filter</option>
+                <option value="correlation">Correlation filter</option>
+                <option value="true">True filter (match everything)</option>
+                <option value="false">False filter (match nothing)</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="ruleSqlBlock" class="rule-block">
+            <label class="form-label">SQL expression</label>
+            <textarea id="ruleSqlExpression" class="form-control font-monospace" rows="3" placeholder="region IN ('eu', 'eu-west') AND priority &gt;= 5 AND sys.Subject LIKE 'order%'"></textarea>
+            <div class="form-text">
+              Supports: comparisons (<code>=</code> <code>!=</code> <code>&lt;</code> <code>&gt;</code> <code>&lt;=</code> <code>&gt;=</code>),
+              <code>AND</code>/<code>OR</code>/<code>NOT</code>, <code>IS [NOT] NULL</code>, <code>LIKE</code> with <code>%</code> and <code>_</code>,
+              <code>[NOT] IN (…)</code>, <code>[NOT] EXISTS(prop)</code>. Property refs: <code>sys.MessageId</code>, <code>user.region</code>, or bare <code>region</code>.
+            </div>
+          </div>
+
+          <div id="ruleCorrelationBlock" class="rule-block d-none">
+            <div class="row g-2">
+              <div class="col-md-4"><label class="form-label small text-muted mb-1">MessageId equals</label><input id="rcMessageId" class="form-control form-control-sm"></div>
+              <div class="col-md-4"><label class="form-label small text-muted mb-1">CorrelationId equals</label><input id="rcCorrelationId" class="form-control form-control-sm"></div>
+              <div class="col-md-4"><label class="form-label small text-muted mb-1">Subject equals</label><input id="rcSubject" class="form-control form-control-sm"></div>
+              <div class="col-md-4"><label class="form-label small text-muted mb-1">SessionId equals</label><input id="rcSessionId" class="form-control form-control-sm"></div>
+              <div class="col-md-4"><label class="form-label small text-muted mb-1">ContentType equals</label><input id="rcContentType" class="form-control form-control-sm"></div>
+              <div class="col-md-4"><label class="form-label small text-muted mb-1">ReplyTo equals</label><input id="rcReplyTo" class="form-control form-control-sm"></div>
+            </div>
+            <div class="form-text">Empty fields are wildcards. All non-empty fields must match exactly.</div>
+          </div>
+
+          <div id="ruleTrivialBlock" class="rule-block d-none">
+            <div class="alert alert-info mb-0 small">Trivial filter — no parameters. Use this only for explicit catch-all (<code>true</code>) or to keep a subscription suspended (<code>false</code>).</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-success" id="btnSaveRule">Save</button>
         </div>
       </div>
     </div>
@@ -200,34 +321,36 @@
     const $$ = sel => Array.from(document.querySelectorAll(sel));
 
     // ── State ──
-    // lockedMessages is keyed by queue, then by SEQUENCE NUMBER (not lock token).
-    // Each message in a queue has a stable broker-assigned sequence number. When the
-    // lock expires and the same message is redelivered, we get a NEW lock token but the
-    // SAME sequence number — so we replace the existing row in place instead of stacking
-    // a duplicate. This also keeps the delivery-count display honest: it always reflects
-    // the latest delivery attempt rather than the first one we happened to see.
     const state = {
-      selectedQueue: null,
-      selectedDescriptor: null,
-      lockedMessages: new Map(), // queueName → Map<sequenceNumber, dto>
-      createModal: null,
+      // The currently selected entity: { kind: 'queue'|'topic'|'subscription'|'subscription-dlq', name, topic?, subscription?, descriptor }
+      selected: null,
+      lockedMessages: new Map(), // entityKey → Map<seq, dto>
+      queues: [],
+      topics: [],
+      subscriptionsByTopic: {}, // topic → [sub, ...]
+      expandedTopics: new Set(),
+      modals: {},
     };
 
-    function lockedFor(queue) {
-      if (!queue) return new Map();
-      let inner = state.lockedMessages.get(queue);
-      if (!inner) {
-        inner = new Map();
-        state.lockedMessages.set(queue, inner);
-      }
+    function entityKey(sel) {
+      if (!sel) return null;
+      if (sel.kind === 'queue') return sel.name;
+      if (sel.kind === 'topic') return `topic:${sel.name}`;
+      if (sel.kind === 'subscription') return `${sel.topic}/Subscriptions/${sel.subscription}`;
+      if (sel.kind === 'subscription-dlq') return `${sel.topic}/Subscriptions/${sel.subscription}/$DeadLetterQueue`;
+      return null;
+    }
+
+    function lockedFor(key) {
+      if (!key) return new Map();
+      let inner = state.lockedMessages.get(key);
+      if (!inner) { inner = new Map(); state.lockedMessages.set(key, inner); }
       return inner;
     }
 
-    /** Key used to dedupe locked messages — sequence number, with a lock-token fallback. */
     function msgKey(m) {
       return (m.sequenceNumber !== null && m.sequenceNumber !== undefined)
-        ? `seq:${m.sequenceNumber}`
-        : `lock:${m.lockToken}`;
+        ? `seq:${m.sequenceNumber}` : `lock:${m.lockToken}`;
     }
 
     // ── Bootstrap inputs ──
@@ -236,14 +359,17 @@
     [["connStr", "osb_conn"], ["mgmtUrl", "osb_mgmt"]].forEach(([id, key]) =>
       $("#" + id).addEventListener("input", e => localStorage.setItem(key, e.target.value)));
 
-    state.createModal = new bootstrap.Modal($("#createQueueModal"));
+    state.modals.createQueue = new bootstrap.Modal($("#createQueueModal"));
+    state.modals.createTopic = new bootstrap.Modal($("#createTopicModal"));
+    state.modals.createSubscription = new bootstrap.Modal($("#createSubscriptionModal"));
+    state.modals.rule = new bootstrap.Modal($("#ruleModal"));
 
     // ── Toast helper ──
     function toast(message, kind = "info") {
       const colors = { ok: "text-bg-success", err: "text-bg-danger", info: "text-bg-secondary" };
       const wrap = document.createElement("div");
       wrap.className = `toast align-items-center ${colors[kind] || colors.info} border-0 show mb-2`;
-      wrap.innerHTML = `<div class="d-flex"><div class="toast-body small">${message}</div>
+      wrap.innerHTML = `<div class="d-flex"><div class="toast-body small">${escapeHtml(message)}</div>
         <button type="button" class="btn-close btn-close-white me-2 m-auto" onclick="this.closest('.toast').remove()"></button></div>`;
       $("#toasts").appendChild(wrap);
       setTimeout(() => wrap.remove(), 4000);
@@ -262,13 +388,18 @@
     }
 
     // ── Tabs ──
-    $$('.nav-link[data-tab]').forEach(a => a.addEventListener("click", e => {
-      e.preventDefault();
-      $$('.nav-link[data-tab]').forEach(x => x.classList.remove("active"));
-      a.classList.add("active");
-      const t = a.dataset.tab;
+    function activateTab(t) {
+      $$('.nav-link[data-tab]').forEach(x => x.classList.toggle("active", x.dataset.tab === t));
       $("#tab-send").classList.toggle("d-none", t !== "send");
       $("#tab-receive").classList.toggle("d-none", t !== "receive");
+      $("#tab-rules").classList.toggle("d-none", t !== "rules");
+      if (t === "rules" && state.selected?.kind === "subscription") {
+        loadRules();
+      }
+    }
+    $$('.nav-link[data-tab]').forEach(a => a.addEventListener("click", e => {
+      e.preventDefault();
+      activateTab(a.dataset.tab);
     }));
 
     // ── Ping ──
@@ -283,7 +414,7 @@
         $("#status").className = "text-success small";
         $("#pingResult").innerHTML =
           `<span class="badge text-bg-light">mgmt</span> ${escapeHtml(r.management)} &nbsp; <span class="badge text-bg-light">amqp</span> ${escapeHtml(r.serviceBus)}`;
-        await loadQueues();
+        await loadEntities();
       } catch (e) {
         $("#status").textContent = "error";
         $("#status").className = "text-danger small";
@@ -291,127 +422,259 @@
       }
     });
 
-    // ── Queues ──
-    async function loadQueues() {
+    // ── Entity loaders ──
+    async function loadEntities() {
       const mgmtUrl = encodeURIComponent($("#mgmtUrl").value);
       try {
-        const queues = await api("GET", `/api/queues?managementUrl=${mgmtUrl}`);
-        renderQueueList(queues || []);
-        // If a queue is currently selected, refresh its settings card too.
-        if (state.selectedQueue) {
-          const found = (queues || []).find(q => q.name === state.selectedQueue);
-          if (found) {
-            state.selectedDescriptor = found;
-            renderQueueSettings();
-          }
+        const [queues, topics] = await Promise.all([
+          api("GET", `/api/queues?managementUrl=${mgmtUrl}`),
+          api("GET", `/api/topics?managementUrl=${mgmtUrl}`),
+        ]);
+        state.queues = queues || [];
+        state.topics = topics || [];
+
+        // Fetch subscriptions for each topic in parallel.
+        const subPairs = await Promise.all(state.topics.map(async t => {
+          const subs = await api("GET", `/api/topics/${encodeURIComponent(t.name)}/subscriptions?managementUrl=${mgmtUrl}`);
+          return [t.name, subs || []];
+        }));
+        state.subscriptionsByTopic = Object.fromEntries(subPairs);
+
+        renderSidebar();
+        if (state.selected) {
+          refreshSelectedDescriptor();
+          renderSelectedSettings();
         }
       } catch (e) {
-        toast(`Loading queues failed: ${e.message}`, "err");
+        toast(`Loading entities failed: ${e.message}`, "err");
+      }
+    }
+    $("#btnRefresh").addEventListener("click", loadEntities);
+
+    function refreshSelectedDescriptor() {
+      const sel = state.selected;
+      if (!sel) return;
+      if (sel.kind === 'queue') {
+        sel.descriptor = state.queues.find(q => q.name === sel.name);
+      } else if (sel.kind === 'topic') {
+        sel.descriptor = state.topics.find(t => t.name === sel.name);
+      } else if (sel.kind === 'subscription' || sel.kind === 'subscription-dlq') {
+        const subs = state.subscriptionsByTopic[sel.topic] || [];
+        sel.descriptor = subs.find(s => s.name === sel.subscription);
       }
     }
 
-    function renderQueueList(queues) {
-      const list = $("#queueList");
-      list.innerHTML = "";
-      if (!queues.length) {
-        list.innerHTML = '<li class="list-group-item text-muted small">no queues yet</li>';
-        return;
+    function renderSidebar() {
+      // Queues (with DLQ siblings underneath).
+      const qList = $("#queueList");
+      qList.innerHTML = "";
+      const main = state.queues.filter(q => !q.name.endsWith("/$DeadLetterQueue") && !q.name.includes("/Subscriptions/"));
+      if (main.length === 0) qList.innerHTML = '<li class="list-group-item text-muted small">no queues yet</li>';
+      for (const q of main.sort((a, b) => a.name.localeCompare(b.name))) {
+        qList.appendChild(queueItem(q, false));
+        const dlq = state.queues.find(x => x.name === q.name + "/$DeadLetterQueue");
+        if (dlq) qList.appendChild(queueItem(dlq, true));
       }
-      const sorted = [...queues].sort((a, b) => {
-        const aBase = a.name.replace(/\/\$DeadLetterQueue$/, "");
-        const bBase = b.name.replace(/\/\$DeadLetterQueue$/, "");
-        if (aBase !== bBase) return aBase.localeCompare(bBase);
-        return a.name.length - b.name.length;
-      });
-      for (const q of sorted) {
-        const isDlq = q.name.endsWith("/$DeadLetterQueue");
-        const displayName = isDlq ? "$DeadLetterQueue" : q.name;
-        const li = document.createElement("li");
-        li.className = "list-group-item queue-item d-flex justify-content-between align-items-center" + (isDlq ? " dlq" : "");
-        // Use a data-name attribute (not the visible text) for matching — DLQ display names
-        // all read "$DeadLetterQueue" so a textContent lookup would collide across queues.
-        li.dataset.name = q.name;
-        if (q.name === state.selectedQueue) li.classList.add("active");
-        const lockedCount = lockedFor(q.name).size;
-        const lockedBadge = lockedCount > 0
-          ? ` <span class="badge text-bg-info ms-1" title="locally locked">${lockedCount}</span>` : "";
-        const deleteBtn = isDlq ? "" : `<button class="btn btn-sm btn-link text-danger p-0" data-del="${escapeHtml(q.name)}">×</button>`;
-        li.innerHTML = `<span><strong>${escapeHtml(displayName)}</strong> <span class="pill">${q.activeMessageCount ?? "?"}</span>${lockedBadge}</span>${deleteBtn}`;
-        li.addEventListener("click", e => {
-          if (e.target.matches("[data-del]")) return;
-          selectQueue(q.name);
-        });
-        list.appendChild(li);
-      }
-      list.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", async e => {
-        const name = e.target.dataset.del;
-        if (!confirm(`Delete queue '${name}'?`)) return;
-        const mgmtUrl = encodeURIComponent($("#mgmtUrl").value);
-        try {
-          await api("DELETE", `/api/queues/${name}?managementUrl=${mgmtUrl}`);
-          toast(`Deleted ${name}`, "ok");
-          // Cascade: drop locally tracked locks for the deleted queue AND its DLQ sibling.
-          state.lockedMessages.delete(name);
-          state.lockedMessages.delete(name + "/$DeadLetterQueue");
-          if (state.selectedQueue === name || state.selectedQueue === name + "/$DeadLetterQueue") {
-            selectQueue(null);
+
+      // Topics: header → subs → sub-DLQs.
+      const tList = $("#topicList");
+      tList.innerHTML = "";
+      if (state.topics.length === 0) tList.innerHTML = '<li class="list-group-item text-muted small">no topics yet</li>';
+      for (const t of state.topics.sort((a, b) => a.name.localeCompare(b.name))) {
+        tList.appendChild(topicHeaderItem(t));
+        if (state.expandedTopics.has(t.name)) {
+          const subs = state.subscriptionsByTopic[t.name] || [];
+          for (const sub of subs.sort((a, b) => a.name.localeCompare(b.name))) {
+            tList.appendChild(subscriptionItem(t, sub, false));
+            tList.appendChild(subscriptionItem(t, sub, true));
           }
-          await loadQueues();
-        } catch (err) { toast(err.message, "err"); }
-      }));
+        }
+      }
     }
 
-    function selectQueue(name) {
-      state.selectedQueue = name;
-      $("#selectedQueue").textContent = name || "—";
-      $("#btnSend").disabled = !name;
-      $("#btnReceive").disabled = !name;
+    function queueItem(q, isDlq) {
+      const li = document.createElement("li");
+      li.className = "list-group-item entity-item d-flex justify-content-between align-items-center" + (isDlq ? " dlq" : "");
+      const sel = { kind: 'queue', name: q.name, descriptor: q };
+      const isActive = entityKey(state.selected) === entityKey(sel);
+      if (isActive) li.classList.add("active");
+      const lockedCount = lockedFor(q.name).size;
+      const lockedBadge = lockedCount > 0 ? ` <span class="badge text-bg-info ms-1">${lockedCount}</span>` : "";
+      const display = isDlq ? "$DeadLetterQueue" : q.name;
+      const del = isDlq ? "" : `<button class="btn btn-sm btn-link text-danger p-0" data-del-queue="${escapeHtml(q.name)}">×</button>`;
+      li.innerHTML = `<span><strong>${escapeHtml(display)}</strong> <span class="pill">${q.activeMessageCount ?? "?"}</span>${lockedBadge}</span>${del}`;
+      li.addEventListener("click", e => { if (e.target.matches("[data-del-queue]")) return; selectEntity(sel); });
+      const dl = li.querySelector("[data-del-queue]");
+      if (dl) dl.addEventListener("click", e => deleteQueue(e.target.dataset.delQueue));
+      return li;
+    }
 
-      // Highlight by data-name (not textContent — DLQ display names collide).
-      $$(".queue-item").forEach(li => li.classList.toggle("active", li.dataset.name === name));
+    function topicHeaderItem(t) {
+      const li = document.createElement("li");
+      li.className = "list-group-item entity-item topic-header d-flex justify-content-between align-items-center";
+      const sel = { kind: 'topic', name: t.name, descriptor: t };
+      if (entityKey(state.selected) === entityKey(sel)) li.classList.add("active");
+      const isExpanded = state.expandedTopics.has(t.name);
+      const toggle = `<span class="topic-toggle" data-toggle="${escapeHtml(t.name)}">${isExpanded ? "▼" : "▶"}</span>`;
+      li.innerHTML = `<span>${toggle} <strong>${escapeHtml(t.name)}</strong></span>
+        <span class="d-flex gap-1">
+          <button class="btn btn-sm btn-link text-secondary p-0" data-add-sub="${escapeHtml(t.name)}" title="Add subscription">+sub</button>
+          <button class="btn btn-sm btn-link text-danger p-0" data-del-topic="${escapeHtml(t.name)}">×</button>
+        </span>`;
+      li.addEventListener("click", e => {
+        if (e.target.matches("[data-toggle]")) { toggleTopic(t.name); return; }
+        if (e.target.matches("[data-add-sub]")) { openCreateSubscription(t.name); return; }
+        if (e.target.matches("[data-del-topic]")) { return; }
+        selectEntity(sel);
+      });
+      li.querySelector("[data-del-topic]").addEventListener("click", e => deleteTopic(e.target.dataset.delTopic));
+      return li;
+    }
 
-      if (name) {
-        fetchAndRenderSettings(name);
-      } else {
-        state.selectedDescriptor = null;
-        $("#queueSettingsCard").style.display = "none";
+    function subscriptionItem(topic, sub, isDlq) {
+      const li = document.createElement("li");
+      li.className = "list-group-item entity-item d-flex justify-content-between align-items-center" + (isDlq ? " sub-dlq" : " sub");
+      const kind = isDlq ? 'subscription-dlq' : 'subscription';
+      const sel = { kind, name: sub.name, topic: topic.name, subscription: sub.name, descriptor: sub };
+      const key = entityKey(sel);
+      if (entityKey(state.selected) === key) li.classList.add("active");
+      const lockedCount = lockedFor(key).size;
+      const lockedBadge = lockedCount > 0 ? ` <span class="badge text-bg-info ms-1">${lockedCount}</span>` : "";
+      const display = isDlq ? "$DeadLetterQueue" : sub.name;
+      const del = isDlq ? "" : `<button class="btn btn-sm btn-link text-danger p-0" data-del-sub="${escapeHtml(topic.name)}|${escapeHtml(sub.name)}">×</button>`;
+      const count = isDlq ? "?" : (sub.activeMessageCount ?? "?");
+      li.innerHTML = `<span>${isDlq ? "" : "↳ "}<strong>${escapeHtml(display)}</strong> <span class="pill">${count}</span>${lockedBadge}</span>${del}`;
+      li.addEventListener("click", e => { if (e.target.matches("[data-del-sub]")) return; selectEntity(sel); });
+      const dl = li.querySelector("[data-del-sub]");
+      if (dl) dl.addEventListener("click", e => {
+        const [t, s] = e.target.dataset.delSub.split("|");
+        deleteSubscription(t, s);
+      });
+      return li;
+    }
+
+    function toggleTopic(name) {
+      if (state.expandedTopics.has(name)) state.expandedTopics.delete(name);
+      else state.expandedTopics.add(name);
+      renderSidebar();
+    }
+
+    async function deleteQueue(name) {
+      if (!confirm(`Delete queue '${name}'?`)) return;
+      const mgmtUrl = encodeURIComponent($("#mgmtUrl").value);
+      try {
+        await api("DELETE", `/api/queues/${encodeURIComponent(name)}?managementUrl=${mgmtUrl}`);
+        toast(`Deleted ${name}`, "ok");
+        state.lockedMessages.delete(name);
+        state.lockedMessages.delete(name + "/$DeadLetterQueue");
+        if (state.selected?.kind === 'queue' && (state.selected.name === name || state.selected.name === name + "/$DeadLetterQueue")) {
+          selectEntity(null);
+        }
+        await loadEntities();
+      } catch (e) { toast(e.message, "err"); }
+    }
+
+    async function deleteTopic(name) {
+      if (!confirm(`Delete topic '${name}' (and ALL its subscriptions)?`)) return;
+      const mgmtUrl = encodeURIComponent($("#mgmtUrl").value);
+      try {
+        await api("DELETE", `/api/topics/${encodeURIComponent(name)}?managementUrl=${mgmtUrl}`);
+        toast(`Deleted topic ${name}`, "ok");
+        state.expandedTopics.delete(name);
+        if (state.selected && (state.selected.name === name || state.selected.topic === name)) selectEntity(null);
+        await loadEntities();
+      } catch (e) { toast(e.message, "err"); }
+    }
+
+    async function deleteSubscription(topic, sub) {
+      if (!confirm(`Delete subscription '${topic}/${sub}'?`)) return;
+      const mgmtUrl = encodeURIComponent($("#mgmtUrl").value);
+      try {
+        await api("DELETE", `/api/topics/${encodeURIComponent(topic)}/subscriptions/${encodeURIComponent(sub)}?managementUrl=${mgmtUrl}`);
+        toast(`Deleted ${topic}/${sub}`, "ok");
+        if (state.selected?.topic === topic && state.selected.subscription === sub) selectEntity(null);
+        await loadEntities();
+      } catch (e) { toast(e.message, "err"); }
+    }
+
+    // ── Selection ──
+    function selectEntity(sel) {
+      state.selected = sel;
+      const key = entityKey(sel);
+      $("#selectedEntity").textContent = sel ? describeSelected(sel) : "—";
+      $("#selectedKindLabel").textContent = sel ? `Selected ${sel.kind}:` : "Selected:";
+
+      // Send capability:
+      // - queues, topics, subscriptions (DLQ excluded) can receive (sub via SDK; queue/topic via direct queue path).
+      // - Topics accept SENDs only.
+      // - Subscriptions accept RECEIVEs only.
+      const canSend = sel && (sel.kind === 'queue' || sel.kind === 'topic');
+      const canReceive = sel && (sel.kind === 'queue' || sel.kind === 'subscription' || sel.kind === 'subscription-dlq');
+      $("#btnSend").disabled = !canSend;
+      $("#btnReceive").disabled = !canReceive;
+      $("#sendHint").innerHTML = sel?.kind === 'topic'
+        ? "Sending to a <strong>topic</strong> — the broker evaluates each subscription's rules and fans out."
+        : "Sent via <code>Azure.Messaging.ServiceBus</code> SDK.";
+
+      // Show/hide the Rules tab for subscriptions.
+      const isSubscription = sel?.kind === 'subscription';
+      $("#rulesTabItem").classList.toggle("d-none", !isSubscription);
+      if (!isSubscription && document.querySelector('.nav-link[data-tab="rules"]').classList.contains("active")) {
+        activateTab("send");
       }
 
-      // Always re-render the locked-messages panel for the newly selected queue (or empty).
+      renderSidebar();
+      if (sel) renderSelectedSettings();
+      else $("#entitySettingsCard").style.display = "none";
       renderReceived();
     }
 
-    async function fetchAndRenderSettings(name) {
-      try {
-        const mgmtUrl = encodeURIComponent($("#mgmtUrl").value);
-        const list = await api("GET", `/api/queues?managementUrl=${mgmtUrl}`);
-        const d = (list || []).find(q => q.name === name);
-        if (!d) return;
-        state.selectedDescriptor = d;
-        renderQueueSettings();
-      } catch (e) { /* swallow - settings card is best-effort */ }
+    function describeSelected(sel) {
+      if (sel.kind === 'queue') return sel.name;
+      if (sel.kind === 'topic') return sel.name + " (topic)";
+      if (sel.kind === 'subscription') return `${sel.topic} / ${sel.subscription}`;
+      if (sel.kind === 'subscription-dlq') return `${sel.topic} / ${sel.subscription} / $DeadLetterQueue`;
+      return "—";
     }
 
-    function renderQueueSettings() {
-      const d = state.selectedDescriptor;
-      if (!d) return;
-      $("#queueSettingsCard").style.display = "";
-      const isDlq = d.name.endsWith("/$DeadLetterQueue");
-      const ttl = d.defaultMessageTimeToLive ? humanTime(d.defaultMessageTimeToLive) : "(unlimited)";
-      const dle = d.deadLetteringOnMessageExpiration ? "yes" : "no";
-      $("#queueSettings").innerHTML = `
-        <dt class="col-sm-3">Active messages</dt><dd class="col-sm-3">${d.activeMessageCount ?? "?"}</dd>
-        <dt class="col-sm-3">Lock duration</dt><dd class="col-sm-3">${humanTime(d.lockDuration)}</dd>
-        <dt class="col-sm-3">Max delivery count</dt><dd class="col-sm-3">${d.maxDeliveryCount}</dd>
-        <dt class="col-sm-3">Default TTL</dt><dd class="col-sm-3">${ttl}</dd>
-        <dt class="col-sm-3">DLQ on expiration</dt><dd class="col-sm-3">${dle}</dd>`;
-      $("#queueSettingsBadges").innerHTML = isDlq
-        ? '<span class="badge text-bg-warning">DLQ</span>'
-        : '<span class="badge text-bg-primary">queue</span>';
+    function renderSelectedSettings() {
+      const sel = state.selected;
+      const d = sel?.descriptor;
+      if (!d) { $("#entitySettingsCard").style.display = "none"; return; }
+      $("#entitySettingsCard").style.display = "";
+      let html = "", badge = "";
+      if (sel.kind === 'queue') {
+        const isDlq = d.name.endsWith("/$DeadLetterQueue");
+        badge = isDlq ? '<span class="badge text-bg-warning">DLQ</span>' : '<span class="badge text-bg-primary">queue</span>';
+        html = `
+          <dt class="col-sm-3">Active messages</dt><dd class="col-sm-3">${d.activeMessageCount ?? "?"}</dd>
+          <dt class="col-sm-3">Lock duration</dt><dd class="col-sm-3">${humanTime(d.lockDuration)}</dd>
+          <dt class="col-sm-3">Max delivery count</dt><dd class="col-sm-3">${d.maxDeliveryCount}</dd>
+          <dt class="col-sm-3">Default TTL</dt><dd class="col-sm-3">${d.defaultMessageTimeToLive ? humanTime(d.defaultMessageTimeToLive) : "(unlimited)"}</dd>
+          <dt class="col-sm-3">DLQ on expiration</dt><dd class="col-sm-3">${d.deadLetteringOnMessageExpiration ? "yes" : "no"}</dd>`;
+      } else if (sel.kind === 'topic') {
+        const subCount = (state.subscriptionsByTopic[d.name] || []).length;
+        badge = '<span class="badge text-bg-warning">topic</span>';
+        html = `
+          <dt class="col-sm-3">Subscriptions</dt><dd class="col-sm-3">${subCount}</dd>
+          <dt class="col-sm-3">Default TTL</dt><dd class="col-sm-3">${d.defaultMessageTimeToLive ? humanTime(d.defaultMessageTimeToLive) : "(unlimited)"}</dd>`;
+      } else if (sel.kind === 'subscription' || sel.kind === 'subscription-dlq') {
+        badge = sel.kind === 'subscription-dlq'
+          ? '<span class="badge text-bg-warning">subscription DLQ</span>'
+          : '<span class="badge text-bg-info">subscription</span>';
+        html = `
+          <dt class="col-sm-3">Topic</dt><dd class="col-sm-3">${escapeHtml(d.topicName)}</dd>
+          <dt class="col-sm-3">Active messages</dt><dd class="col-sm-3">${d.activeMessageCount ?? "?"}</dd>
+          <dt class="col-sm-3">Lock duration</dt><dd class="col-sm-3">${humanTime(d.lockDuration)}</dd>
+          <dt class="col-sm-3">Max delivery count</dt><dd class="col-sm-3">${d.maxDeliveryCount}</dd>
+          <dt class="col-sm-3">Default TTL</dt><dd class="col-sm-3">${d.defaultMessageTimeToLive ? humanTime(d.defaultMessageTimeToLive) : "(unlimited)"}</dd>
+          <dt class="col-sm-3">Backing queue</dt><dd class="col-sm-9"><code>${escapeHtml(d.backingQueueName)}</code></dd>`;
+      }
+      $("#entitySettings").innerHTML = html;
+      $("#entitySettingsBadges").innerHTML = badge;
     }
 
     function humanTime(ts) {
-      // ts comes back as "HH:MM:SS" or "D.HH:MM:SS" from JSON serialization of TimeSpan.
       if (!ts) return "—";
       const m = ts.match(/(\d+\.)?(\d{2}):(\d{2}):(\d{2})/);
       if (!m) return ts;
@@ -424,22 +687,22 @@
       return `${(total/86400).toFixed(1)}d`;
     }
 
-    $("#btnRefresh").addEventListener("click", loadQueues);
+    function secondsToTimeSpan(seconds) {
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = seconds % 60;
+      return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+    }
 
-    // ── Create modal ──
-    $("#btnOpenCreate").addEventListener("click", () => {
-      $("#cqName").value = "";
-      $("#cqMaxDelivery").value = "10";
-      $("#cqLockDuration").value = "60";
-      $("#cqDefaultTtl").value = "";
-      $("#cqDleOnExpiration").checked = false;
-      state.createModal.show();
+    // ── Create modals ──
+    $("#btnOpenCreateQueue").addEventListener("click", e => { e.preventDefault();
+      $("#cqName").value = ""; $("#cqMaxDelivery").value = "10"; $("#cqLockDuration").value = "60";
+      $("#cqDefaultTtl").value = ""; $("#cqDleOnExpiration").checked = false;
+      state.modals.createQueue.show();
     });
-
     $("#btnCreate").addEventListener("click", async () => {
       const name = $("#cqName").value.trim();
       if (!name) { toast("Queue name is required", "err"); return; }
-
       const options = {
         maxDeliveryCount: parseInt($("#cqMaxDelivery").value) || 10,
         lockDuration: secondsToTimeSpan(parseInt($("#cqLockDuration").value) || 60),
@@ -447,25 +710,72 @@
       };
       const ttl = parseInt($("#cqDefaultTtl").value);
       if (ttl > 0) options.defaultMessageTimeToLive = secondsToTimeSpan(ttl);
-
       try {
-        await api("PUT", `/api/queues/${encodeURIComponent(name)}`, {
-          managementUrl: $("#mgmtUrl").value,
-          options,
-        });
-        state.createModal.hide();
-        toast(`Created ${name}`, "ok");
-        await loadQueues();
-        selectQueue(name);
+        await api("PUT", `/api/queues/${encodeURIComponent(name)}`, { managementUrl: $("#mgmtUrl").value, options });
+        state.modals.createQueue.hide();
+        toast(`Created queue ${name}`, "ok");
+        await loadEntities();
+        selectEntity({ kind: 'queue', name, descriptor: null });
       } catch (e) { toast(e.message, "err"); }
     });
 
-    function secondsToTimeSpan(seconds) {
-      const h = Math.floor(seconds / 3600);
-      const m = Math.floor((seconds % 3600) / 60);
-      const s = seconds % 60;
-      return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+    $("#btnOpenCreateTopic").addEventListener("click", e => { e.preventDefault();
+      $("#ctName").value = ""; $("#ctDefaultTtl").value = "";
+      state.modals.createTopic.show();
+    });
+    $("#btnCreateTopic").addEventListener("click", async () => {
+      const name = $("#ctName").value.trim();
+      if (!name) { toast("Topic name is required", "err"); return; }
+      const options = {};
+      const ttl = parseInt($("#ctDefaultTtl").value);
+      if (ttl > 0) options.defaultMessageTimeToLive = secondsToTimeSpan(ttl);
+      try {
+        await api("PUT", `/api/topics/${encodeURIComponent(name)}`, { managementUrl: $("#mgmtUrl").value, options });
+        state.modals.createTopic.hide();
+        toast(`Created topic ${name}`, "ok");
+        state.expandedTopics.add(name);
+        await loadEntities();
+        selectEntity({ kind: 'topic', name, descriptor: null });
+      } catch (e) { toast(e.message, "err"); }
+    });
+
+    function openCreateSubscription(prefilledTopic = null) {
+      const sel = $("#csTopic");
+      sel.innerHTML = state.topics.map(t => `<option value="${escapeHtml(t.name)}">${escapeHtml(t.name)}</option>`).join("");
+      if (prefilledTopic) sel.value = prefilledTopic;
+      $("#csName").value = "";
+      $("#csMaxDelivery").value = "10";
+      $("#csLockDuration").value = "60";
+      $("#csDefaultTtl").value = "";
+      $("#csDleOnExpiration").checked = false;
+      state.modals.createSubscription.show();
     }
+    $("#btnOpenCreateSubscription").addEventListener("click", e => { e.preventDefault();
+      if (state.topics.length === 0) { toast("Create a topic first.", "err"); return; }
+      openCreateSubscription();
+    });
+    $("#btnCreateSubscription").addEventListener("click", async () => {
+      const topic = $("#csTopic").value;
+      const name = $("#csName").value.trim();
+      if (!topic || !name) { toast("Topic and subscription name are required", "err"); return; }
+      const options = {
+        maxDeliveryCount: parseInt($("#csMaxDelivery").value) || 10,
+        lockDuration: secondsToTimeSpan(parseInt($("#csLockDuration").value) || 60),
+        deadLetteringOnMessageExpiration: $("#csDleOnExpiration").checked,
+      };
+      const ttl = parseInt($("#csDefaultTtl").value);
+      if (ttl > 0) options.defaultMessageTimeToLive = secondsToTimeSpan(ttl);
+      try {
+        await api("PUT", `/api/topics/${encodeURIComponent(topic)}/subscriptions/${encodeURIComponent(name)}`, {
+          managementUrl: $("#mgmtUrl").value, options,
+        });
+        state.modals.createSubscription.hide();
+        toast(`Created ${topic}/${name}`, "ok");
+        state.expandedTopics.add(topic);
+        await loadEntities();
+        selectEntity({ kind: 'subscription', name, topic, subscription: name, descriptor: null });
+      } catch (e) { toast(e.message, "err"); }
+    });
 
     // ── Application properties editor ──
     function addAppPropRow(key = "", value = "") {
@@ -490,13 +800,30 @@
       return Object.keys(out).length ? out : null;
     }
 
-    // ── Send ──
+    // ── Send / Receive ──
+    function sendTargetEntity() {
+      const sel = state.selected;
+      if (!sel) return null;
+      if (sel.kind === 'queue') return sel.name;
+      if (sel.kind === 'topic') return sel.name;
+      return null;
+    }
+    function receiveTargetEntity() {
+      const sel = state.selected;
+      if (!sel) return null;
+      if (sel.kind === 'queue') return sel.name;
+      if (sel.kind === 'subscription') return `${sel.topic}/Subscriptions/${sel.subscription}`;
+      if (sel.kind === 'subscription-dlq') return `${sel.topic}/Subscriptions/${sel.subscription}/$DeadLetterQueue`;
+      return null;
+    }
+
     $("#btnSend").addEventListener("click", async () => {
-      if (!state.selectedQueue) return;
+      const target = sendTargetEntity();
+      if (!target) return;
       try {
         const r = await api("POST", "/api/send", {
           connectionString: $("#connStr").value,
-          queue: state.selectedQueue,
+          queue: target,
           body: $("#msgBody").value,
           messageId: $("#msgId").value || null,
           correlationId: $("#msgCorr").value || null,
@@ -514,38 +841,26 @@
         });
         toast(r.scheduledFor
           ? `Scheduled (id=${r.messageId}, for=${r.scheduledFor})`
-          : `Sent (id=${r.messageId || "auto"})`, "ok");
-        loadQueues();
+          : `Sent to ${target} (id=${r.messageId || "auto"})`, "ok");
+        loadEntities();
       } catch (e) { toast(e.message, "err"); }
     });
 
-    // ── Receive ──
     $("#btnReceive").addEventListener("click", receiveOne);
-
     async function receiveOne() {
-      // Pin the queue at call time — if the user switches mid-request we still attribute
-      // the result to the queue the receive was issued against.
-      const queueAtCall = state.selectedQueue;
-      if (!queueAtCall) return false;
+      const target = receiveTargetEntity();
+      if (!target) return false;
       try {
         const r = await api("POST", "/api/receive", {
           connectionString: $("#connStr").value,
-          queue: queueAtCall,
+          queue: target,
           timeoutSeconds: 2,
         });
-        if (!r.received) {
-          toast("No messages", "info");
-          return false;
-        }
-        // Stamp the source queue on the dto so disposition calls can target it later
-        // even if the user has switched to a different queue in the sidebar.
-        r.__queue = queueAtCall;
-        // Key by sequence number so redeliveries replace the existing row rather than
-        // creating a new one each time the lock expires and the broker re-hands-out the
-        // same message with a fresh lock token.
-        lockedFor(queueAtCall).set(msgKey(r), r);
-        if (queueAtCall === state.selectedQueue) renderReceived();
-        loadQueues();
+        if (!r.received) { toast("No messages", "info"); return false; }
+        r.__queue = target;
+        lockedFor(target).set(msgKey(r), r);
+        renderReceived();
+        loadEntities();
         return true;
       } catch (e) { toast(e.message, "err"); return false; }
     }
@@ -553,15 +868,14 @@
     function renderReceived() {
       const out = $("#receivedList");
       out.innerHTML = "";
-      const queueLocks = lockedFor(state.selectedQueue);
-      if (!state.selectedQueue || queueLocks.size === 0) {
-        out.innerHTML = state.selectedQueue
-          ? '<p class="text-muted small">No locked messages on this queue — click <em>Receive next</em> to pull one.</p>'
-          : '<p class="text-muted small">Pick a queue first.</p>';
+      const target = receiveTargetEntity();
+      const queueLocks = lockedFor(target);
+      if (!target || queueLocks.size === 0) {
+        out.innerHTML = target
+          ? '<p class="text-muted small">No locked messages on this entity — click <em>Receive next</em> to pull one.</p>'
+          : '<p class="text-muted small">Pick a queue or subscription first.</p>';
         return;
       }
-      // Iterate the Map values — the key is sequenceNumber but the lockToken (used in data attrs)
-      // lives on the dto and is the current/latest token for that message.
       for (const m of [...queueLocks.values()].reverse()) {
         const tok = m.lockToken;
         const card = document.createElement("div");
@@ -569,7 +883,7 @@
         const dlqInfo = (m.deadLetterReason || m.deadLetterSource) ? `
           <div class="dlq-info">
             <strong>Dead-letter info</strong>
-            ${m.deadLetterSource ? `<div>Source queue: <code>${escapeHtml(m.deadLetterSource)}</code></div>` : ""}
+            ${m.deadLetterSource ? `<div>Source: <code>${escapeHtml(m.deadLetterSource)}</code></div>` : ""}
             ${m.deadLetterReason ? `<div>Reason: ${escapeHtml(m.deadLetterReason)}</div>` : ""}
             ${m.deadLetterErrorDescription ? `<div>Description: ${escapeHtml(m.deadLetterErrorDescription)}</div>` : ""}
           </div>` : "";
@@ -582,8 +896,8 @@
             <div class="btn-group btn-group-sm">
               <button class="btn btn-success" data-complete="${escapeHtml(tok)}">Complete</button>
               <button class="btn btn-warning" data-abandon="${escapeHtml(tok)}">Abandon</button>
-              <button class="btn btn-outline-secondary" data-renew="${escapeHtml(tok)}" title="Renew lock">⟳ Renew</button>
-              <button class="btn btn-outline-primary" data-defer="${escapeHtml(tok)}" title="Defer — retrieve later by sequence number">Defer</button>
+              <button class="btn btn-outline-secondary" data-renew="${escapeHtml(tok)}">⟳ Renew</button>
+              <button class="btn btn-outline-primary" data-defer="${escapeHtml(tok)}">Defer</button>
               <button class="btn btn-danger" data-deadletter="${escapeHtml(tok)}">DLQ</button>
             </div>
           </div>
@@ -602,30 +916,6 @@
       out.querySelectorAll("[data-defer]").forEach(b => b.addEventListener("click", () => deferMessage(b.dataset.defer)));
     }
 
-    async function deferMessage(lockToken) {
-      const found = findLocked(lockToken);
-      if (!found) { toast("Lock token no longer tracked locally", "err"); return; }
-      try {
-        const r = await api("POST", "/api/defer", {
-          connectionString: $("#connStr").value,
-          queue: found.queue,
-          lockToken,
-        });
-        lockedFor(found.queue).delete(found.key);
-        renderReceived();
-        toast(`Deferred (seq=${r.sequenceNumber}). Retrieve via ReceiveDeferredMessagesAsync.`, "ok");
-        loadQueues();
-      } catch (e) { toast(e.message, "err"); }
-    }
-
-    /**
-     * Look up where the lock came from (the message dto remembers its source queue in __queue),
-     * not whatever the user has currently selected. Without this you'd ack/abandon against the
-     * wrong receiver and the SDK would surface a confusing "lock not held" error.
-     *
-     * The map is keyed by sequence number for dedupe, so this scans values to find the matching
-     * lock token. Also returns the entry's key so callers can delete the right entry.
-     */
     function findLocked(lockToken) {
       for (const [queue, inner] of state.lockedMessages) {
         for (const [key, msg] of inner) {
@@ -639,15 +929,11 @@
       const found = findLocked(lockToken);
       if (!found) { toast("Lock token no longer tracked locally", "err"); return; }
       try {
-        await api("POST", `/api/${action}`, {
-          connectionString: $("#connStr").value,
-          queue: found.queue,
-          lockToken,
-        });
+        await api("POST", `/api/${action}`, { connectionString: $("#connStr").value, queue: found.queue, lockToken });
         lockedFor(found.queue).delete(found.key);
         renderReceived();
         toast(`${action[0].toUpperCase() + action.slice(1)}d`, "ok");
-        loadQueues();
+        loadEntities();
       } catch (e) { toast(e.message, "err"); }
     }
 
@@ -658,17 +944,11 @@
       if (reason === null) return;
       const description = prompt("Dead-letter description (optional)", "") || null;
       try {
-        await api("POST", "/api/deadletter", {
-          connectionString: $("#connStr").value,
-          queue: found.queue,
-          lockToken,
-          reason: reason || null,
-          description,
-        });
+        await api("POST", "/api/deadletter", { connectionString: $("#connStr").value, queue: found.queue, lockToken, reason: reason || null, description });
         lockedFor(found.queue).delete(found.key);
         renderReceived();
         toast("Dead-lettered", "ok");
-        loadQueues();
+        loadEntities();
       } catch (e) { toast(e.message, "err"); }
     }
 
@@ -676,14 +956,150 @@
       const found = findLocked(lockToken);
       if (!found) { toast("Lock token no longer tracked locally", "err"); return; }
       try {
-        const r = await api("POST", "/api/renew", {
-          connectionString: $("#connStr").value,
-          queue: found.queue,
-          lockToken,
-        });
+        const r = await api("POST", "/api/renew", { connectionString: $("#connStr").value, queue: found.queue, lockToken });
         found.msg.lockedUntil = r.renewedUntil;
         renderReceived();
         toast(`Renewed until ${r.renewedUntil}`, "ok");
+      } catch (e) { toast(e.message, "err"); }
+    }
+
+    async function deferMessage(lockToken) {
+      const found = findLocked(lockToken);
+      if (!found) { toast("Lock token no longer tracked locally", "err"); return; }
+      try {
+        const r = await api("POST", "/api/defer", { connectionString: $("#connStr").value, queue: found.queue, lockToken });
+        lockedFor(found.queue).delete(found.key);
+        renderReceived();
+        toast(`Deferred (seq=${r.sequenceNumber})`, "ok");
+        loadEntities();
+      } catch (e) { toast(e.message, "err"); }
+    }
+
+    // ── Rules tab ──
+    async function loadRules() {
+      const sel = state.selected;
+      if (sel?.kind !== 'subscription') return;
+      const mgmtUrl = encodeURIComponent($("#mgmtUrl").value);
+      try {
+        const rules = await api("GET", `/api/topics/${encodeURIComponent(sel.topic)}/subscriptions/${encodeURIComponent(sel.subscription)}/rules?managementUrl=${mgmtUrl}`);
+        renderRules(rules || []);
+      } catch (e) { toast(e.message, "err"); }
+    }
+
+    function renderRules(rules) {
+      const out = $("#rulesList");
+      out.innerHTML = "";
+      if (rules.length === 0) {
+        out.innerHTML = '<div class="alert alert-warning small"><strong>This subscription has no rules.</strong> No messages will be delivered until you add one.</div>';
+        return;
+      }
+      for (const r of rules) {
+        const card = document.createElement("div");
+        card.className = "card mb-2 rule-card" + (r.name === "$Default" ? " default" : "");
+        let bodyHtml = "";
+        if (r.filterType === "sql") {
+          bodyHtml = `<div class="filter-expr">${escapeHtml(r.sqlExpression || "")}</div>`;
+        } else if (r.filterType === "correlation") {
+          const c = r.correlation || {};
+          const fields = [
+            ["MessageId", c.messageId], ["CorrelationId", c.correlationId], ["Subject", c.subject],
+            ["To", c.to], ["ReplyTo", c.replyTo], ["ReplyToSessionId", c.replyToSessionId],
+            ["SessionId", c.sessionId], ["ContentType", c.contentType],
+          ].filter(([_, v]) => v);
+          bodyHtml = fields.length
+            ? `<div class="small">${fields.map(([k, v]) => `<code>${k}</code> = <code>${escapeHtml(v)}</code>`).join(" · ")}</div>`
+            : '<div class="small text-muted">(no constraints — equivalent to TrueFilter)</div>';
+        } else if (r.filterType === "true") {
+          bodyHtml = '<div class="small text-muted">Always matches (catch-all).</div>';
+        } else if (r.filterType === "false") {
+          bodyHtml = '<div class="small text-muted">Never matches (subscription is quiescent for this rule).</div>';
+        }
+        card.innerHTML = `<div class="card-body py-2">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <strong>${escapeHtml(r.name)}</strong>
+              <span class="badge text-bg-light filter-type-badge ms-2">${escapeHtml(r.filterType)}</span>
+            </div>
+            <div class="btn-group btn-group-sm">
+              <button class="btn btn-outline-secondary" data-edit-rule='${escapeHtml(JSON.stringify(r))}'>Edit</button>
+              <button class="btn btn-outline-danger" data-del-rule="${escapeHtml(r.name)}">Delete</button>
+            </div>
+          </div>
+          <div class="mt-2">${bodyHtml}</div>
+        </div>`;
+        out.appendChild(card);
+      }
+      out.querySelectorAll("[data-edit-rule]").forEach(b =>
+        b.addEventListener("click", () => openRuleModal(JSON.parse(b.dataset.editRule))));
+      out.querySelectorAll("[data-del-rule]").forEach(b =>
+        b.addEventListener("click", () => deleteRule(b.dataset.delRule)));
+    }
+
+    $("#btnAddRule").addEventListener("click", () => openRuleModal(null));
+
+    function openRuleModal(existing) {
+      $("#ruleModalTitle").textContent = existing ? `Edit Rule '${existing.name}'` : "Add Rule";
+      $("#ruleName").value = existing?.name ?? "";
+      $("#ruleName").disabled = !!existing;
+      $("#ruleFilterType").value = existing?.filterType ?? "sql";
+      $("#ruleSqlExpression").value = existing?.sqlExpression ?? "";
+      const c = existing?.correlation ?? {};
+      $("#rcMessageId").value = c.messageId ?? "";
+      $("#rcCorrelationId").value = c.correlationId ?? "";
+      $("#rcSubject").value = c.subject ?? "";
+      $("#rcSessionId").value = c.sessionId ?? "";
+      $("#rcContentType").value = c.contentType ?? "";
+      $("#rcReplyTo").value = c.replyTo ?? "";
+      updateRuleBlocks();
+      state.modals.rule.show();
+    }
+    $("#ruleFilterType").addEventListener("change", updateRuleBlocks);
+    function updateRuleBlocks() {
+      const t = $("#ruleFilterType").value;
+      $("#ruleSqlBlock").classList.toggle("d-none", t !== "sql");
+      $("#ruleCorrelationBlock").classList.toggle("d-none", t !== "correlation");
+      $("#ruleTrivialBlock").classList.toggle("d-none", t !== "true" && t !== "false");
+    }
+
+    $("#btnSaveRule").addEventListener("click", async () => {
+      const sel = state.selected;
+      if (sel?.kind !== 'subscription') return;
+      const name = $("#ruleName").value.trim();
+      if (!name) { toast("Rule name is required", "err"); return; }
+      const filterType = $("#ruleFilterType").value;
+      const rule = { filterType };
+      if (filterType === "sql") {
+        rule.sqlExpression = $("#ruleSqlExpression").value;
+      } else if (filterType === "correlation") {
+        rule.correlation = {
+          messageId: $("#rcMessageId").value || null,
+          correlationId: $("#rcCorrelationId").value || null,
+          subject: $("#rcSubject").value || null,
+          sessionId: $("#rcSessionId").value || null,
+          contentType: $("#rcContentType").value || null,
+          replyTo: $("#rcReplyTo").value || null,
+        };
+      }
+      try {
+        await api("PUT", `/api/topics/${encodeURIComponent(sel.topic)}/subscriptions/${encodeURIComponent(sel.subscription)}/rules/${encodeURIComponent(name)}`, {
+          managementUrl: $("#mgmtUrl").value,
+          rule,
+        });
+        state.modals.rule.hide();
+        toast(`Saved rule ${name}`, "ok");
+        loadRules();
+      } catch (e) { toast(e.message, "err"); }
+    });
+
+    async function deleteRule(name) {
+      const sel = state.selected;
+      if (sel?.kind !== 'subscription') return;
+      if (!confirm(`Delete rule '${name}'?`)) return;
+      const mgmtUrl = encodeURIComponent($("#mgmtUrl").value);
+      try {
+        await api("DELETE", `/api/topics/${encodeURIComponent(sel.topic)}/subscriptions/${encodeURIComponent(sel.subscription)}/rules/${encodeURIComponent(name)}?managementUrl=${mgmtUrl}`);
+        toast(`Deleted rule ${name}`, "ok");
+        loadRules();
       } catch (e) { toast(e.message, "err"); }
     }
 
