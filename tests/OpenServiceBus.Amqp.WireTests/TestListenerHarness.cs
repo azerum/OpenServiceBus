@@ -15,6 +15,7 @@ using OpenServiceBus.InMemoryStorage.DependencyInjection;
 using OpenServiceBus.InMemoryStorage.Lifecycle;
 using OpenServiceBus.InMemoryStorage.Queues;
 using OpenServiceBus.InMemoryStorage.Routing;
+using OpenServiceBus.InMemoryStorage.Transactions;
 
 namespace OpenServiceBus.Amqp.WireTests;
 
@@ -70,12 +71,14 @@ internal sealed class TestListenerHarness : IAsyncDisposable
         IMessageStore storeAsIface = store;
         var queues = new QueueManager(storeAsIface);
         var router = new MessageRouter(queues, storeAsIface, NullLogger<MessageRouter>.Instance);
+        var transactions = new TransactionManager(NullLogger<TransactionManager>.Instance);
 
         var host = new AmqpListenerHost(
             Options.Create(options),
             queues,
             storeAsIface,
             router,
+            transactions,
             tp,
             NullLoggerFactory.Instance);
 

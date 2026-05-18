@@ -1,6 +1,7 @@
 using Amqp;
 using Amqp.Framing;
 using Amqp.Listener;
+using Amqp.Transactions;
 using Amqp.Types;
 using Microsoft.Extensions.Logging;
 using OpenServiceBus.Core.Entities;
@@ -8,6 +9,7 @@ using OpenServiceBus.Core.Filters;
 using OpenServiceBus.Core.Messaging;
 using OpenServiceBus.Core.Routing;
 using OpenServiceBus.Core.Storage;
+using OpenServiceBus.Core.Transactions;
 
 namespace OpenServiceBus.Amqp.Queues;
 
@@ -31,6 +33,7 @@ public sealed class QueueSenderProcessor : IMessageProcessor
     private readonly QueueDescriptor _descriptor;
     private readonly IMessageStore _store;
     private readonly IMessageRouter _router;
+    private readonly ITransactionManager _transactions;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<QueueSenderProcessor> _logger;
 
@@ -39,6 +42,7 @@ public sealed class QueueSenderProcessor : IMessageProcessor
         QueueDescriptor descriptor,
         IMessageStore store,
         IMessageRouter router,
+        ITransactionManager transactions,
         TimeProvider timeProvider,
         ILogger<QueueSenderProcessor> logger)
     {
@@ -46,6 +50,7 @@ public sealed class QueueSenderProcessor : IMessageProcessor
         _descriptor = descriptor;
         _store = store;
         _router = router;
+        _transactions = transactions;
         _timeProvider = timeProvider;
         _logger = logger;
     }
@@ -62,7 +67,9 @@ public sealed class QueueSenderProcessor : IMessageProcessor
             // enqueues so each inner message gets its own sequence number and lifecycle.
             if (msg.Format == AmqpBatchedMessageFormat && msg.BodySection is DataList dataList)
             {
-                _ = EnqueueBatchAsync(messageContext, dataList);
+                // M17: a transactional batch sends all inner messages under the same txn.
+                var batchTxnId = (messageContext.DeliveryState as TransactionalState)?.TxnId;
+                _ = EnqueueBatchAsync(messageContext, dataList, batchTxnId);
                 return;
             }
 
@@ -84,6 +91,28 @@ public sealed class QueueSenderProcessor : IMessageProcessor
             // M16: forward target may be a topic — build a filter context unconditionally so
             // the router can fan-out if the chain hits one. Cheap when not forwarded.
             var filterContext = BuildFilterContext(msg, _timeProvider.GetUtcNow());
+
+            // M17: if the client wrapped this transfer in a TransactionalState, buffer the
+            // enqueue under the txn and reply with a transactional Accepted instead of running
+            // the actual store op now. Commit/rollback happens via the coordinator link.
+            if (messageContext.DeliveryState is TransactionalState txnState && txnState.TxnId is { Length: > 0 } txnId)
+            {
+                if (_transactions.Enlist(txnId, ct => RouteOrEnqueueAsync(encoded, expiresAt, scheduledFor, sessionId, messageId, dedupWindow, filterContext)))
+                {
+                    messageContext.Link.DisposeMessage(messageContext.Message,
+                        new TransactionalState { TxnId = txnId, Outcome = new Accepted() },
+                        settled: true);
+                }
+                else
+                {
+                    messageContext.Complete(new Error(new Symbol(ErrorCode.IllegalState))
+                    {
+                        Description = "Unknown or already-discharged transaction id.",
+                    });
+                }
+                return;
+            }
+
             _ = EnqueueAndCompleteAsync(messageContext, encoded, expiresAt, scheduledFor, sessionId, messageId, dedupWindow, filterContext);
         }
         catch (Exception ex)
@@ -96,10 +125,11 @@ public sealed class QueueSenderProcessor : IMessageProcessor
         }
     }
 
-    private async Task EnqueueBatchAsync(MessageContext context, DataList dataList)
+    private async Task EnqueueBatchAsync(MessageContext context, DataList dataList, byte[]? txnId)
     {
         try
         {
+            var enlisted = true;
             for (var i = 0; i < dataList.Count; i++)
             {
                 var innerBinary = dataList[i].Binary;
@@ -118,10 +148,37 @@ public sealed class QueueSenderProcessor : IMessageProcessor
                     : (TimeSpan?)null;
                 var filterContext = BuildFilterContext(inner, _timeProvider.GetUtcNow());
 
-                await RouteOrEnqueueAsync(innerBytes, expiresAt, scheduledFor, sessionId, messageId, dedupWindow, filterContext).ConfigureAwait(false);
+                if (txnId is { Length: > 0 })
+                {
+                    if (!_transactions.Enlist(txnId, _ => RouteOrEnqueueAsync(innerBytes, expiresAt, scheduledFor, sessionId, messageId, dedupWindow, filterContext)))
+                    {
+                        enlisted = false;
+                        break;
+                    }
+                }
+                else
+                {
+                    await RouteOrEnqueueAsync(innerBytes, expiresAt, scheduledFor, sessionId, messageId, dedupWindow, filterContext).ConfigureAwait(false);
+                }
             }
-            _logger.LogDebug("Split batched envelope into {Count} message(s) on {Queue}", dataList.Count, _queueName);
-            context.Complete();
+
+            if (txnId is { Length: > 0 })
+            {
+                if (enlisted)
+                {
+                    context.Link.DisposeMessage(context.Message,
+                        new TransactionalState { TxnId = txnId, Outcome = new Accepted() }, settled: true);
+                }
+                else
+                {
+                    context.Complete(new Error(new Symbol(ErrorCode.IllegalState)) { Description = "Unknown or already-discharged transaction id." });
+                }
+            }
+            else
+            {
+                _logger.LogDebug("Split batched envelope into {Count} message(s) on {Queue}", dataList.Count, _queueName);
+                context.Complete();
+            }
         }
         catch (Exception ex)
         {

@@ -13,6 +13,7 @@ using OpenServiceBus.Core.Entities;
 using OpenServiceBus.Core.Messaging;
 using OpenServiceBus.Core.Routing;
 using OpenServiceBus.Core.Storage;
+using OpenServiceBus.Core.Transactions;
 
 namespace OpenServiceBus.Amqp.Routing;
 
@@ -34,6 +35,7 @@ public sealed class EntityLinkProcessor : ILinkProcessor
     private readonly ITopicRegistry? _topics;
     private readonly IMessageStore _store;
     private readonly IMessageRouter _router;
+    private readonly ITransactionManager _transactions;
     private readonly AmqpListenerOptions _options;
     private readonly TimeProvider _timeProvider;
     private readonly ILoggerFactory _loggerFactory;
@@ -45,6 +47,7 @@ public sealed class EntityLinkProcessor : ILinkProcessor
         IQueueRegistry registry,
         IMessageStore store,
         IMessageRouter router,
+        ITransactionManager transactions,
         IOptions<AmqpListenerOptions> options,
         TimeProvider timeProvider,
         ILoggerFactory loggerFactory,
@@ -54,6 +57,7 @@ public sealed class EntityLinkProcessor : ILinkProcessor
         _topics = topics;
         _store = store;
         _router = router;
+        _transactions = transactions;
         _options = options.Value;
         _timeProvider = timeProvider;
         _loggerFactory = loggerFactory;
@@ -155,7 +159,7 @@ public sealed class EntityLinkProcessor : ILinkProcessor
         }
 
         var source = _receiverSources.GetOrAdd(backingQueue, name => new QueueReceiverSource(
-            name, descriptor, _store, _router, _timeProvider, _loggerFactory.CreateLogger<QueueReceiverSource>()));
+            name, descriptor, _store, _router, _transactions, _timeProvider, _loggerFactory.CreateLogger<QueueReceiverSource>()));
         var endpoint = new SourceLinkEndpoint(source, attachContext.Link);
         attachContext.Complete(endpoint, 0);
         _logger.LogDebug("Wired subscription receiver attach to {Entity}", backingQueue);
@@ -169,6 +173,7 @@ public sealed class EntityLinkProcessor : ILinkProcessor
             _topics!,
             _store,
             _router,
+            _transactions,
             _timeProvider,
             _loggerFactory.CreateLogger<TopicSenderProcessor>());
         var endpoint = new TargetLinkEndpoint(processor, attachContext.Link);
@@ -193,6 +198,7 @@ public sealed class EntityLinkProcessor : ILinkProcessor
                 descriptor,
                 _store,
                 _router,
+                _transactions,
                 _timeProvider,
                 _loggerFactory.CreateLogger<QueueSenderProcessor>());
             var endpoint = new TargetLinkEndpoint(processor, attachContext.Link);
@@ -210,7 +216,7 @@ public sealed class EntityLinkProcessor : ILinkProcessor
             }
 
             var source = _receiverSources.GetOrAdd(descriptor.Name, name => new QueueReceiverSource(
-                name, descriptor, _store, _router, _timeProvider, _loggerFactory.CreateLogger<QueueReceiverSource>()));
+                name, descriptor, _store, _router, _transactions, _timeProvider, _loggerFactory.CreateLogger<QueueReceiverSource>()));
             var endpoint = new SourceLinkEndpoint(source, attachContext.Link);
             attachContext.Complete(endpoint, 0);
             _logger.LogDebug("Wired receiver attach to {Entity}", descriptor.Name);
@@ -271,6 +277,7 @@ public sealed class EntityLinkProcessor : ILinkProcessor
             descriptor,
             _store,
             _router,
+            _transactions,
             _timeProvider,
             _loggerFactory.CreateLogger<SessionReceiverSource>(),
             sessionLock.SessionId,

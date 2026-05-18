@@ -11,6 +11,7 @@ using OpenServiceBus.InMemoryStorage.Lifecycle;
 using OpenServiceBus.InMemoryStorage.Queues;
 using OpenServiceBus.InMemoryStorage.Routing;
 using OpenServiceBus.InMemoryStorage.Topics;
+using OpenServiceBus.InMemoryStorage.Transactions;
 
 namespace OpenServiceBus.Testing;
 
@@ -109,12 +110,14 @@ public sealed class OpenServiceBusTestHost : IAsyncDisposable
         var queues = new QueueManager(storeAsIface);
         var topics = new TopicManager(queues);
         var router = new MessageRouter(queues, storeAsIface, NullLogger<MessageRouter>.Instance, topics);
+        var transactions = new TransactionManager(NullLogger<TransactionManager>.Instance);
 
         var listener = new AmqpListenerHost(
             Options.Create(listenerOptions),
             queues,
             storeAsIface,
             router,
+            transactions,
             opts.TimeProvider,
             NullLoggerFactory.Instance,
             topics);

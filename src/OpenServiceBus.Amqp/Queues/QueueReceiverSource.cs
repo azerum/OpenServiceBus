@@ -3,12 +3,14 @@ using OpenServiceBus.Amqp.DeadLettering;
 using Amqp;
 using Amqp.Framing;
 using Amqp.Listener;
+using Amqp.Transactions;
 using Amqp.Types;
 using Microsoft.Extensions.Logging;
 using OpenServiceBus.Core.Entities;
 using OpenServiceBus.Core.Messaging;
 using OpenServiceBus.Core.Routing;
 using OpenServiceBus.Core.Storage;
+using OpenServiceBus.Core.Transactions;
 
 namespace OpenServiceBus.Amqp.Queues;
 
@@ -42,6 +44,7 @@ public sealed class QueueReceiverSource : IMessageSource
     private readonly QueueDescriptor _descriptor;
     private readonly IMessageStore _store;
     private readonly IMessageRouter _router;
+    private readonly ITransactionManager _transactions;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<QueueReceiverSource> _logger;
     private readonly bool _isDlq;
@@ -51,6 +54,7 @@ public sealed class QueueReceiverSource : IMessageSource
         QueueDescriptor descriptor,
         IMessageStore store,
         IMessageRouter router,
+        ITransactionManager transactions,
         TimeProvider timeProvider,
         ILogger<QueueReceiverSource> logger)
     {
@@ -58,6 +62,7 @@ public sealed class QueueReceiverSource : IMessageSource
         _descriptor = descriptor;
         _store = store;
         _router = router;
+        _transactions = transactions;
         _timeProvider = timeProvider;
         _logger = logger;
         _isDlq = EntityNames.IsDeadLetterQueue(entityName);
@@ -120,6 +125,25 @@ public sealed class QueueReceiverSource : IMessageSource
 
         try
         {
+            // M17: a transactional disposition wraps the real outcome in TransactionalState.
+            // Buffer the store op under the txn and reply with a transactional Accepted;
+            // commit/rollback happens via the coordinator's discharge.
+            if (dispositionContext.DeliveryState is TransactionalState txnState && txnState.TxnId is { Length: > 0 } txnId)
+            {
+                var inner = txnState.Outcome;
+                var enlisted = _transactions.Enlist(txnId, _ => InvokeDispositionAsync(lockToken, inner));
+                if (enlisted)
+                {
+                    receiveContext.Link.DisposeMessage(receiveContext.Message,
+                        new TransactionalState { TxnId = txnId, Outcome = new Accepted() }, settled: true);
+                }
+                else
+                {
+                    dispositionContext.Complete();
+                }
+                return;
+            }
+
             switch (dispositionContext.DeliveryState)
             {
                 case Accepted:
@@ -152,7 +176,41 @@ public sealed class QueueReceiverSource : IMessageSource
         }
         finally
         {
-            dispositionContext.Complete();
+            // Only complete here for the non-tx path; the tx branch already settled the delivery
+            // with a TransactionalState outcome above.
+            if (dispositionContext.DeliveryState is not TransactionalState)
+            {
+                dispositionContext.Complete();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Apply a single buffered disposition outcome against the store. Runs at txn commit time
+    /// inside <see cref="ITransactionManager.CommitAsync"/>.
+    /// </summary>
+    private async Task InvokeDispositionAsync(Guid lockToken, Outcome? outcome)
+    {
+        switch (outcome)
+        {
+            case Accepted:
+                await _store.TryCompleteAsync(_entityName, lockToken).ConfigureAwait(false);
+                break;
+            case Modified modified when modified.UndeliverableHere:
+                await _store.TryDeferAsync(_entityName, lockToken).ConfigureAwait(false);
+                break;
+            case Released:
+            case Modified:
+                await _store.TryAbandonAsync(_entityName, lockToken).ConfigureAwait(false);
+                break;
+            case Rejected rejected:
+                var (reason, description) = ExtractDeadLetterInfo(rejected);
+                await DeadLetterAsync(lockToken, reason, description).ConfigureAwait(false);
+                break;
+            default:
+                // Treat unknown as abandon so the lock is at least released on commit.
+                await _store.TryAbandonAsync(_entityName, lockToken).ConfigureAwait(false);
+                break;
         }
     }
 

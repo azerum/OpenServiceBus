@@ -1,12 +1,14 @@
 using Amqp;
 using Amqp.Framing;
 using Amqp.Listener;
+using Amqp.Transactions;
 using Amqp.Types;
 using Microsoft.Extensions.Logging;
 using OpenServiceBus.Core.Entities;
 using OpenServiceBus.Core.Filters;
 using OpenServiceBus.Core.Routing;
 using OpenServiceBus.Core.Storage;
+using OpenServiceBus.Core.Transactions;
 
 namespace OpenServiceBus.Amqp.Topics;
 
@@ -25,6 +27,7 @@ public sealed class TopicSenderProcessor : IMessageProcessor
     private readonly ITopicRegistry _topics;
     private readonly IMessageStore _store;
     private readonly IMessageRouter _router;
+    private readonly ITransactionManager _transactions;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<TopicSenderProcessor> _logger;
 
@@ -33,6 +36,7 @@ public sealed class TopicSenderProcessor : IMessageProcessor
         ITopicRegistry topics,
         IMessageStore store,
         IMessageRouter router,
+        ITransactionManager transactions,
         TimeProvider timeProvider,
         ILogger<TopicSenderProcessor> logger)
     {
@@ -40,6 +44,7 @@ public sealed class TopicSenderProcessor : IMessageProcessor
         _topics = topics;
         _store = store;
         _router = router;
+        _transactions = transactions;
         _timeProvider = timeProvider;
         _logger = logger;
     }
@@ -62,6 +67,23 @@ public sealed class TopicSenderProcessor : IMessageProcessor
             var expiresAt = ComputeExpiresAt(msg);
             var scheduledFor = ReadScheduledEnqueueTime(msg);
             var filterContext = BuildFilterContext(msg, _timeProvider.GetUtcNow());
+
+            // M17: transactional fan-out — buffer the route-and-fanout under the txn so it
+            // only happens on commit. Each enlist captures the same byte[] + filter context.
+            if (messageContext.DeliveryState is TransactionalState txnState && txnState.TxnId is { Length: > 0 } txnId)
+            {
+                if (_transactions.Enlist(txnId, _ => _router.RouteAsync(_topic.Name, encoded, expiresAt, scheduledFor, sessionId: null, filterContext: filterContext)))
+                {
+                    messageContext.Link.DisposeMessage(messageContext.Message,
+                        new TransactionalState { TxnId = txnId, Outcome = new Accepted() }, settled: true);
+                }
+                else
+                {
+                    messageContext.Complete(new Error(new Symbol(ErrorCode.IllegalState)) { Description = "Unknown or already-discharged transaction id." });
+                }
+                return;
+            }
+
             // Note: M14 doesn't yet thread session routing through topic fan-out; subscriptions
             // with RequiresSession are accepted at creation time but messages pass via the
             // regular channel. Lifted when EvaluateSubscribers returns descriptors.

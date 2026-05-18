@@ -1,14 +1,17 @@
 using Amqp;
 using Amqp.Listener;
+using Amqp.Transactions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenServiceBus.Amqp.Management;
 using OpenServiceBus.Amqp.Routing;
+using OpenServiceBus.Amqp.Transactions;
 using OpenServiceBus.Core.Entities;
 using OpenServiceBus.Core.Messaging;
 using OpenServiceBus.Core.Routing;
 using OpenServiceBus.Core.Storage;
+using OpenServiceBus.Core.Transactions;
 using Trace = Amqp.Trace;
 using TraceLevel = Amqp.TraceLevel;
 
@@ -23,6 +26,7 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
     private readonly ITopicRegistry? _topicRegistry;
     private readonly IMessageStore _messageStore;
     private readonly IMessageRouter _router;
+    private readonly ITransactionManager _transactions;
     private readonly TimeProvider _timeProvider;
     private ContainerHost? _host;
 
@@ -31,6 +35,7 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
         IQueueRegistry queueRegistry,
         IMessageStore messageStore,
         IMessageRouter router,
+        ITransactionManager transactions,
         TimeProvider timeProvider,
         ILoggerFactory loggerFactory,
         ITopicRegistry? topicRegistry = null)
@@ -40,6 +45,7 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
         _topicRegistry = topicRegistry;
         _messageStore = messageStore;
         _router = router;
+        _transactions = transactions;
         _timeProvider = timeProvider;
         _loggerFactory = loggerFactory;
         _logger = loggerFactory.CreateLogger<AmqpListenerHost>();
@@ -70,7 +76,15 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
 
         host.RegisterRequestProcessor("$cbs", new CbsRequestProcessor(_options, _loggerFactory.CreateLogger<CbsRequestProcessor>()));
 
-        var linkProcessor = new EntityLinkProcessor(_queueRegistry, _messageStore, _router, Options.Create(_options), _timeProvider, _loggerFactory, _topicRegistry);
+        // M17: AMQP transaction coordinator. Coordinator-targeted attaches have no Address,
+        // and the framework's default address lookup would throw on the (Target)attach.Target
+        // cast. The AddressResolver hook lets us redirect those attaches to a synthetic
+        // "$coordinator" address where our IMessageProcessor lives.
+        host.AddressResolver = (_, attach) => attach.Target is Coordinator ? CoordinatorProcessor.Address : null;
+        host.RegisterMessageProcessor(CoordinatorProcessor.Address,
+            new CoordinatorProcessor(_transactions, _loggerFactory.CreateLogger<CoordinatorProcessor>()));
+
+        var linkProcessor = new EntityLinkProcessor(_queueRegistry, _messageStore, _router, _transactions, Options.Create(_options), _timeProvider, _loggerFactory, _topicRegistry);
         host.RegisterLinkProcessor(linkProcessor);
 
         host.Open();
