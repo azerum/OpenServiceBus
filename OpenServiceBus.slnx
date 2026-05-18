@@ -6,6 +6,7 @@
     <Project Path="src/OpenServiceBus.Explorer/OpenServiceBus.Explorer.csproj" />
     <Project Path="src/OpenServiceBus.Host/OpenServiceBus.Host.csproj" />
     <Project Path="src/OpenServiceBus.Management/OpenServiceBus.Management.csproj" />
+    <Project Path="src/OpenServiceBus.SqliteStorage/OpenServiceBus.SqliteStorage.csproj" />
     <Project Path="src/OpenServiceBus.Testing/OpenServiceBus.Testing.csproj" />
   </Folder>
   <Folder Name="/samples/">
@@ -15,6 +16,7 @@
     <Project Path="tests/OpenServiceBus.Amqp.Tests/OpenServiceBus.Amqp.Tests.csproj" />
     <Project Path="tests/OpenServiceBus.Amqp.WireTests/OpenServiceBus.Amqp.WireTests.csproj" />
     <Project Path="tests/OpenServiceBus.InMemoryStorage.Tests/OpenServiceBus.InMemoryStorage.Tests.csproj" />
+    <Project Path="tests/OpenServiceBus.SqliteStorage.Tests/OpenServiceBus.SqliteStorage.Tests.csproj" />
     <Project Path="tests/OpenServiceBus.Core.Tests/OpenServiceBus.Core.Tests.csproj" />
     <Project Path="tests/OpenServiceBus.IntegrationTests/OpenServiceBus.IntegrationTests.csproj" />
     <Project Path="tests/OpenServiceBus.Testing.Tests/OpenServiceBus.Testing.Tests.csproj" />

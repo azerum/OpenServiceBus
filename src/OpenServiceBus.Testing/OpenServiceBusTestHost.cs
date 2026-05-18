@@ -105,8 +105,12 @@ public sealed class OpenServiceBusTestHost : IAsyncDisposable
             }
         }
 
-        var store = new InMemoryMessageStore(opts.TimeProvider);
-        IMessageStore storeAsIface = store;
+        // M18: callers can swap in a different backing store (e.g. SQLite) via opts.StoreFactory.
+        // The rest of the stack (registries, router, transactions, listener) is identical and
+        // talks to whatever the factory hands back through the IMessageStore interface.
+        IMessageStore storeAsIface = opts.StoreFactory is not null
+            ? opts.StoreFactory(opts.TimeProvider)
+            : new InMemoryMessageStore(opts.TimeProvider);
         var queues = new QueueManager(storeAsIface);
         var topics = new TopicManager(queues);
         var router = new MessageRouter(queues, storeAsIface, NullLogger<MessageRouter>.Instance, topics);

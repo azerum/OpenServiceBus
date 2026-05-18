@@ -1,3 +1,5 @@
+using OpenServiceBus.Core.Storage;
+
 namespace OpenServiceBus.Testing;
 
 /// <summary>
@@ -71,4 +73,12 @@ public sealed class OpenServiceBusTestHostOptions
     /// wire-protocol issues.
     /// </summary>
     public bool EnableFrameTracing { get; set; }
+
+    /// <summary>
+    /// Optional store factory. When set, the test host wires this <see cref="IMessageStore"/>
+    /// in place of the default in-memory implementation — used by the SQLite test project to
+    /// run the full SDK suite against a persistent backing store without coupling the
+    /// <c>OpenServiceBus.Testing</c> package to <c>OpenServiceBus.SqliteStorage</c>.
+    /// </summary>
+    public Func<TimeProvider, IMessageStore>? StoreFactory { get; set; }
 }
