@@ -4,6 +4,7 @@ using OpenServiceBus.Amqp.Hosting;
 using OpenServiceBus.Amqp.Lifecycle;
 using OpenServiceBus.Amqp.Queues;
 using OpenServiceBus.Amqp.Routing;
+using OpenServiceBus.Host;
 using OpenServiceBus.InMemoryStorage.DependencyInjection;
 using OpenServiceBus.InMemoryStorage.Lifecycle;
 using OpenServiceBus.InMemoryStorage.Queues;
@@ -17,6 +18,7 @@ builder.Services
     .Bind(builder.Configuration.GetSection("OpenServiceBus:Amqp"));
 builder.Services.AddOpenServiceBusInMemoryStorage();
 builder.Services.AddOpenServiceBusAmqp();
+builder.Services.AddHostedService<ConfigBootstrapHostedService>();
 
 var app = builder.Build();
 
