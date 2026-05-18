@@ -1,0 +1,34 @@
+# Build outputs
+**/bin/
+**/obj/
+
+# IDE / editor noise
+.idea/
+.vs/
+.vscode/
+
+# Git + VCS
+.git/
+.github/
+.gitignore
+.gitattributes
+
+# Tests are not needed in the runtime image
+tests/
+
+# Sample apps
+samples/
+
+# Docs (not needed in the image)
+docs/
+**/*.md
+
+# Local dev / CI artefacts
+*.log
+*.db
+*.db-wal
+*.db-shm
+
+# OS junk
+.DS_Store
+Thumbs.db

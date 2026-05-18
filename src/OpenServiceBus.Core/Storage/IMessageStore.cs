@@ -16,6 +16,14 @@ public interface IMessageStore
     Task DeleteQueueAsync(string queueName, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Names of every queue the store currently has rows for. Used at broker startup by
+    /// persistent stores (M18) so the in-memory <c>QueueManager</c> can rehydrate after a
+    /// restart — without this the queues exist in the backing file but the registry has
+    /// forgotten about them.
+    /// </summary>
+    IReadOnlyCollection<string> ListQueueNames();
+
+    /// <summary>
     /// Enqueue an encoded message. The returned record carries the assigned sequence number.
     /// </summary>
     /// <param name="expiresAt">
