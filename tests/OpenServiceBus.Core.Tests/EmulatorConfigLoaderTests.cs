@@ -73,7 +73,7 @@ public class EmulatorConfigLoaderTests
     }
 
     [Fact]
-    public void LoadFromJson_UnsupportedFieldsSet_EmitsWarningsButStillCreatesQueue()
+    public void LoadFromJson_AllAdvancedFieldsSet_AllProjectedOntoDescriptor()
     {
         // Arrange
         const string json = """
@@ -102,15 +102,13 @@ public class EmulatorConfigLoaderTests
         // Act
         var result = EmulatorConfigLoader.LoadFromJson(json);
 
-        // Assert
-        // RequiresSession (M14) and RequiresDuplicateDetection (M15) are now honored, no warning.
-        // Forwarding still warns until M16 lands.
+        // Assert — M14/M15/M16 fields are all now honored from config.json.
         result.Queues.Count.ShouldBe(1);
         result.Queues[0].RequiresSession.ShouldBeTrue();
         result.Queues[0].RequiresDuplicateDetection.ShouldBeTrue();
-        result.Warnings.ShouldContain(w => w.Contains("ForwardTo"));
-        result.Warnings.ShouldContain(w => w.Contains("ForwardDeadLetteredMessagesTo"));
-        result.Warnings.Count.ShouldBe(2);
+        result.Queues[0].ForwardTo.ShouldBe("other");
+        result.Queues[0].ForwardDeadLetteredMessagesTo.ShouldBe("other-dlq");
+        result.Warnings.Count.ShouldBe(0);
     }
 
     [Fact]

@@ -7,6 +7,7 @@ using Amqp.Types;
 using Microsoft.Extensions.Logging;
 using OpenServiceBus.Core.Entities;
 using OpenServiceBus.Core.Messaging;
+using OpenServiceBus.Core.Routing;
 using OpenServiceBus.Core.Storage;
 
 namespace OpenServiceBus.Amqp.Queues;
@@ -40,6 +41,7 @@ public sealed class QueueReceiverSource : IMessageSource
     private readonly string _entityName;
     private readonly QueueDescriptor _descriptor;
     private readonly IMessageStore _store;
+    private readonly IMessageRouter _router;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<QueueReceiverSource> _logger;
     private readonly bool _isDlq;
@@ -48,12 +50,14 @@ public sealed class QueueReceiverSource : IMessageSource
         string entityName,
         QueueDescriptor descriptor,
         IMessageStore store,
+        IMessageRouter router,
         TimeProvider timeProvider,
         ILogger<QueueReceiverSource> logger)
     {
         _entityName = entityName;
         _descriptor = descriptor;
         _store = store;
+        _router = router;
         _timeProvider = timeProvider;
         _logger = logger;
         _isDlq = EntityNames.IsDeadLetterQueue(entityName);
@@ -182,11 +186,15 @@ public sealed class QueueReceiverSource : IMessageSource
         if (removed is null) return;
 
         var dlqBytes = DeadLetterEncoder.AppendDeadLetterHeaders(removed.EncodedMessage, _entityName, reason, description);
-        var dlqName = _entityName + EntityNames.DeadLetterSuffix;
-        await _store.EnqueueAsync(dlqName, dlqBytes, expiresAt: null, cancellationToken: cancellationToken).ConfigureAwait(false);
+        // M16: if the entity is configured to forward dead-lettered messages elsewhere, route there;
+        // otherwise the message lands on the local <entity>/$DeadLetterQueue as before.
+        var dlqTarget = string.IsNullOrEmpty(_descriptor.ForwardDeadLetteredMessagesTo)
+            ? _entityName + EntityNames.DeadLetterSuffix
+            : _descriptor.ForwardDeadLetteredMessagesTo!;
+        await _router.RouteAsync(dlqTarget, dlqBytes, expiresAt: null, cancellationToken: cancellationToken).ConfigureAwait(false);
 
         _logger.LogDebug("Dead-lettered seq#{Seq} from {Entity} to {Dlq} (reason={Reason})",
-            removed.SequenceNumber, _entityName, dlqName, reason ?? "(unspecified)");
+            removed.SequenceNumber, _entityName, dlqTarget, reason ?? "(unspecified)");
     }
 
     private static (string? Reason, string? Description) ExtractDeadLetterInfo(Rejected rejected)

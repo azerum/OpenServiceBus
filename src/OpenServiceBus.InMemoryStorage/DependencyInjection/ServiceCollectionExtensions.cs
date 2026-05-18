@@ -1,9 +1,11 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using OpenServiceBus.Core.Routing;
 using OpenServiceBus.Core.Storage;
 using OpenServiceBus.InMemoryStorage.Lifecycle;
 using OpenServiceBus.InMemoryStorage.Queues;
+using OpenServiceBus.InMemoryStorage.Routing;
 using OpenServiceBus.InMemoryStorage.Topics;
 
 namespace OpenServiceBus.InMemoryStorage.DependencyInjection;
@@ -24,6 +26,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IQueueRegistry>(sp => sp.GetRequiredService<QueueManager>());
         services.TryAddSingleton<TopicManager>();
         services.TryAddSingleton<ITopicRegistry>(sp => sp.GetRequiredService<TopicManager>());
+        services.TryAddSingleton<IMessageRouter, MessageRouter>();
         services.AddHostedService<LockManager>();
         return services;
     }

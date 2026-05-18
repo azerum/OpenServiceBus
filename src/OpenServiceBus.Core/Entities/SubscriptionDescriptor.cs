@@ -22,6 +22,18 @@ public sealed record SubscriptionDescriptor
     public bool RequiresSession { get; init; }
 
     /// <summary>
+    /// Auto-forward target for messages that match this subscription's rules.
+    /// See <see cref="QueueDescriptor.ForwardTo"/>. Enforced in M16.
+    /// </summary>
+    public string? ForwardTo { get; init; }
+
+    /// <summary>
+    /// Auto-forward target for dead-lettered messages on this subscription.
+    /// See <see cref="QueueDescriptor.ForwardDeadLetteredMessagesTo"/>. Enforced in M16.
+    /// </summary>
+    public string? ForwardDeadLetteredMessagesTo { get; init; }
+
+    /// <summary>
     /// The backing queue address: <c>&lt;TopicName&gt;/subscriptions/&lt;Name&gt;</c>.
     /// This is what AMQP receivers attach to and what the in-memory store keys on.
     /// </summary>

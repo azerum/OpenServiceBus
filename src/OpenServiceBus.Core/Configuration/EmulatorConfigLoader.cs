@@ -63,11 +63,6 @@ public static class EmulatorConfigLoader
     {
         var props = q.Properties ?? new QueueProperties();
 
-        if (!string.IsNullOrEmpty(props.ForwardTo))
-            warnings.Add($"Queue '{q.Name}': ForwardTo='{props.ForwardTo}' is not yet supported.");
-        if (!string.IsNullOrEmpty(props.ForwardDeadLetteredMessagesTo))
-            warnings.Add($"Queue '{q.Name}': ForwardDeadLetteredMessagesTo='{props.ForwardDeadLetteredMessagesTo}' is not yet supported.");
-
         var descriptor = new QueueDescriptor
         {
             Name = q.Name,
@@ -79,6 +74,10 @@ public static class EmulatorConfigLoader
             RequiresSession = props.RequiresSession ?? false,
             RequiresDuplicateDetection = props.RequiresDuplicateDetection ?? false,
             DuplicateDetectionHistoryTimeWindow = ParseDuration(props.DuplicateDetectionHistoryTimeWindow, $"Queue '{q.Name}'.DuplicateDetectionHistoryTimeWindow", warnings),
+            // M16: auto-forwarding. The router enforces target-exists lazily at runtime so
+            // queues and topics may appear in config.json in any order.
+            ForwardTo = string.IsNullOrEmpty(props.ForwardTo) ? null : props.ForwardTo,
+            ForwardDeadLetteredMessagesTo = string.IsNullOrEmpty(props.ForwardDeadLetteredMessagesTo) ? null : props.ForwardDeadLetteredMessagesTo,
         };
 
         return descriptor;

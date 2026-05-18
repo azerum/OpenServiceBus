@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OpenServiceBus.Core.Entities;
 using OpenServiceBus.Core.Messaging;
+using OpenServiceBus.Core.Routing;
 using OpenServiceBus.Core.Storage;
 
 namespace OpenServiceBus.Amqp.Lifecycle;
@@ -20,17 +21,20 @@ public sealed class TtlExpirationService : BackgroundService
 
     private readonly IMessageStore _store;
     private readonly IQueueRegistry _registry;
+    private readonly IMessageRouter _router;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<TtlExpirationService> _logger;
 
     public TtlExpirationService(
         IMessageStore store,
         IQueueRegistry registry,
+        IMessageRouter router,
         TimeProvider timeProvider,
         ILogger<TtlExpirationService> logger)
     {
         _store = store;
         _registry = registry;
+        _router = router;
         _timeProvider = timeProvider;
         _logger = logger;
     }
@@ -64,7 +68,10 @@ public sealed class TtlExpirationService : BackgroundService
 
                 if (routeToDlq)
                 {
-                    var dlqName = queue.Name + EntityNames.DeadLetterSuffix;
+                    // M16: per-queue ForwardDeadLetteredMessagesTo overrides the local DLQ destination.
+                    var dlqTarget = string.IsNullOrEmpty(queue.ForwardDeadLetteredMessagesTo)
+                        ? queue.Name + EntityNames.DeadLetterSuffix
+                        : queue.ForwardDeadLetteredMessagesTo!;
                     foreach (var msg in expired)
                     {
                         var dlqBytes = DeadLetterEncoder.AppendDeadLetterHeaders(
@@ -72,9 +79,9 @@ public sealed class TtlExpirationService : BackgroundService
                             queue.Name,
                             QueueReceiverSource.TtlExpiredReason,
                             QueueReceiverSource.TtlExpiredDescription);
-                        await _store.EnqueueAsync(dlqName, dlqBytes, expiresAt: null, cancellationToken: cancellationToken).ConfigureAwait(false);
+                        await _router.RouteAsync(dlqTarget, dlqBytes, expiresAt: null, cancellationToken: cancellationToken).ConfigureAwait(false);
                     }
-                    _logger.LogDebug("TTL-expired {Count} message(s) from {Queue} → {Dlq}", expired.Count, queue.Name, dlqName);
+                    _logger.LogDebug("TTL-expired {Count} message(s) from {Queue} → {Dlq}", expired.Count, queue.Name, dlqTarget);
                 }
                 else
                 {

@@ -1,0 +1,44 @@
+using OpenServiceBus.Core.Filters;
+
+namespace OpenServiceBus.Core.Routing;
+
+/// <summary>
+/// Resolves "where should this message actually land?" against the entity registries.
+/// Handles two server-side routing concerns above the bare storage layer:
+///
+///   1. Topic fan-out — a topic isn't a queue, so a send to a topic must evaluate every
+///      subscription's rules and enqueue to the matching backing queues.
+///   2. Auto-forwarding (M16) — a queue or subscription with <c>ForwardTo</c> set is a
+///      transparent passthrough: the original destination never accumulates messages, the
+///      router redirects to the configured destination, chaining up to <see cref="MaxForwardDepth"/> hops.
+///
+/// One method covers both. Senders (queue, topic, even the DLQ writers) call
+/// <see cref="RouteAsync"/> with the *configured* destination name and let the router work
+/// out the actual storage operations. <see cref="MessageFilterContext"/> is only used when
+/// the chain passes through a topic; pass <c>null</c> for direct queue sends.
+/// </summary>
+public interface IMessageRouter
+{
+    /// <summary>Maximum number of forward hops in a single chain. Matches Azure Service Bus.</summary>
+    int MaxForwardDepth => 4;
+
+    /// <summary>
+    /// Enqueue <paramref name="encodedMessage"/> at the entity named <paramref name="targetEntityName"/>,
+    /// transparently following any auto-forward chain or topic fan-out. Returns the list of
+    /// concrete queue names the message landed in (zero, one, or many for topic fan-out).
+    /// </summary>
+    /// <param name="filterContext">
+    /// Required when the chain may traverse a topic so subscription rules can be evaluated.
+    /// Pass <c>null</c> only for hops that are guaranteed to be queues.
+    /// </param>
+    Task<IReadOnlyList<string>> RouteAsync(
+        string targetEntityName,
+        byte[] encodedMessage,
+        DateTimeOffset? expiresAt = null,
+        DateTimeOffset? scheduledEnqueueTime = null,
+        string? sessionId = null,
+        string? messageId = null,
+        TimeSpan? duplicateDetectionWindow = null,
+        MessageFilterContext? filterContext = null,
+        CancellationToken cancellationToken = default);
+}

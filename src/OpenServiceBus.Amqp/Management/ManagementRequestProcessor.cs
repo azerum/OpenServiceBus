@@ -7,6 +7,7 @@ using OpenServiceBus.Amqp.Topics;
 using OpenServiceBus.Core.Entities;
 using OpenServiceBus.Core.Filters;
 using OpenServiceBus.Core.Messaging;
+using OpenServiceBus.Core.Routing;
 using OpenServiceBus.Core.Storage;
 
 namespace OpenServiceBus.Amqp.Management;
@@ -91,6 +92,7 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
     private readonly string _entityName;
     private readonly QueueDescriptor _descriptor;
     private readonly IMessageStore _store;
+    private readonly IMessageRouter _router;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<ManagementRequestProcessor> _logger;
 
@@ -104,12 +106,14 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
         string entityName,
         QueueDescriptor descriptor,
         IMessageStore store,
+        IMessageRouter router,
         TimeProvider timeProvider,
         ILogger<ManagementRequestProcessor> logger)
     {
         _entityName = entityName;
         _descriptor = descriptor;
         _store = store;
+        _router = router;
         _timeProvider = timeProvider;
         _logger = logger;
     }
@@ -124,12 +128,13 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
         string entityName,
         QueueDescriptor descriptor,
         IMessageStore store,
+        IMessageRouter router,
         TimeProvider timeProvider,
         ILogger<ManagementRequestProcessor> logger,
         ITopicRegistry topics,
         string topicName,
         string subscriptionName)
-        : this(entityName, descriptor, store, timeProvider, logger)
+        : this(entityName, descriptor, store, router, timeProvider, logger)
     {
         _topics = topics;
         _topicName = topicName;
@@ -442,8 +447,11 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
         if (removed is null) return;
 
         var dlqBytes = DeadLettering.DeadLetterEncoder.AppendDeadLetterHeaders(removed.EncodedMessage, _entityName, reason, description);
-        var dlqName = _entityName + EntityNames.DeadLetterSuffix;
-        await _store.EnqueueAsync(dlqName, dlqBytes).ConfigureAwait(false);
+        // M16: honor ForwardDeadLetteredMessagesTo when set, fallback to local DLQ.
+        var dlqTarget = string.IsNullOrEmpty(_descriptor.ForwardDeadLetteredMessagesTo)
+            ? _entityName + EntityNames.DeadLetterSuffix
+            : _descriptor.ForwardDeadLetteredMessagesTo!;
+        await _router.RouteAsync(dlqTarget, dlqBytes).ConfigureAwait(false);
     }
 
     private Message HandleAddRule(Message request)

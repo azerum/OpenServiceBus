@@ -82,6 +82,8 @@ public static class TopicEndpoints
                 DeadLetteringOnMessageExpiration = b.DeadLetteringOnMessageExpiration,
                 DefaultMessageTimeToLive = b.DefaultMessageTimeToLive,
                 RequiresSession = b.RequiresSession,
+                ForwardTo = b.ForwardTo,
+                ForwardDeadLetteredMessagesTo = b.ForwardDeadLetteredMessagesTo,
             };
             try
             {
@@ -158,6 +160,8 @@ public sealed record CreateSubscriptionRequest
     public bool DeadLetteringOnMessageExpiration { get; init; }
     public TimeSpan? DefaultMessageTimeToLive { get; init; }
     public bool RequiresSession { get; init; }
+    public string? ForwardTo { get; init; }
+    public string? ForwardDeadLetteredMessagesTo { get; init; }
 }
 
 /// <summary>
@@ -234,6 +238,8 @@ public sealed record SubscriptionResponse(
     bool DeadLetteringOnMessageExpiration,
     TimeSpan? DefaultMessageTimeToLive,
     bool RequiresSession,
+    string? ForwardTo,
+    string? ForwardDeadLetteredMessagesTo,
     string BackingQueueName,
     long? ActiveMessageCount)
 {
@@ -245,6 +251,8 @@ public sealed record SubscriptionResponse(
         d.DeadLetteringOnMessageExpiration,
         d.DefaultMessageTimeToLive,
         d.RequiresSession,
+        d.ForwardTo,
+        d.ForwardDeadLetteredMessagesTo,
         d.BackingQueueName,
         count);
 }

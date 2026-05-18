@@ -4,7 +4,9 @@ using Amqp.Listener;
 using Amqp.Types;
 using Microsoft.Extensions.Logging;
 using OpenServiceBus.Core.Entities;
+using OpenServiceBus.Core.Filters;
 using OpenServiceBus.Core.Messaging;
+using OpenServiceBus.Core.Routing;
 using OpenServiceBus.Core.Storage;
 
 namespace OpenServiceBus.Amqp.Queues;
@@ -28,6 +30,7 @@ public sealed class QueueSenderProcessor : IMessageProcessor
     private readonly string _queueName;
     private readonly QueueDescriptor _descriptor;
     private readonly IMessageStore _store;
+    private readonly IMessageRouter _router;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<QueueSenderProcessor> _logger;
 
@@ -35,12 +38,14 @@ public sealed class QueueSenderProcessor : IMessageProcessor
         string queueName,
         QueueDescriptor descriptor,
         IMessageStore store,
+        IMessageRouter router,
         TimeProvider timeProvider,
         ILogger<QueueSenderProcessor> logger)
     {
         _queueName = queueName;
         _descriptor = descriptor;
         _store = store;
+        _router = router;
         _timeProvider = timeProvider;
         _logger = logger;
     }
@@ -76,7 +81,10 @@ public sealed class QueueSenderProcessor : IMessageProcessor
             var dedupWindow = _descriptor.RequiresDuplicateDetection
                 ? _descriptor.DuplicateDetectionHistoryTimeWindow ?? TimeSpan.FromMinutes(10)
                 : (TimeSpan?)null;
-            _ = EnqueueAndCompleteAsync(messageContext, encoded, expiresAt, scheduledFor, sessionId, messageId, dedupWindow);
+            // M16: forward target may be a topic — build a filter context unconditionally so
+            // the router can fan-out if the chain hits one. Cheap when not forwarded.
+            var filterContext = BuildFilterContext(msg, _timeProvider.GetUtcNow());
+            _ = EnqueueAndCompleteAsync(messageContext, encoded, expiresAt, scheduledFor, sessionId, messageId, dedupWindow, filterContext);
         }
         catch (Exception ex)
         {
@@ -108,8 +116,9 @@ public sealed class QueueSenderProcessor : IMessageProcessor
                 var dedupWindow = _descriptor.RequiresDuplicateDetection
                     ? _descriptor.DuplicateDetectionHistoryTimeWindow ?? TimeSpan.FromMinutes(10)
                     : (TimeSpan?)null;
+                var filterContext = BuildFilterContext(inner, _timeProvider.GetUtcNow());
 
-                await _store.EnqueueAsync(_queueName, innerBytes, expiresAt, scheduledFor, sessionId, messageId, dedupWindow).ConfigureAwait(false);
+                await RouteOrEnqueueAsync(innerBytes, expiresAt, scheduledFor, sessionId, messageId, dedupWindow, filterContext).ConfigureAwait(false);
             }
             _logger.LogDebug("Split batched envelope into {Count} message(s) on {Queue}", dataList.Count, _queueName);
             context.Complete();
@@ -127,13 +136,13 @@ public sealed class QueueSenderProcessor : IMessageProcessor
         return Message.Decode(buf);
     }
 
-    private async Task EnqueueAndCompleteAsync(MessageContext context, byte[] encoded, DateTimeOffset? expiresAt, DateTimeOffset? scheduledFor, string? sessionId, string? messageId, TimeSpan? duplicateDetectionWindow)
+    private async Task EnqueueAndCompleteAsync(MessageContext context, byte[] encoded, DateTimeOffset? expiresAt, DateTimeOffset? scheduledFor, string? sessionId, string? messageId, TimeSpan? duplicateDetectionWindow, MessageFilterContext filterContext)
     {
         try
         {
-            var stored = await _store.EnqueueAsync(_queueName, encoded, expiresAt, scheduledFor, sessionId, messageId, duplicateDetectionWindow).ConfigureAwait(false);
-            _logger.LogDebug("Enqueued message #{Seq} ({Bytes} bytes) to {Queue} (expiresAt={Expires}, scheduledFor={Scheduled})",
-                stored.SequenceNumber, encoded.Length, _queueName,
+            await RouteOrEnqueueAsync(encoded, expiresAt, scheduledFor, sessionId, messageId, duplicateDetectionWindow, filterContext).ConfigureAwait(false);
+            _logger.LogDebug("Accepted send on {Queue} ({Bytes} bytes, expiresAt={Expires}, scheduledFor={Scheduled})",
+                _queueName, encoded.Length,
                 expiresAt?.ToString("O") ?? "never",
                 scheduledFor?.ToString("O") ?? "immediate");
             context.Complete();
@@ -146,6 +155,50 @@ public sealed class QueueSenderProcessor : IMessageProcessor
                 Description = ex.Message,
             });
         }
+    }
+
+    /// <summary>
+    /// Hook for auto-forwarding (M16). When the queue has <c>ForwardTo</c>, the message is
+    /// routed to the configured destination via <see cref="IMessageRouter"/> — which transparently
+    /// handles topic fan-out and chained queues up to the 4-hop cap. Otherwise it's a direct
+    /// store enqueue, identical to pre-M16 behavior.
+    /// </summary>
+    private Task RouteOrEnqueueAsync(byte[] encoded, DateTimeOffset? expiresAt, DateTimeOffset? scheduledFor, string? sessionId, string? messageId, TimeSpan? dedupWindow, MessageFilterContext filterContext)
+    {
+        if (!string.IsNullOrEmpty(_descriptor.ForwardTo))
+        {
+            return _router.RouteAsync(
+                _descriptor.ForwardTo, encoded, expiresAt, scheduledFor,
+                sessionId, messageId, dedupWindow, filterContext);
+        }
+
+        return _store.EnqueueAsync(_queueName, encoded, expiresAt, scheduledFor, sessionId, messageId, dedupWindow);
+    }
+
+    private static MessageFilterContext BuildFilterContext(Message msg, DateTimeOffset enqueuedAt)
+    {
+        var appProps = new Dictionary<string, object?>(StringComparer.Ordinal);
+        if (msg.ApplicationProperties is not null)
+        {
+            foreach (var key in msg.ApplicationProperties.Map.Keys)
+            {
+                if (key is null) continue;
+                appProps[key.ToString()!] = msg.ApplicationProperties.Map[key];
+            }
+        }
+        return new MessageFilterContext
+        {
+            MessageId = msg.Properties?.MessageId,
+            CorrelationId = msg.Properties?.CorrelationId,
+            Subject = msg.Properties?.Subject,
+            To = msg.Properties?.To,
+            ReplyTo = msg.Properties?.ReplyTo,
+            ReplyToSessionId = msg.Properties?.ReplyToGroupId,
+            SessionId = msg.Properties?.GroupId,
+            ContentType = msg.Properties?.ContentType,
+            EnqueuedTimeUtc = enqueuedAt,
+            ApplicationProperties = appProps,
+        };
     }
 
     private static DateTimeOffset? ReadScheduledEnqueueTime(Message msg)

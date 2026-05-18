@@ -1129,6 +1129,18 @@
           <input id="cqDedupWindow" type="number" min="1" placeholder="600 (default — 10 min)">
           <div class="help">Only applies when duplicate detection is enabled.</div>
         </div>
+        <div class="field-grid" style="margin-top:14px">
+          <div class="field">
+            <label>Forward to <span class="mono-tag">M16</span></label>
+            <input id="cqForwardTo" placeholder="another-queue or topic">
+            <div class="help">All accepted sends are transparently routed to this destination.</div>
+          </div>
+          <div class="field">
+            <label>Forward dead-lettered to <span class="mono-tag">M16</span></label>
+            <input id="cqForwardDlq" placeholder="another-queue">
+            <div class="help">Dead-letters land here instead of the local <code>$DeadLetterQueue</code>.</div>
+          </div>
+        </div>
       </div>
       <div class="modal-foot">
         <button class="btn ghost" data-close>Cancel</button>
@@ -1182,6 +1194,18 @@
         <div style="margin-top:8px">
           <label class="checkbox"><input id="csDleOnExpiration" type="checkbox"> Dead-letter on expiration</label>
           <label class="checkbox"><input id="csRequiresSession" type="checkbox"> Sessions required <span class="mono-tag">M14</span></label>
+        </div>
+        <div class="field-grid" style="margin-top:14px">
+          <div class="field">
+            <label>Forward to <span class="mono-tag">M16</span></label>
+            <input id="csForwardTo" placeholder="another-queue or topic">
+            <div class="help">Matching messages skip this subscription's backing queue and route to the destination.</div>
+          </div>
+          <div class="field">
+            <label>Forward dead-lettered to <span class="mono-tag">M16</span></label>
+            <input id="csForwardDlq" placeholder="another-queue">
+            <div class="help">Dead-letters land here instead of the sub's local DLQ.</div>
+          </div>
         </div>
       </div>
       <div class="modal-foot">
@@ -1651,6 +1675,8 @@
       if (d.requiresSession) flagBadges.push('<span class="badge flag on">Sessions</span>');
       if (d.requiresDuplicateDetection) flagBadges.push('<span class="badge flag on">Dedup</span>');
       if (d.deadLetteringOnMessageExpiration) flagBadges.push('<span class="badge flag on">DLQ on TTL</span>');
+      if (d.forwardTo) flagBadges.push(`<span class="badge flag on" title="Forwards to ${escapeHtml(d.forwardTo)}">→ ${escapeHtml(d.forwardTo)}</span>`);
+      if (d.forwardDeadLetteredMessagesTo) flagBadges.push(`<span class="badge flag on" title="DLQ forwards to ${escapeHtml(d.forwardDeadLetteredMessagesTo)}">DLQ → ${escapeHtml(d.forwardDeadLetteredMessagesTo)}</span>`);
 
       const stats = entityStats(sel, d);
       header.innerHTML = `
@@ -1751,6 +1777,12 @@
             ? `yes · window <span class="mono-tag">${escapeHtml(humanTime(d.duplicateDetectionHistoryTimeWindow) || "10m")}</span>`
             : "no"]);
         }
+        rows.push(["Auto-forward to", d.forwardTo
+          ? `<code>${escapeHtml(d.forwardTo)}</code>`
+          : '<span class="muted">— (no forwarding)</span>']);
+        rows.push(["DLQ forward to", d.forwardDeadLetteredMessagesTo
+          ? `<code>${escapeHtml(d.forwardDeadLetteredMessagesTo)}</code>`
+          : '<span class="muted">— (local <code>$DeadLetterQueue</code>)</span>']);
         if (d.backingQueueName) rows.push(["Backing queue", `<code>${escapeHtml(d.backingQueueName)}</code>`]);
       } else if (sel.kind === 'topic') {
         const subs = state.subscriptionsByTopic[d.name] || [];
@@ -1814,6 +1846,7 @@
       $("#cqName").value = ""; $("#cqMaxDelivery").value = "10"; $("#cqLockDuration").value = "60";
       $("#cqDefaultTtl").value = ""; $("#cqDleOnExpiration").checked = false;
       $("#cqRequiresSession").checked = false; $("#cqRequiresDedup").checked = false; $("#cqDedupWindow").value = "";
+      $("#cqForwardTo").value = ""; $("#cqForwardDlq").value = "";
       openModal("createQueueModal");
     });
     $("#btnCreate").addEventListener("click", async () => {
@@ -1832,6 +1865,10 @@
       if (options.requiresDuplicateDetection && dedupSecs > 0) {
         options.duplicateDetectionHistoryTimeWindow = secondsToTimeSpan(dedupSecs);
       }
+      const fwd = $("#cqForwardTo").value.trim();
+      if (fwd) options.forwardTo = fwd;
+      const fwdDlq = $("#cqForwardDlq").value.trim();
+      if (fwdDlq) options.forwardDeadLetteredMessagesTo = fwdDlq;
       try {
         await api("PUT", `/api/queues/${encodeURIComponent(name)}`, { managementUrl: $("#mgmtUrl").value, options });
         closeModal("createQueueModal");
@@ -1868,6 +1905,7 @@
       $("#csName").value = ""; $("#csMaxDelivery").value = "10"; $("#csLockDuration").value = "60";
       $("#csDefaultTtl").value = ""; $("#csDleOnExpiration").checked = false;
       $("#csRequiresSession").checked = false;
+      $("#csForwardTo").value = ""; $("#csForwardDlq").value = "";
       openModal("createSubscriptionModal");
     }
     $("#btnOpenCreateSubscription").addEventListener("click", () => {
@@ -1886,6 +1924,10 @@
       };
       const ttl = parseInt($("#csDefaultTtl").value);
       if (ttl > 0) options.defaultMessageTimeToLive = secondsToTimeSpan(ttl);
+      const fwd = $("#csForwardTo").value.trim();
+      if (fwd) options.forwardTo = fwd;
+      const fwdDlq = $("#csForwardDlq").value.trim();
+      if (fwdDlq) options.forwardDeadLetteredMessagesTo = fwdDlq;
       try {
         await api("PUT", `/api/topics/${encodeURIComponent(topic)}/subscriptions/${encodeURIComponent(name)}`, {
           managementUrl: $("#mgmtUrl").value, options,

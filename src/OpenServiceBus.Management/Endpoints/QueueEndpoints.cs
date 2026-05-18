@@ -41,8 +41,15 @@ public static class QueueEndpoints
         group.MapPut("/{name}", async (string name, CreateQueueRequest? body, IQueueRegistry registry, CancellationToken ct) =>
         {
             var descriptor = (body ?? new CreateQueueRequest()).ToDescriptor(name);
-            var created = await registry.CreateAsync(descriptor, ct);
-            return Results.Ok(QueueResponse.From(created));
+            try
+            {
+                var created = await registry.CreateAsync(descriptor, ct);
+                return Results.Ok(QueueResponse.From(created));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
         });
 
         group.MapDelete("/{name}", async (string name, IQueueRegistry registry, CancellationToken ct) =>
@@ -64,6 +71,8 @@ public sealed record CreateQueueRequest
     public bool RequiresSession { get; init; }
     public bool RequiresDuplicateDetection { get; init; }
     public TimeSpan? DuplicateDetectionHistoryTimeWindow { get; init; }
+    public string? ForwardTo { get; init; }
+    public string? ForwardDeadLetteredMessagesTo { get; init; }
 
     public QueueDescriptor ToDescriptor(string name) => new()
     {
@@ -75,6 +84,8 @@ public sealed record CreateQueueRequest
         RequiresSession = RequiresSession,
         RequiresDuplicateDetection = RequiresDuplicateDetection,
         DuplicateDetectionHistoryTimeWindow = DuplicateDetectionHistoryTimeWindow,
+        ForwardTo = ForwardTo,
+        ForwardDeadLetteredMessagesTo = ForwardDeadLetteredMessagesTo,
     };
 }
 
@@ -87,6 +98,8 @@ public sealed record QueueResponse(
     bool RequiresSession,
     bool RequiresDuplicateDetection,
     TimeSpan? DuplicateDetectionHistoryTimeWindow,
+    string? ForwardTo,
+    string? ForwardDeadLetteredMessagesTo,
     long? ActiveMessageCount)
 {
     public static QueueResponse From(QueueDescriptor d, long? count = null) => new(
@@ -98,5 +111,7 @@ public sealed record QueueResponse(
         d.RequiresSession,
         d.RequiresDuplicateDetection,
         d.DuplicateDetectionHistoryTimeWindow,
+        d.ForwardTo,
+        d.ForwardDeadLetteredMessagesTo,
         count);
 }

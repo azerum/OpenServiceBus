@@ -5,6 +5,7 @@ using Amqp.Types;
 using Microsoft.Extensions.Logging;
 using OpenServiceBus.Core.Entities;
 using OpenServiceBus.Core.Filters;
+using OpenServiceBus.Core.Routing;
 using OpenServiceBus.Core.Storage;
 
 namespace OpenServiceBus.Amqp.Topics;
@@ -23,6 +24,7 @@ public sealed class TopicSenderProcessor : IMessageProcessor
     private readonly TopicDescriptor _topic;
     private readonly ITopicRegistry _topics;
     private readonly IMessageStore _store;
+    private readonly IMessageRouter _router;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<TopicSenderProcessor> _logger;
 
@@ -30,12 +32,14 @@ public sealed class TopicSenderProcessor : IMessageProcessor
         TopicDescriptor topic,
         ITopicRegistry topics,
         IMessageStore store,
+        IMessageRouter router,
         TimeProvider timeProvider,
         ILogger<TopicSenderProcessor> logger)
     {
         _topic = topic;
         _topics = topics;
         _store = store;
+        _router = router;
         _timeProvider = timeProvider;
         _logger = logger;
     }
@@ -83,12 +87,10 @@ public sealed class TopicSenderProcessor : IMessageProcessor
     {
         try
         {
-            var subscribers = _topics.EvaluateSubscribers(_topic.Name, filterContext);
-            foreach (var queue in subscribers)
-            {
-                await _store.EnqueueAsync(queue, encoded, expiresAt, scheduledFor, sessionId).ConfigureAwait(false);
-            }
-            _logger.LogDebug("Fanned out 1 message on topic {Topic} to {Count} subscriber(s)", _topic.Name, subscribers.Count);
+            // Routing the topic name itself triggers the router's fan-out path, which also
+            // walks each subscription's ForwardTo (M16) before landing on a backing queue.
+            var landed = await _router.RouteAsync(_topic.Name, encoded, expiresAt, scheduledFor, sessionId, filterContext: filterContext).ConfigureAwait(false);
+            _logger.LogDebug("Fanned out 1 message on topic {Topic} to {Count} subscriber(s)", _topic.Name, landed.Count);
             context.Complete();
         }
         catch (Exception ex)
@@ -112,11 +114,7 @@ public sealed class TopicSenderProcessor : IMessageProcessor
                 var expiresAt = ComputeExpiresAt(inner);
                 var scheduledFor = ReadScheduledEnqueueTime(inner);
                 var filterContext = BuildFilterContext(inner, _timeProvider.GetUtcNow());
-                var subscribers = _topics.EvaluateSubscribers(_topic.Name, filterContext);
-                foreach (var queue in subscribers)
-                {
-                    await _store.EnqueueAsync(queue, innerBytes, expiresAt, scheduledFor, sessionId: null).ConfigureAwait(false);
-                }
+                await _router.RouteAsync(_topic.Name, innerBytes, expiresAt, scheduledFor, sessionId: null, filterContext: filterContext).ConfigureAwait(false);
             }
             context.Complete();
         }

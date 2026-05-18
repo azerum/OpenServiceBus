@@ -91,6 +91,22 @@ public sealed class TopicManager : ITopicRegistry
             throw new InvalidOperationException($"Cannot create subscription '{descriptor.Name}' — topic '{descriptor.TopicName}' does not exist.");
         }
 
+        // M16: self-forwarding rejection — also catches "forwards to my own backing queue" since
+        // that's the same entity from the router's point of view.
+        if (!string.IsNullOrEmpty(descriptor.ForwardTo)
+            && (string.Equals(descriptor.ForwardTo, descriptor.BackingQueueName, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(descriptor.ForwardTo, descriptor.TopicName, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException(
+                $"Subscription '{descriptor.TopicName}/{descriptor.Name}' cannot forward to itself or its parent topic.");
+        }
+        if (!string.IsNullOrEmpty(descriptor.ForwardDeadLetteredMessagesTo)
+            && string.Equals(descriptor.ForwardDeadLetteredMessagesTo, descriptor.BackingQueueName, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Subscription '{descriptor.TopicName}/{descriptor.Name}' cannot forward dead-lettered messages to itself.");
+        }
+
         var key = SubKey(descriptor.TopicName, descriptor.Name);
         var stored = _subscriptions.GetOrAdd(key, descriptor);
         if (!ReferenceEquals(stored, descriptor))
@@ -99,6 +115,9 @@ public sealed class TopicManager : ITopicRegistry
         }
 
         // The backing queue gives us all the queue-level machinery for free.
+        // M16: mirror ForwardDeadLetteredMessagesTo onto the backing queue so the receiver
+        // sources (which key off the queue descriptor) honor it. Subscription-level ForwardTo
+        // is enforced one level up — in the topic fan-out — so it stays on the descriptor only.
         await _queues.CreateAsync(new QueueDescriptor
         {
             Name = descriptor.BackingQueueName,
@@ -106,6 +125,7 @@ public sealed class TopicManager : ITopicRegistry
             MaxDeliveryCount = descriptor.MaxDeliveryCount,
             DefaultMessageTimeToLive = descriptor.DefaultMessageTimeToLive,
             DeadLetteringOnMessageExpiration = descriptor.DeadLetteringOnMessageExpiration,
+            ForwardDeadLetteredMessagesTo = descriptor.ForwardDeadLetteredMessagesTo,
         }, cancellationToken).ConfigureAwait(false);
 
         // Every fresh subscription gets a $Default rule with a TrueFilter — same as Azure SB.

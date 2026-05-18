@@ -53,4 +53,19 @@ public sealed record QueueDescriptor
     /// is true. Defaults to 10 minutes when null — matches Azure Service Bus.
     /// </summary>
     public TimeSpan? DuplicateDetectionHistoryTimeWindow { get; init; }
+
+    /// <summary>
+    /// Destination entity (queue or topic by name) that every accepted send is transparently
+    /// forwarded to. Senders see a normal "accepted" disposition; no message ever lands on
+    /// this queue itself. Enforced server-side in M16 with a 4-hop chain cap matching Azure
+    /// Service Bus. Null disables auto-forwarding.
+    /// </summary>
+    public string? ForwardTo { get; init; }
+
+    /// <summary>
+    /// Destination entity that dead-lettered messages are forwarded to instead of the
+    /// queue's local <c>$DeadLetterQueue</c>. Applies to every DLQ trigger — explicit
+    /// dead-letter, max-delivery, TTL expiration. Enforced in M16. Null = standard local DLQ.
+    /// </summary>
+    public string? ForwardDeadLetteredMessagesTo { get; init; }
 }

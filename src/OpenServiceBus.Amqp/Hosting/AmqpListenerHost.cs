@@ -7,6 +7,7 @@ using OpenServiceBus.Amqp.Management;
 using OpenServiceBus.Amqp.Routing;
 using OpenServiceBus.Core.Entities;
 using OpenServiceBus.Core.Messaging;
+using OpenServiceBus.Core.Routing;
 using OpenServiceBus.Core.Storage;
 using Trace = Amqp.Trace;
 using TraceLevel = Amqp.TraceLevel;
@@ -21,6 +22,7 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
     private readonly IQueueRegistry _queueRegistry;
     private readonly ITopicRegistry? _topicRegistry;
     private readonly IMessageStore _messageStore;
+    private readonly IMessageRouter _router;
     private readonly TimeProvider _timeProvider;
     private ContainerHost? _host;
 
@@ -28,6 +30,7 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
         IOptions<AmqpListenerOptions> options,
         IQueueRegistry queueRegistry,
         IMessageStore messageStore,
+        IMessageRouter router,
         TimeProvider timeProvider,
         ILoggerFactory loggerFactory,
         ITopicRegistry? topicRegistry = null)
@@ -36,6 +39,7 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
         _queueRegistry = queueRegistry;
         _topicRegistry = topicRegistry;
         _messageStore = messageStore;
+        _router = router;
         _timeProvider = timeProvider;
         _loggerFactory = loggerFactory;
         _logger = loggerFactory.CreateLogger<AmqpListenerHost>();
@@ -66,7 +70,7 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
 
         host.RegisterRequestProcessor("$cbs", new CbsRequestProcessor(_options, _loggerFactory.CreateLogger<CbsRequestProcessor>()));
 
-        var linkProcessor = new EntityLinkProcessor(_queueRegistry, _messageStore, Options.Create(_options), _timeProvider, _loggerFactory, _topicRegistry);
+        var linkProcessor = new EntityLinkProcessor(_queueRegistry, _messageStore, _router, Options.Create(_options), _timeProvider, _loggerFactory, _topicRegistry);
         host.RegisterLinkProcessor(linkProcessor);
 
         host.Open();
@@ -165,6 +169,7 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
             descriptor.Name,
             descriptor,
             _messageStore,
+            _router,
             _timeProvider,
             _loggerFactory.CreateLogger<ManagementRequestProcessor>());
 
@@ -205,6 +210,7 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
             descriptor.BackingQueueName,
             queue,
             _messageStore,
+            _router,
             _timeProvider,
             _loggerFactory.CreateLogger<ManagementRequestProcessor>(),
             _topicRegistry,

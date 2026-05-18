@@ -9,6 +9,7 @@ using OpenServiceBus.Core.Storage;
 using OpenServiceBus.InMemoryStorage;
 using OpenServiceBus.InMemoryStorage.Lifecycle;
 using OpenServiceBus.InMemoryStorage.Queues;
+using OpenServiceBus.InMemoryStorage.Routing;
 using OpenServiceBus.InMemoryStorage.Topics;
 
 namespace OpenServiceBus.Testing;
@@ -107,11 +108,13 @@ public sealed class OpenServiceBusTestHost : IAsyncDisposable
         IMessageStore storeAsIface = store;
         var queues = new QueueManager(storeAsIface);
         var topics = new TopicManager(queues);
+        var router = new MessageRouter(queues, storeAsIface, NullLogger<MessageRouter>.Instance, topics);
 
         var listener = new AmqpListenerHost(
             Options.Create(listenerOptions),
             queues,
             storeAsIface,
+            router,
             opts.TimeProvider,
             NullLoggerFactory.Instance,
             topics);
@@ -119,6 +122,7 @@ public sealed class OpenServiceBusTestHost : IAsyncDisposable
         var ttlSweeper = new TtlExpirationService(
             storeAsIface,
             queues,
+            router,
             opts.TimeProvider,
             NullLogger<TtlExpirationService>.Instance);
 
