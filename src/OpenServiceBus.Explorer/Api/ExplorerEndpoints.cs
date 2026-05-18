@@ -171,6 +171,8 @@ public static class ExplorerEndpoints
         contentType = msg.ContentType,
         enqueuedTime = SafeTime(() => msg.EnqueuedTime),
         lockedUntil = SafeTime(() => msg.LockedUntil),
+        expiresAt = SafeTime(() => msg.ExpiresAt),  // M6 TTL deadline
+        timeToLive = Safe(() => (TimeSpan?)msg.TimeToLive),
         deliveryCount = Safe(() => (int?)msg.DeliveryCount),
         lockToken = msg.LockToken,
         body = SafeBody(msg.Body),

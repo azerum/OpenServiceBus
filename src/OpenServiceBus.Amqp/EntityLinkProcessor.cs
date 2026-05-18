@@ -24,6 +24,7 @@ public sealed class EntityLinkProcessor : ILinkProcessor
     private readonly IQueueRegistry _registry;
     private readonly IMessageStore _store;
     private readonly AmqpListenerOptions _options;
+    private readonly TimeProvider _timeProvider;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<EntityLinkProcessor> _logger;
 
@@ -34,11 +35,13 @@ public sealed class EntityLinkProcessor : ILinkProcessor
         IQueueRegistry registry,
         IMessageStore store,
         IOptions<AmqpListenerOptions> options,
+        TimeProvider timeProvider,
         ILoggerFactory loggerFactory)
     {
         _registry = registry;
         _store = store;
         _options = options.Value;
+        _timeProvider = timeProvider;
         _loggerFactory = loggerFactory;
         _logger = loggerFactory.CreateLogger<EntityLinkProcessor>();
     }
@@ -98,7 +101,11 @@ public sealed class EntityLinkProcessor : ILinkProcessor
             if (isReceiverFromClient)
             {
                 var processor = new QueueSenderProcessor(
-                    descriptor.Name, _store, _loggerFactory.CreateLogger<QueueSenderProcessor>());
+                    descriptor.Name,
+                    descriptor,
+                    _store,
+                    _timeProvider,
+                    _loggerFactory.CreateLogger<QueueSenderProcessor>());
                 var endpoint = new TargetLinkEndpoint(processor, attachContext.Link);
                 attachContext.Complete(endpoint, processor.Credit);
                 _logger.LogDebug("Wired sender attach to {Entity} (credit={Credit})", descriptor.Name, processor.Credit);
@@ -106,7 +113,7 @@ public sealed class EntityLinkProcessor : ILinkProcessor
             else
             {
                 var source = _receiverSources.GetOrAdd(descriptor.Name, name => new QueueReceiverSource(
-                    name, descriptor, _store, _loggerFactory.CreateLogger<QueueReceiverSource>()));
+                    name, descriptor, _store, _timeProvider, _loggerFactory.CreateLogger<QueueReceiverSource>()));
                 var endpoint = new SourceLinkEndpoint(source, attachContext.Link);
                 // initialCredit=0: broker is the sender on this link; client grants credit via Flow.
                 attachContext.Complete(endpoint, 0);

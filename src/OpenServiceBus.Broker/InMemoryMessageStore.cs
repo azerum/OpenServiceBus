@@ -45,6 +45,7 @@ public sealed class InMemoryMessageStore : IMessageStore
     public Task<StoredMessage> EnqueueAsync(
         string queueName,
         byte[] encodedMessage,
+        DateTimeOffset? expiresAt = null,
         CancellationToken cancellationToken = default)
     {
         var state = GetQueue(queueName);
@@ -54,6 +55,7 @@ public sealed class InMemoryMessageStore : IMessageStore
             SequenceNumber = seq,
             EnqueuedAt = _timeProvider.GetUtcNow(),
             EncodedMessage = encodedMessage,
+            ExpiresAt = expiresAt,
         };
 
         state.Messages[seq] = message;
@@ -63,6 +65,28 @@ public sealed class InMemoryMessageStore : IMessageStore
         }
 
         return Task.FromResult(message);
+    }
+
+    public IReadOnlyList<StoredMessage> ExpireMessages(string queueName, DateTimeOffset now)
+    {
+        if (!_queues.TryGetValue(queueName, out var state)) return Array.Empty<StoredMessage>();
+
+        // Build a set of currently-locked sequence numbers — locked messages stay alive
+        // even if they cross their TTL deadline; the lock holder gets the chance to settle them.
+        var locked = new HashSet<long>();
+        foreach (var entry in state.Locks.Values) locked.Add(entry.SequenceNumber);
+
+        var expired = new List<StoredMessage>();
+        foreach (var (seq, msg) in state.Messages)
+        {
+            if (!msg.IsExpired(now)) continue;
+            if (locked.Contains(seq)) continue;
+            if (state.Messages.TryRemove(seq, out var removed))
+            {
+                expired.Add(removed);
+            }
+        }
+        return expired;
     }
 
     public Task<long> CountAsync(string queueName, CancellationToken cancellationToken = default)

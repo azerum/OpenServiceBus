@@ -21,6 +21,7 @@ public static class ServiceCollectionExtensions
 
         services.TryAddSingleton<AmqpListenerHost>();
         services.AddHostedService(sp => sp.GetRequiredService<AmqpListenerHost>());
+        services.AddHostedService<TtlExpirationService>();
 
         return services;
     }

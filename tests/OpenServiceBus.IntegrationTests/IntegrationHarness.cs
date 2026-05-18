@@ -17,6 +17,7 @@ namespace OpenServiceBus.IntegrationTests;
 internal sealed class IntegrationHarness : IAsyncDisposable
 {
     public AmqpListenerHost Host { get; }
+    public TtlExpirationService TtlSweeper { get; }
     public IQueueRegistry Queues { get; }
     public IMessageStore Store { get; }
     public int Port { get; }
@@ -26,9 +27,10 @@ internal sealed class IntegrationHarness : IAsyncDisposable
     public string ConnectionString =>
         $"Endpoint=sb://127.0.0.1:{Port};SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true";
 
-    private IntegrationHarness(AmqpListenerHost host, IQueueRegistry queues, IMessageStore store, int port)
+    private IntegrationHarness(AmqpListenerHost host, TtlExpirationService ttlSweeper, IQueueRegistry queues, IMessageStore store, int port)
     {
         Host = host;
+        TtlSweeper = ttlSweeper;
         Queues = queues;
         Store = store;
         Port = port;
@@ -61,10 +63,18 @@ internal sealed class IntegrationHarness : IAsyncDisposable
             Options.Create(options),
             queues,
             storeAsIface,
+            TimeProvider.System,
             loggerFactory);
 
+        var ttlSweeper = new TtlExpirationService(
+            storeAsIface,
+            queues,
+            TimeProvider.System,
+            loggerFactory.CreateLogger<TtlExpirationService>());
+
         await host.StartAsync(CancellationToken.None);
-        return new IntegrationHarness(host, queues, storeAsIface, port);
+        await ttlSweeper.StartAsync(CancellationToken.None);
+        return new IntegrationHarness(host, ttlSweeper, queues, storeAsIface, port);
     }
 
     private static int GetFreePort()
@@ -75,5 +85,10 @@ internal sealed class IntegrationHarness : IAsyncDisposable
         finally { listener.Stop(); }
     }
 
-    public async ValueTask DisposeAsync() => await Host.StopAsync(CancellationToken.None);
+    public async ValueTask DisposeAsync()
+    {
+        await TtlSweeper.StopAsync(CancellationToken.None);
+        TtlSweeper.Dispose();
+        await Host.StopAsync(CancellationToken.None);
+    }
 }

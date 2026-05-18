@@ -19,4 +19,13 @@ public sealed record StoredMessage
     /// <c>header.delivery-count</c> on each delivery. Starts at 0, incremented on abandon / lock expiry.
     /// </summary>
     public int DeliveryCount { get; init; }
+
+    /// <summary>
+    /// Absolute UTC deadline after which the message is considered expired (M6). Null = no TTL.
+    /// Computed at enqueue time as <c>now + min(perMessageTtl, queueDefaultTtl)</c>.
+    /// </summary>
+    public DateTimeOffset? ExpiresAt { get; init; }
+
+    /// <summary>True when this message has passed its TTL deadline.</summary>
+    public bool IsExpired(DateTimeOffset now) => ExpiresAt is not null && ExpiresAt.Value <= now;
 }

@@ -13,11 +13,25 @@ public interface IMessageStore
     /// <summary>Remove a queue and discard its messages. Called once at queue deletion.</summary>
     Task DeleteQueueAsync(string queueName, CancellationToken cancellationToken = default);
 
-    /// <summary>Enqueue an encoded message. The returned record carries the assigned sequence number.</summary>
+    /// <summary>
+    /// Enqueue an encoded message. The returned record carries the assigned sequence number.
+    /// </summary>
+    /// <param name="expiresAt">
+    /// Absolute UTC deadline after which the message is considered expired (M6). Null = no TTL.
+    /// The caller is responsible for computing this from per-message TTL and queue-default TTL.
+    /// </param>
     Task<StoredMessage> EnqueueAsync(
         string queueName,
         byte[] encodedMessage,
+        DateTimeOffset? expiresAt = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Remove and return any non-locked messages whose <see cref="StoredMessage.ExpiresAt"/>
+    /// has passed. Locked messages are not touched; they re-enter expiration eligibility when
+    /// abandoned or when their lock expires.
+    /// </summary>
+    IReadOnlyList<StoredMessage> ExpireMessages(string queueName, DateTimeOffset now);
 
     /// <summary>The number of currently enqueued messages on the queue (active + locked, but not yet completed).</summary>
     Task<long> CountAsync(string queueName, CancellationToken cancellationToken = default);

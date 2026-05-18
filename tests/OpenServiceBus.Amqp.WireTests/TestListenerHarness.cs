@@ -21,15 +21,17 @@ namespace OpenServiceBus.Amqp.WireTests;
 internal sealed class TestListenerHarness : IAsyncDisposable
 {
     public AmqpListenerHost Host { get; }
+    public TtlExpirationService TtlSweeper { get; }
     public IQueueRegistry Queues { get; }
     public IMessageStore Store { get; }
     public TimeProvider TimeProvider { get; }
     public int Port { get; }
     public string AmqpUri => $"amqp://127.0.0.1:{Port}";
 
-    private TestListenerHarness(AmqpListenerHost host, IQueueRegistry queues, IMessageStore store, TimeProvider timeProvider, int port)
+    private TestListenerHarness(AmqpListenerHost host, TtlExpirationService ttlSweeper, IQueueRegistry queues, IMessageStore store, TimeProvider timeProvider, int port)
     {
         Host = host;
+        TtlSweeper = ttlSweeper;
         Queues = queues;
         Store = store;
         TimeProvider = timeProvider;
@@ -60,10 +62,18 @@ internal sealed class TestListenerHarness : IAsyncDisposable
             Options.Create(options),
             queues,
             storeAsIface,
+            tp,
             NullLoggerFactory.Instance);
 
+        var ttlSweeper = new TtlExpirationService(
+            storeAsIface,
+            queues,
+            tp,
+            NullLogger<TtlExpirationService>.Instance);
+
         await host.StartAsync(CancellationToken.None);
-        return new TestListenerHarness(host, queues, storeAsIface, tp, options.Port);
+        await ttlSweeper.StartAsync(CancellationToken.None);
+        return new TestListenerHarness(host, ttlSweeper, queues, storeAsIface, tp, options.Port);
     }
 
     private static int GetFreePort()
@@ -82,6 +92,8 @@ internal sealed class TestListenerHarness : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        await TtlSweeper.StopAsync(CancellationToken.None);
+        TtlSweeper.Dispose();
         await Host.StopAsync(CancellationToken.None);
     }
 }

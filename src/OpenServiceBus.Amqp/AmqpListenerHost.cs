@@ -18,17 +18,20 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
     private readonly ILoggerFactory _loggerFactory;
     private readonly IQueueRegistry _queueRegistry;
     private readonly IMessageStore _messageStore;
+    private readonly TimeProvider _timeProvider;
     private ContainerHost? _host;
 
     public AmqpListenerHost(
         IOptions<AmqpListenerOptions> options,
         IQueueRegistry queueRegistry,
         IMessageStore messageStore,
+        TimeProvider timeProvider,
         ILoggerFactory loggerFactory)
     {
         _options = options.Value;
         _queueRegistry = queueRegistry;
         _messageStore = messageStore;
+        _timeProvider = timeProvider;
         _loggerFactory = loggerFactory;
         _logger = loggerFactory.CreateLogger<AmqpListenerHost>();
     }
@@ -58,7 +61,7 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
 
         host.RegisterRequestProcessor("$cbs", new CbsRequestProcessor());
 
-        var linkProcessor = new EntityLinkProcessor(_queueRegistry, _messageStore, Options.Create(_options), _loggerFactory);
+        var linkProcessor = new EntityLinkProcessor(_queueRegistry, _messageStore, Options.Create(_options), _timeProvider, _loggerFactory);
         host.RegisterLinkProcessor(linkProcessor);
 
         host.Open();
