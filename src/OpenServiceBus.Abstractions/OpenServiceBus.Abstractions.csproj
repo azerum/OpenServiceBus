@@ -1,8 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-
-  <PropertyGroup>
-    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-    <Description>Public contracts (IMessageStore, ILockManager, IEntityRegistry, options) for OpenServiceBus. Zero runtime dependencies.</Description>
-  </PropertyGroup>
-
-</Project>
