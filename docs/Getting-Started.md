@@ -5,8 +5,7 @@ Three install paths cover essentially every use case. Pick whichever matches you
 ## 1. Embedded test fixture (recommended for tests)
 
 ```bash
-dotnet add package OpenServiceBus.Testing \
-    --source https://nuget.pkg.github.com/mauritsarissen/index.json
+dotnet add package OpenServiceBus.Testing
 ```
 
 `OpenServiceBus.Testing` ships an `OpenServiceBusTestHost` that boots a full broker on a

@@ -7,7 +7,7 @@ port, every Service Bus feature available against the real Azure SDK.
 ## Install
 
 ```bash
-dotnet add package OpenServiceBus.Testing --source https://nuget.pkg.github.com/mauritsarissen/index.json
+dotnet add package OpenServiceBus.Testing
 ```
 
 ## Hello world

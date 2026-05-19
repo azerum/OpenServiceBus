@@ -1,7 +1,7 @@
 # OpenServiceBus
 
 [![CI](https://github.com/mauritsarissen/OpenServiceBus/actions/workflows/ci.yml/badge.svg)](https://github.com/mauritsarissen/OpenServiceBus/actions/workflows/ci.yml)
-[![NuGet](https://img.shields.io/badge/NuGet-OpenServiceBus.Testing-blue?logo=nuget)](https://github.com/mauritsarissen/OpenServiceBus/packages)
+[![NuGet](https://img.shields.io/nuget/v/OpenServiceBus.Testing.svg?logo=nuget&label=nuget.org)](https://www.nuget.org/packages/OpenServiceBus.Testing)
 [![Docker Hub](https://img.shields.io/badge/Docker-mauritsarissen%2Fopenservicebus-2496ED?logo=docker)](https://hub.docker.com/r/mauritsarissen/openservicebus)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -96,9 +96,12 @@ If you don't want any external process at all, install the test fixture and run 
 inside your test process:
 
 ```bash
-dotnet add package OpenServiceBus.Testing \
-    --source https://nuget.pkg.github.com/mauritsarissen/index.json
+dotnet add package OpenServiceBus.Testing
 ```
+
+Published on [nuget.org](https://www.nuget.org/packages?q=OpenServiceBus) — no extra source
+needed. (GitHub Packages also mirrors every release, see
+[Contributing](docs/Contributing.md#releasing).)
 
 ```csharp
 await using var host = await OpenServiceBusTestHost.StartAsync();

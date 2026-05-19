@@ -88,10 +88,10 @@ jobs:
           dotnet-version: |
             8.0.x
             10.0.x
-          # Source maps GitHub Packages so `dotnet nuget push` can authenticate via GITHUB_TOKEN.
-          source-url: https://nuget.pkg.github.com/mauritsarissen/index.json
-        env:
-          NUGET_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # NOTE: deliberately no `source-url:` here. That option injects an extra source into
+        # the global nuget.config which trips NU1507 under Central Package Management
+        # (multiple sources without explicit mapping = restore error). Auth for nuget push
+        # happens inline below with --source + --api-key.
 
       - run: dotnet restore
 
@@ -110,13 +110,36 @@ jobs:
       - name: List packed artifacts
         run: ls -la ./nupkgs
 
+      - name: Push to nuget.org
+        # Primary public registry. Requires repo secret NUGET_API_KEY (generated at
+        # https://www.nuget.org/account/apikeys with scope "Push new packages and package
+        # versions" and glob "OpenServiceBus.*"). The step skips itself when the secret
+        # isn't configured, so the workflow still succeeds on repos that only want GHCR.
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          if [ -z "$NUGET_API_KEY" ]; then
+            echo "::notice::NUGET_API_KEY not set - skipping nuget.org push."
+            exit 0
+          fi
+          dotnet nuget push './nupkgs/*.nupkg' \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key "$NUGET_API_KEY" \
+            --skip-duplicate
+          dotnet nuget push './nupkgs/*.snupkg' \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key "$NUGET_API_KEY" \
+            --skip-duplicate || true
+
       - name: Push to GitHub Packages
+        # Secondary mirror so `dotnet add package --source ghcr...` also works (useful for
+        # private preview builds before a public push). Authenticates with the built-in
+        # GITHUB_TOKEN; no extra secret needed.
         run: |
           dotnet nuget push './nupkgs/*.nupkg' \
             --source https://nuget.pkg.github.com/mauritsarissen/index.json \
             --api-key ${{ secrets.GITHUB_TOKEN }} \
             --skip-duplicate
-          # Symbols too - GitHub Packages accepts .snupkg via the same endpoint.
           dotnet nuget push './nupkgs/*.snupkg' \
             --source https://nuget.pkg.github.com/mauritsarissen/index.json \
             --api-key ${{ secrets.GITHUB_TOKEN }} \
@@ -201,12 +224,13 @@ jobs:
           body: |
             ## Install
 
-            ### NuGet (GitHub Packages)
+            ### NuGet (nuget.org)
 
             ```bash
-            dotnet add package OpenServiceBus.Testing --version ${{ env.VERSION }} \
-              --source https://nuget.pkg.github.com/mauritsarissen/index.json
+            dotnet add package OpenServiceBus.Testing --version ${{ env.VERSION }}
             ```
+
+            Browse the package pages on [nuget.org/packages?q=OpenServiceBus](https://www.nuget.org/packages?q=OpenServiceBus).
 
             ### Docker
 

@@ -58,7 +58,7 @@ in the repo - every page here is committed in source.
 
 ```bash
 # Tests / in-process
-dotnet add package OpenServiceBus.Testing --source https://nuget.pkg.github.com/mauritsarissen/index.json
+dotnet add package OpenServiceBus.Testing
 
 # Docker
 docker run -d -p 5672:5672 -p 5300:5300 -v osb-data:/data ghcr.io/mauritsarissen/openservicebus:latest
