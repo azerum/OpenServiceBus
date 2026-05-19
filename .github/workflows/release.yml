@@ -32,6 +32,10 @@ permissions:
 env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
+  # Forces every JavaScript-based action (setup-node, upload-artifact, download-artifact,
+  # etc.) to run on the runner's Node 24 instead of Node 20 — ahead of the September 2026
+  # deprecation cutoff. Safe to leave on permanently.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   test:
