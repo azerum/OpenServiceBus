@@ -44,9 +44,9 @@ jobs:
           dotnet-version: |
             8.0.x
             10.0.x
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
       - name: Install Azure Functions Core Tools (for M11 integration test)
         run: npm install -g azure-functions-core-tools@4 --unsafe-perm true
       - run: dotnet restore

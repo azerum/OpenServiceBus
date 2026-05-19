@@ -26,9 +26,9 @@ jobs:
             10.0.x
 
       - name: Setup Node (for Azure Functions Core Tools)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Install Azure Functions Core Tools
         run: npm install -g azure-functions-core-tools@4 --unsafe-perm true
@@ -47,4 +47,4 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: test-results
-          path: '**/TestResults/*.trx'
+          path: "**/TestResults/*.trx"
