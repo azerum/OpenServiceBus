@@ -40,29 +40,69 @@ public static class ExplorerEndpoints
             var session = sessions.GetOrCreate(req.ConnectionString);
             await using var sender = session.Sender(req.Queue);
 
-            var msg = new ServiceBusMessage(req.Body ?? string.Empty);
-            // Every message gets a MessageId - either the user-supplied one or an auto-generated
-            // Guid - so the Explorer can always show a stable identifier in the received list.
-            // The Service Bus SDK does NOT auto-generate this; without it the field is null on the wire.
-            msg.MessageId = string.IsNullOrWhiteSpace(req.MessageId)
-                ? Guid.NewGuid().ToString("N")
-                : req.MessageId;
-            if (!string.IsNullOrWhiteSpace(req.CorrelationId)) msg.CorrelationId = req.CorrelationId;
-            if (!string.IsNullOrWhiteSpace(req.Subject)) msg.Subject = req.Subject;
-            if (!string.IsNullOrWhiteSpace(req.ContentType)) msg.ContentType = req.ContentType;
-            if (!string.IsNullOrWhiteSpace(req.ReplyTo)) msg.ReplyTo = req.ReplyTo;
-            if (!string.IsNullOrWhiteSpace(req.To)) msg.To = req.To;
-            if (!string.IsNullOrWhiteSpace(req.SessionId)) msg.SessionId = req.SessionId;
-            if (!string.IsNullOrWhiteSpace(req.PartitionKey)) msg.PartitionKey = req.PartitionKey;
-            if (req.TimeToLiveSeconds is > 0) msg.TimeToLive = TimeSpan.FromSeconds(req.TimeToLiveSeconds.Value);
-            if (req.ScheduledEnqueueTime is { } scheduled) msg.ScheduledEnqueueTime = scheduled;
-            if (req.Properties is { Count: > 0 })
+            var count = Math.Max(1, req.Count ?? 1);
+            var strategy = string.Equals(req.Strategy, "PARALLEL", StringComparison.OrdinalIgnoreCase)
+                ? "PARALLEL"
+                : "ATONCE";
+
+            // Each copy gets a unique MessageId. If the user supplied a base id we suffix it (-0, -1, ...);
+            // otherwise we generate a fresh Guid per copy. Without distinct ids dedup-enabled entities
+            // would collapse the bulk into a single delivery.
+            var baseId = string.IsNullOrWhiteSpace(req.MessageId) ? null : req.MessageId;
+            ServiceBusMessage BuildOne(int index)
             {
-                foreach (var (k, v) in req.Properties) msg.ApplicationProperties[k] = v;
+                var msg = new ServiceBusMessage(req.Body ?? string.Empty);
+                msg.MessageId = baseId is null
+                    ? Guid.NewGuid().ToString("N")
+                    : (count == 1 ? baseId : $"{baseId}-{index}");
+                if (!string.IsNullOrWhiteSpace(req.CorrelationId)) msg.CorrelationId = req.CorrelationId;
+                if (!string.IsNullOrWhiteSpace(req.Subject)) msg.Subject = req.Subject;
+                if (!string.IsNullOrWhiteSpace(req.ContentType)) msg.ContentType = req.ContentType;
+                if (!string.IsNullOrWhiteSpace(req.ReplyTo)) msg.ReplyTo = req.ReplyTo;
+                if (!string.IsNullOrWhiteSpace(req.To)) msg.To = req.To;
+                if (!string.IsNullOrWhiteSpace(req.SessionId)) msg.SessionId = req.SessionId;
+                if (!string.IsNullOrWhiteSpace(req.PartitionKey)) msg.PartitionKey = req.PartitionKey;
+                if (req.TimeToLiveSeconds is > 0) msg.TimeToLive = TimeSpan.FromSeconds(req.TimeToLiveSeconds.Value);
+                if (req.ScheduledEnqueueTime is { } scheduled) msg.ScheduledEnqueueTime = scheduled;
+                if (req.Properties is { Count: > 0 })
+                {
+                    foreach (var (k, v) in req.Properties) msg.ApplicationProperties[k] = v;
+                }
+                return msg;
             }
 
-            await sender.SendMessageAsync(msg, ct);
-            return Results.Ok(new { sent = true, messageId = msg.MessageId, scheduledFor = msg.ScheduledEnqueueTime });
+            string firstId;
+            if (count == 1)
+            {
+                var msg = BuildOne(0);
+                firstId = msg.MessageId;
+                await sender.SendMessageAsync(msg, ct);
+            }
+            else if (strategy == "PARALLEL")
+            {
+                // PARALLEL: fire N independent SendMessageAsync calls concurrently. Each is its own
+                // wire transfer/disposition pair, exercising the broker's per-message path.
+                var msgs = Enumerable.Range(0, count).Select(BuildOne).ToList();
+                firstId = msgs[0].MessageId;
+                await Task.WhenAll(msgs.Select(m => sender.SendMessageAsync(m, ct)));
+            }
+            else
+            {
+                // ATONCE: a single SendMessagesAsync(IEnumerable<>) — the SDK packs them into one
+                // AMQP transfer with one settlement, the real bulk path.
+                var msgs = Enumerable.Range(0, count).Select(BuildOne).ToList();
+                firstId = msgs[0].MessageId;
+                await sender.SendMessagesAsync(msgs, ct);
+            }
+
+            return Results.Ok(new
+            {
+                sent = true,
+                sentCount = count,
+                strategy,
+                messageId = firstId,
+                scheduledFor = req.ScheduledEnqueueTime,
+            });
         });
 
         api.MapPost("/receive", async (ReceiveRequest req, SessionManager sessions, CancellationToken ct) =>
@@ -80,6 +120,18 @@ public static class ExplorerEndpoints
             }
             session.TrackLocked(msg, receiver);
             return Results.Ok(ToDto(msg));
+        });
+
+        // Browse mode: returns a snapshot from the head of the queue without taking any locks.
+        // Each call anchors at sequenceNumber 0 so the result is stable across repeated peeks.
+        api.MapPost("/peek", async (PeekRequest req, SessionManager sessions, CancellationToken ct) =>
+        {
+            var session = sessions.GetOrCreate(req.ConnectionString);
+            var receiver = session.Receiver(req.Queue);
+            var max = Math.Clamp(req.MaxMessages ?? 1, 1, 100);
+            var msgs = await receiver.PeekMessagesAsync(max, fromSequenceNumber: 0, ct);
+            var items = msgs.Select(m => ToDto(m, peekOnly: true)).ToList();
+            return Results.Ok(new { count = items.Count, messages = items });
         });
 
         api.MapPost("/complete", async (DispositionRequest req, SessionManager sessions, CancellationToken ct) =>
@@ -137,6 +189,49 @@ public static class ExplorerEndpoints
             }
             await receiver.DeferMessageAsync(msg, cancellationToken: ct);
             return Results.Ok(new { deferred = true, sequenceNumber = msg.SequenceNumber });
+        });
+
+        // Requeue: re-publish a copy of a locked DLQ message onto its source entity and complete
+        // the DLQ original. For a queue DLQ that source is the parent queue; for a subscription
+        // DLQ it is the topic (so the broker re-evaluates rules and fans out again).
+        api.MapPost("/requeue", async (DispositionRequest req, SessionManager sessions, CancellationToken ct) =>
+        {
+            var session = sessions.GetOrCreate(req.ConnectionString);
+            if (!session.TryTakeLocked(req.LockToken, out var msg, out var receiver) || msg is null || receiver is null)
+            {
+                return Results.NotFound(new { error = "Unknown lock token (already settled or never tracked)." });
+            }
+            var target = ComputeRequeueTarget(req.Queue);
+            if (target is null)
+            {
+                return Results.BadRequest(new { error = $"Cannot derive requeue target from '{req.Queue}'." });
+            }
+
+            var copy = new ServiceBusMessage(msg.Body)
+            {
+                MessageId = msg.MessageId,
+            };
+            if (!string.IsNullOrEmpty(msg.CorrelationId)) copy.CorrelationId = msg.CorrelationId;
+            if (!string.IsNullOrEmpty(msg.Subject)) copy.Subject = msg.Subject;
+            if (!string.IsNullOrEmpty(msg.ContentType)) copy.ContentType = msg.ContentType;
+            if (!string.IsNullOrEmpty(msg.ReplyTo)) copy.ReplyTo = msg.ReplyTo;
+            if (!string.IsNullOrEmpty(msg.To)) copy.To = msg.To;
+            if (!string.IsNullOrEmpty(msg.SessionId)) copy.SessionId = msg.SessionId;
+            if (!string.IsNullOrEmpty(msg.PartitionKey)) copy.PartitionKey = msg.PartitionKey;
+            // TimeToLive is TimeSpan.MaxValue when the broker treats it as "infinite" -
+            // forwarding that to a sender raises. Skip it; the destination queue's default applies.
+            if (msg.TimeToLive != default && msg.TimeToLive < TimeSpan.FromDays(1000)) copy.TimeToLive = msg.TimeToLive;
+            foreach (var kv in msg.ApplicationProperties)
+            {
+                // Strip broker-stamped DLQ markers - the new copy starts clean.
+                if (kv.Key is "DeadLetterReason" or "DeadLetterErrorDescription" or "Diagnostic-Id") continue;
+                copy.ApplicationProperties[kv.Key] = kv.Value;
+            }
+
+            await using var sender = session.Sender(target);
+            await sender.SendMessageAsync(copy, ct);
+            await receiver.CompleteMessageAsync(msg, ct);
+            return Results.Ok(new { requeued = true, target, messageId = copy.MessageId });
         });
 
         // --- Topic CRUD (proxied) ---
@@ -246,7 +341,22 @@ public static class ExplorerEndpoints
     private static string Combine(string baseUrl, string suffix)
         => baseUrl.TrimEnd('/') + suffix;
 
-    private static object ToDto(ServiceBusReceivedMessage msg) => new
+    // For "<queue>/$DeadLetterQueue" the target is the parent queue.
+    // For "<topic>/Subscriptions/<sub>/$DeadLetterQueue" the target is the topic (so the broker
+    // re-evaluates subscription filters and fans the message out again).
+    private static string? ComputeRequeueTarget(string queue)
+    {
+        const string dlqSuffix = "/$DeadLetterQueue";
+        if (!queue.EndsWith(dlqSuffix, StringComparison.OrdinalIgnoreCase)) return null;
+        var stripped = queue[..^dlqSuffix.Length];
+        const string subSegment = "/Subscriptions/";
+        var idx = stripped.IndexOf(subSegment, StringComparison.OrdinalIgnoreCase);
+        return idx > 0 ? stripped[..idx] : stripped;
+    }
+
+    // When peekOnly is true, lockToken and lockedUntil are nulled out — the client uses null
+    // lockToken as the signal that no dispositions are available for this message.
+    private static object ToDto(ServiceBusReceivedMessage msg, bool peekOnly = false) => new
     {
         received = true,
         sequenceNumber = Safe(() => (long?)msg.SequenceNumber),
@@ -255,11 +365,11 @@ public static class ExplorerEndpoints
         subject = msg.Subject,
         contentType = msg.ContentType,
         enqueuedTime = SafeTime(() => msg.EnqueuedTime),
-        lockedUntil = SafeTime(() => msg.LockedUntil),
+        lockedUntil = peekOnly ? null : SafeTime(() => msg.LockedUntil),
         expiresAt = SafeTime(() => msg.ExpiresAt),  // M6 TTL deadline
         timeToLive = Safe(() => (TimeSpan?)msg.TimeToLive),
         deliveryCount = Safe(() => (int?)msg.DeliveryCount),
-        lockToken = msg.LockToken,
+        lockToken = peekOnly ? null : msg.LockToken,
         body = SafeBody(msg.Body),
         applicationProperties = msg.ApplicationProperties.ToDictionary(kv => kv.Key, kv => kv.Value?.ToString()),
         // M5: dead-letter metadata - populated only on messages received from a DLQ.
@@ -317,8 +427,11 @@ public sealed record SendRequest(
     string? PartitionKey,
     int? TimeToLiveSeconds,
     DateTimeOffset? ScheduledEnqueueTime,
-    Dictionary<string, string>? Properties);
+    Dictionary<string, string>? Properties,
+    int? Count,
+    string? Strategy);
 public sealed record ReceiveRequest(string ConnectionString, string Queue, int? TimeoutSeconds, string? SessionId);
+public sealed record PeekRequest(string ConnectionString, string Queue, int? MaxMessages);
 public sealed record DispositionRequest(string ConnectionString, string Queue, string LockToken);
 public sealed record DeadLetterRequest(string ConnectionString, string Queue, string LockToken, string? Reason, string? Description);
 public sealed record PingRequest(string ConnectionString, string ManagementUrl);

@@ -592,6 +592,46 @@
     }
     .form-actions .hint { color: var(--text-mute); font-size: 12px; }
 
+    .bulk-controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-left: auto;
+    }
+    .bulk-controls label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11.5px;
+      color: var(--text-mute);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .bulk-controls input,
+    .bulk-controls select {
+      padding: 6px 8px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 12.5px;
+      font-weight: 500;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+    .bulk-controls input { width: 72px; }
+    .bulk-hint {
+      margin-top: 10px;
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      background: var(--code-bg);
+      color: var(--text-mute);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .bulk-hint strong { color: var(--text); }
+
     /* ── Buttons ── */
     .btn {
       display: inline-flex;
@@ -678,6 +718,162 @@
       font-size: 12px;
     }
     .receive-toolbar .hint { color: var(--text-mute); font-size: 12px; margin-left: auto; }
+    .receive-controls {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      padding: 4px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .receive-controls label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 6px;
+      font-size: 11px;
+      color: var(--text-mute);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .receive-controls select,
+    .receive-controls input {
+      padding: 5px 8px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 12.5px;
+      font-weight: 500;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+    .receive-controls input { width: 56px; }
+    .receive-controls .btn { padding: 6px 14px; }
+
+    /* ── Compact message row + dropdown menu ── */
+    .msg-card-compact {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 4px;
+      overflow: visible;
+    }
+    .msg-card-compact.expanded { box-shadow: var(--shadow-sm); }
+    .msg-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 12px;
+      cursor: pointer;
+      font-size: 12.5px;
+      min-height: 34px;
+    }
+    .msg-row:hover { background: var(--surface-2); }
+    .msg-id-compact {
+      font-family: var(--mono);
+      font-size: 11.5px;
+      color: var(--text);
+      font-weight: 600;
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .msg-pill {
+      font-size: 10.5px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: var(--surface-2);
+      color: var(--text-mute);
+      white-space: nowrap;
+      flex-shrink: 0;
+      font-weight: 500;
+    }
+    .msg-pill.mono { font-family: var(--mono); }
+    .msg-pill.lock { background: var(--warning-soft); color: var(--warning); }
+    .msg-pill.peek { background: var(--info-soft); color: var(--info); }
+    .msg-preview {
+      flex: 1;
+      font-family: var(--mono);
+      font-size: 11.5px;
+      color: var(--text-mute);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
+    }
+    .msg-menu-wrap { position: relative; flex-shrink: 0; }
+    .msg-menu-wrap .icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px; height: 26px;
+      padding: 0;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-mute);
+      cursor: pointer;
+    }
+    .msg-menu-wrap .icon-btn:hover { background: var(--surface-2); color: var(--text); }
+    .msg-menu-wrap .icon-btn svg { width: 14px; height: 14px; }
+    .msg-menu {
+      position: fixed;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      box-shadow: 0 4px 12px rgb(0 0 0 / 0.18);
+      min-width: 160px;
+      z-index: 40;
+      padding: 4px;
+    }
+    .msg-menu button {
+      display: block;
+      width: 100%;
+      padding: 7px 10px;
+      text-align: left;
+      background: none;
+      border: none;
+      border-radius: 4px;
+      color: var(--text);
+      font-size: 12.5px;
+      cursor: pointer;
+    }
+    .msg-menu button:hover { background: var(--surface-2); }
+    .msg-menu button.danger { color: var(--danger); }
+    .msg-menu button.danger:hover { background: var(--danger-soft); }
+    .msg-detail {
+      padding: 12px 14px;
+      border-top: 1px solid var(--border);
+      background: var(--code-bg);
+      font-size: 12.5px;
+    }
+    .msg-detail .meta-row {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      padding: 4px 0;
+      font-size: 12px;
+      color: var(--text);
+    }
+    .msg-detail .meta-row dt { color: var(--text-mute); font-weight: 500; margin: 0; }
+    .msg-detail .meta-row dd { margin: 0; font-family: var(--mono); overflow-wrap: anywhere; }
+    .msg-body-full {
+      margin: 8px 0 0;
+      padding: 10px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-family: var(--mono);
+      font-size: 11.5px;
+      max-height: 280px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
 
     .msg-card {
       background: var(--surface);
@@ -842,16 +1038,14 @@
     /* ── Dropdown ── */
     .dropdown { position: relative; display: inline-block; }
     .dropdown-menu {
-      position: absolute;
-      top: calc(100% + 4px);
-      right: 0;
+      position: fixed;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
       box-shadow: var(--shadow-lg);
       padding: 4px;
       min-width: 180px;
-      z-index: 30;
+      z-index: 40;
       display: none;
     }
     .dropdown.open .dropdown-menu { display: block; }
@@ -955,7 +1149,7 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:13px;height:13px"><path d="M12 5v14M5 12h14"/></svg>
               Create
             </button>
-            <div class="dropdown-menu" style="position:absolute;top:calc(100% + 4px);left:0;right:auto;color:var(--text);background:var(--surface);">
+            <div class="dropdown-menu" style="color:var(--text);background:var(--surface);">
               <button id="btnOpenCreateQueue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="12" rx="2"/></svg>Queue</button>
               <button id="btnOpenCreateTopic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4"/><path d="M12 18v4"/><circle cx="12" cy="12" r="4"/><path d="m4.93 4.93 2.83 2.83"/><path d="m16.24 16.24 2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/></svg>Topic</button>
               <button id="btnOpenCreateSubscription"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8L12 14L21 8"/><rect x="3" y="6" width="18" height="14" rx="2"/></svg>Subscription</button>
@@ -1012,6 +1206,10 @@
               Receive
               <span class="tab-count" id="lockedCountBadge" hidden>0</span>
             </button>
+            <button class="tab" data-tab="deadletter" id="dlqTab" hidden>
+              Dead-letter
+              <span class="tab-count" id="dlqCountBadge" hidden>0</span>
+            </button>
             <button class="tab" data-tab="rules" id="rulesTab" hidden>Rules</button>
           </nav>
 
@@ -1059,27 +1257,67 @@
 
             <div class="form-actions">
               <span class="hint" id="sendHint">Sent via <code>Azure.Messaging.ServiceBus</code> SDK.</span>
+              <div class="bulk-controls">
+                <label>Copies
+                  <input id="msgCount" type="number" min="1" value="1">
+                </label>
+                <label>Strategy
+                  <select id="msgStrategy">
+                    <option value="ATONCE">AT ONCE</option>
+                    <option value="PARALLEL">PARALLEL</option>
+                  </select>
+                </label>
+              </div>
               <button id="btnSend" class="btn primary" disabled>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-7 20-4-9-9-4 20-7Z"/><path d="M22 2 11 13"/></svg>
                 Send message
               </button>
             </div>
+            <div class="bulk-hint" id="bulkHint" hidden></div>
           </div>
 
           <!-- Receive -->
           <div class="tab-body" data-pane="receive" hidden>
             <div class="receive-toolbar">
-              <button id="btnReceive" class="btn primary" disabled>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-                Receive next
-              </button>
+              <div class="receive-controls">
+                <label>Mode
+                  <select id="receiveMode">
+                    <option value="peek" selected>Peek</option>
+                    <option value="lock">Peek &amp; Lock</option>
+                  </select>
+                </label>
+                <label>Count
+                  <input id="receiveCount" type="number" min="1" max="100" value="1">
+                </label>
+                <button id="btnReceive" class="btn primary" disabled>Peek</button>
+              </div>
               <div class="session-input" id="receiveSessionBox" hidden>
                 <label>Session</label>
                 <input id="receiveSessionId" placeholder="session-id (required)">
               </div>
-              <span class="hint">Messages stay locked until you settle them.</span>
+              <span class="hint" id="receiveHint">Peek browses without locking.</span>
             </div>
             <div id="receivedList"></div>
+          </div>
+
+          <!-- Dead-letter -->
+          <div class="tab-body" data-pane="deadletter" hidden>
+            <div class="receive-toolbar">
+              <div class="receive-controls">
+                <label>Mode
+                  <select id="receiveModeDlq">
+                    <option value="peek" selected>Peek</option>
+                    <option value="lock">Peek &amp; Lock</option>
+                  </select>
+                </label>
+                <label>Count
+                  <input id="receiveCountDlq" type="number" min="1" max="100" value="1">
+                </label>
+                <button id="btnReceiveDlq" class="btn primary">Peek</button>
+              </div>
+              <span class="hint" id="receiveHintDlq">Reading from <code id="dlqAddress">$DeadLetterQueue</code>.</span>
+            </div>
+            <div id="receivedListDlq"></div>
           </div>
 
           <!-- Rules -->
@@ -1289,7 +1527,9 @@
     // ──────────────────────────────────────────────────────────────────
     const state = {
       selected: null,        // { kind, name, topic?, subscription?, descriptor }
-      lockedMessages: new Map(), // entityKey → Map<msgKey, dto>
+      lockedMessages: new Map(), // entityKey → Map<msgKey, dto> (peek-lock'd, has lockToken)
+      peekedMessages: new Map(), // entityKey → Array<dto> (last peek snapshot, no lockToken)
+      expandedMessages: new Set(), // composite "target|seq" keys to remember which detail rows are open across rerenders
       queues: [],
       topics: [],
       subscriptionsByTopic: {},
@@ -1306,6 +1546,7 @@
       add:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>',
       twisty: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 18 6-6-6-6"/></svg>',
       renew:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M8 16H3v5"/></svg>',
+      kebab:  '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>',
     };
 
     // ──────────────────────────────────────────────────────────────────
@@ -1341,9 +1582,24 @@
     // Dropdown
     // ──────────────────────────────────────────────────────────────────
     const dd = $("#createDropdown");
-    $("#btnCreateToggle").addEventListener("click", e => { e.stopPropagation(); dd.classList.toggle("open"); });
+    const ddMenu = dd.querySelector(".dropdown-menu");
+    function positionCreateMenu() {
+      const r = $("#btnCreateToggle").getBoundingClientRect();
+      ddMenu.style.top = (r.bottom + 4) + "px";
+      ddMenu.style.left = r.left + "px";
+    }
+    $("#btnCreateToggle").addEventListener("click", e => {
+      e.stopPropagation();
+      const opening = !dd.classList.contains("open");
+      if (opening) positionCreateMenu();
+      dd.classList.toggle("open");
+    });
     document.addEventListener("click", () => dd.classList.remove("open"));
     dd.addEventListener("click", e => e.stopPropagation());
+    // Reposition or close the create menu when the page reflows so it doesn't drift away from
+    // the button.
+    window.addEventListener("scroll", () => dd.classList.remove("open"), true);
+    window.addEventListener("resize", () => { if (dd.classList.contains("open")) positionCreateMenu(); });
 
     // ──────────────────────────────────────────────────────────────────
     // Toasts
@@ -1476,11 +1732,8 @@
       } else if (visibleQs.length === 0) {
         qList.innerHTML = '<div class="row-meta" style="padding:6px 10px">No matches</div>';
       } else {
-        for (const q of visibleQs) {
-          qList.appendChild(queueRow(q, false));
-          const dlq = state.queues.find(x => x.name === q.name + "/$DeadLetterQueue");
-          if (dlq) qList.appendChild(queueRow(dlq, true));
-        }
+        // DLQ rows are no longer surfaced here — they show as a tab inside the parent entity.
+        for (const q of visibleQs) qList.appendChild(queueRow(q, false));
       }
 
       // Topics
@@ -1505,10 +1758,8 @@
             const subs = (state.subscriptionsByTopic[t.name] || [])
               .filter(s => !state.sidebarFilter || passesFilter(s.name) || passesFilter(t.name))
               .sort((a,b) => a.name.localeCompare(b.name));
-            for (const sub of subs) {
-              tList.appendChild(subscriptionRow(t, sub, false));
-              tList.appendChild(subscriptionRow(t, sub, true));
-            }
+            // Subscription DLQ is reachable from the Dead-letter tab in the subscription content.
+            for (const sub of subs) tList.appendChild(subscriptionRow(t, sub, false));
           }
         }
       }
@@ -1698,8 +1949,12 @@
 
     function entityStats(sel, d) {
       const cells = [];
+      const dlq = dlqCountForSelected(sel);
       if (sel.kind === 'queue' || sel.kind === 'subscription' || sel.kind === 'subscription-dlq') {
         cells.push(stat("Active messages", d.activeMessageCount ?? "?"));
+        if (sel.kind !== 'subscription-dlq') {
+          cells.push(stat("Dead-lettered", dlq ?? "?"));
+        }
         cells.push(stat("Lock duration", humanTime(d.lockDuration)));
         cells.push(stat("Max delivery", d.maxDeliveryCount));
         cells.push(stat("Default TTL", d.defaultMessageTimeToLive ? humanTime(d.defaultMessageTimeToLive) : "∞"));
@@ -1709,12 +1964,40 @@
       } else if (sel.kind === 'topic') {
         const subCount = (state.subscriptionsByTopic[d.name] || []).length;
         cells.push(stat("Subscriptions", subCount));
+        cells.push(stat("Dead-lettered (all subs)", dlq ?? "?"));
         cells.push(stat("Default TTL", d.defaultMessageTimeToLive ? humanTime(d.defaultMessageTimeToLive) : "∞"));
       }
       return cells.join("");
     }
-    function stat(label, value, mono = false) {
-      return `<div class="stat"><div class="label">${label}</div><div class="value${mono ? ' mono' : ''}">${value}</div></div>`;
+    function stat(label, value, opts = {}) {
+      const cls = (opts.mono ? ' mono' : '') + (opts.alert ? ' alert' : '');
+      return `<div class="stat"><div class="label">${label}</div><div class="value${cls}">${value}</div></div>`;
+    }
+
+    // Aggregates the dead-letter count for any selected entity. For a topic this sums DLQs across
+    // every subscription, since topics themselves don't carry messages — their DLQ pressure lives
+    // on the children. Returns null when the broker hasn't reported a count yet.
+    function dlqCountForSelected(sel) {
+      if (!sel) return null;
+      if (sel.kind === 'queue') {
+        return state.queues.find(q => q.name === sel.name + "/$DeadLetterQueue")?.activeMessageCount ?? null;
+      }
+      if (sel.kind === 'subscription' || sel.kind === 'subscription-dlq') {
+        const addr = `${sel.topic}/Subscriptions/${sel.subscription}/$DeadLetterQueue`;
+        return state.queues.find(q => q.name === addr)?.activeMessageCount ?? null;
+      }
+      if (sel.kind === 'topic') {
+        const subs = state.subscriptionsByTopic[sel.name] || [];
+        if (subs.length === 0) return 0;
+        let total = 0, anyReported = false;
+        for (const s of subs) {
+          const addr = `${sel.name}/Subscriptions/${s.name}/$DeadLetterQueue`;
+          const c = state.queues.find(q => q.name === addr)?.activeMessageCount;
+          if (typeof c === 'number') { total += c; anyReported = true; }
+        }
+        return anyReported ? total : null;
+      }
+      return null;
     }
 
     function renderTabs() {
@@ -1722,27 +2005,47 @@
       const canSend = sel && (sel.kind === 'queue' || sel.kind === 'topic');
       const canReceive = sel && (sel.kind === 'queue' || sel.kind === 'subscription' || sel.kind === 'subscription-dlq');
       const isSubscription = sel?.kind === 'subscription';
+      const dlqAddr = dlqAddressFor(sel);
+      const hasDlq = dlqAddr !== null;
 
       $("#rulesTab").hidden = !isSubscription;
+      $("#dlqTab").hidden = !hasDlq;
       $("#btnSend").disabled = !canSend;
       $("#btnReceive").disabled = !canReceive;
       $("#sendHint").innerHTML = sel?.kind === 'topic'
         ? "Sending to a <strong>topic</strong> - the broker evaluates each subscription's rules and fans out."
         : 'Sent via <code>Azure.Messaging.ServiceBus</code> SDK.';
 
+      if (hasDlq) $("#dlqAddress").textContent = dlqAddr;
+
       // Force activeTab into valid range
       if (state.activeTab === "send" && !canSend) state.activeTab = canReceive ? "receive" : "overview";
       if (state.activeTab === "receive" && !canReceive) state.activeTab = "overview";
+      if (state.activeTab === "deadletter" && !hasDlq) state.activeTab = "overview";
+      if (state.activeTab === "rules" && !isSubscription) state.activeTab = "overview";
 
       $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === state.activeTab));
       $$(".tab-body").forEach(p => p.hidden = p.dataset.pane !== state.activeTab);
 
-      // Locked count badge
+      // Locked count badge (main receive)
       const key = entityKey(sel);
       const locked = key ? lockedFor(key).size : 0;
       const badge = $("#lockedCountBadge");
       badge.hidden = locked === 0;
       badge.textContent = locked;
+
+      // DLQ tab badge: prefer locked count, fall back to broker-reported active count.
+      const dlqBadge = $("#dlqCountBadge");
+      if (hasDlq) {
+        const dlqLocked = lockedFor(dlqAddr).size;
+        const dlqActive = dlqDescriptorFor(sel)?.activeMessageCount;
+        const shown = dlqLocked > 0 ? dlqLocked : (dlqActive ?? 0);
+        dlqBadge.hidden = shown === 0;
+        dlqBadge.textContent = shown;
+        dlqBadge.classList.remove("alert");
+      } else {
+        dlqBadge.hidden = true;
+      }
 
       // Session input visibility
       $("#receiveSessionBox").hidden = !(sel?.descriptor?.requiresSession === true);
@@ -1750,7 +2053,8 @@
 
     function renderActivePane() {
       if (state.activeTab === "overview") renderOverview();
-      if (state.activeTab === "receive") renderReceived();
+      if (state.activeTab === "receive") renderReceived('main');
+      if (state.activeTab === "deadletter") renderReceived('dlq');
       if (state.activeTab === "rules") loadRules();
     }
 
@@ -1764,9 +2068,11 @@
       const rows = [];
 
       if (sel.kind === 'queue' || sel.kind === 'subscription' || sel.kind === 'subscription-dlq') {
+        const dlq = dlqCountForSelected(sel);
         rows.push(["Name", escapeHtml(d.name)]);
         if (d.topicName) rows.push(["Topic", escapeHtml(d.topicName)]);
         rows.push(["Active messages", d.activeMessageCount ?? "?"]);
+        if (sel.kind !== 'subscription-dlq') rows.push(["Dead-lettered", dlq ?? "?"]);
         rows.push(["Lock duration", humanTime(d.lockDuration)]);
         rows.push(["Max delivery count", d.maxDeliveryCount]);
         rows.push(["Default TTL", d.defaultMessageTimeToLive ? humanTime(d.defaultMessageTimeToLive) : "∞ (unlimited)"]);
@@ -1786,8 +2092,10 @@
         if (d.backingQueueName) rows.push(["Backing queue", `<code>${escapeHtml(d.backingQueueName)}</code>`]);
       } else if (sel.kind === 'topic') {
         const subs = state.subscriptionsByTopic[d.name] || [];
+        const dlq = dlqCountForSelected(sel);
         rows.push(["Name", escapeHtml(d.name)]);
         rows.push(["Subscriptions", subs.length]);
+        rows.push(["Dead-lettered", dlq ?? "?"]);
         rows.push(["Default TTL", d.defaultMessageTimeToLive ? humanTime(d.defaultMessageTimeToLive) : "∞ (unlimited)"]);
       }
 
@@ -1972,18 +2280,52 @@
       if (sel.kind === 'queue' || sel.kind === 'topic') return sel.name;
       return null;
     }
-    function receiveTargetEntity() {
+    function receiveTargetEntity(which = 'main') {
       const sel = state.selected;
       if (!sel) return null;
+      if (which === 'dlq') return dlqAddressFor(sel);
       if (sel.kind === 'queue') return sel.name;
       if (sel.kind === 'subscription') return `${sel.topic}/Subscriptions/${sel.subscription}`;
       if (sel.kind === 'subscription-dlq') return `${sel.topic}/Subscriptions/${sel.subscription}/$DeadLetterQueue`;
       return null;
     }
+    function dlqAddressFor(sel) {
+      if (!sel) return null;
+      if (sel.kind === 'queue') return sel.name + "/$DeadLetterQueue";
+      if (sel.kind === 'subscription') return `${sel.topic}/Subscriptions/${sel.subscription}/$DeadLetterQueue`;
+      return null;
+    }
+    function dlqDescriptorFor(sel) {
+      const addr = dlqAddressFor(sel);
+      return addr ? state.queues.find(q => q.name === addr) || null : null;
+    }
+
+    function updateBulkHint() {
+      const count = Math.max(1, parseInt($("#msgCount").value) || 1);
+      const strategy = $("#msgStrategy").value || "ATONCE";
+      const hint = $("#bulkHint");
+      if (count <= 1) { hint.hidden = true; return; }
+      hint.hidden = false;
+      const desc = strategy === "PARALLEL"
+        ? `<strong>${count} parallel sends</strong> — fires <code>SendMessageAsync</code> ${count}× concurrently. Each is its own AMQP transfer.`
+        : `<strong>${count} in one batch</strong> — packs all messages into a single <code>SendMessagesAsync</code> call (one AMQP transfer, one settlement).`;
+      const idNote = $("#msgId").value
+        ? ` MessageId will be suffixed <code>-0</code>…<code>-${count - 1}</code> to keep ids unique.`
+        : "";
+      hint.innerHTML = desc + idNote;
+    }
+    $("#msgCount").addEventListener("input", updateBulkHint);
+    $("#msgStrategy").addEventListener("change", updateBulkHint);
+    $("#msgId").addEventListener("input", updateBulkHint);
 
     $("#btnSend").addEventListener("click", async () => {
       const target = sendTargetEntity();
       if (!target) return;
+      const count = Math.max(1, parseInt($("#msgCount").value) || 1);
+      const strategy = $("#msgStrategy").value || "ATONCE";
+      const btn = $("#btnSend");
+      btn.disabled = true;
+      const t0 = performance.now();
       try {
         const r = await api("POST", "/api/send", {
           connectionString: $("#connStr").value,
@@ -2002,116 +2344,272 @@
             ? new Date(Date.now() + parseInt($("#msgScheduledSecs").value) * 1000).toISOString()
             : null,
           properties: collectAppProps(),
+          count,
+          strategy,
         });
-        toast(r.scheduledFor
-          ? `Scheduled (id=${r.messageId}, for=${r.scheduledFor})`
-          : `Sent to ${target} (id=${r.messageId || "auto"})`, "ok");
+        const elapsed = Math.round(performance.now() - t0);
+        const sentCount = r.sentCount ?? 1;
+        const strat = r.strategy || strategy;
+        const stratLabel = strat === "PARALLEL" ? "PARALLEL" : "AT ONCE";
+        const msg = r.scheduledFor
+          ? `Scheduled ${sentCount} for ${r.scheduledFor} (${stratLabel})`
+          : sentCount === 1
+            ? `Sent to ${target} (id=${r.messageId || "auto"})`
+            : `Sent ${sentCount} to ${target} in ${elapsed}ms (${stratLabel})`;
+        toast(msg, "ok");
         loadEntities();
-      } catch (e) { toast(e.message, "err"); }
+      } catch (e) {
+        toast(e.message, "err");
+      } finally {
+        renderTabs();
+      }
     });
 
-    $("#btnReceive").addEventListener("click", receiveOne);
-    async function receiveOne() {
-      const target = receiveTargetEntity();
-      if (!target) return false;
-      const requiresSession = state.selected?.descriptor?.requiresSession === true;
-      const sessionId = requiresSession ? $("#receiveSessionId").value.trim() : null;
-      if (requiresSession && !sessionId) { toast("Session ID is required on session-enabled entities.", "err"); return false; }
+    // Per-pane control ids (main entity vs DLQ subview).
+    const RX = {
+      main: { mode: "#receiveMode", count: "#receiveCount", btn: "#btnReceive", list: "#receivedList" },
+      dlq:  { mode: "#receiveModeDlq", count: "#receiveCountDlq", btn: "#btnReceiveDlq", list: "#receivedListDlq" },
+    };
+
+    function rxMode(which) { return $(RX[which].mode)?.value || 'peek'; }
+    function rxCount(which) { return Math.max(1, Math.min(100, parseInt($(RX[which].count)?.value) || 1)); }
+
+    function updateReceiveButton(which) {
+      const btn = $(RX[which].btn);
+      if (!btn) return;
+      const mode = rxMode(which);
+      const count = rxCount(which);
+      const base = mode === 'lock' ? 'Peek & Lock' : 'Peek';
+      btn.textContent = count > 1 ? `${base} ${count}` : base;
+    }
+    ['main','dlq'].forEach(w => {
+      $(RX[w].mode)?.addEventListener("change", () => updateReceiveButton(w));
+      $(RX[w].count)?.addEventListener("input", () => updateReceiveButton(w));
+      $(RX[w].btn)?.addEventListener("click", () => doReceiveAction(w));
+    });
+
+    async function doReceiveAction(which) {
+      const target = receiveTargetEntity(which);
+      if (!target) return;
+      const mode = rxMode(which);
+      const count = rxCount(which);
+      const btn = $(RX[which].btn);
+      btn.disabled = true;
       try {
-        const r = await api("POST", "/api/receive", {
-          connectionString: $("#connStr").value,
-          queue: target,
-          timeoutSeconds: 2,
-          sessionId,
-        });
-        if (!r.received) { toast("No messages", "info"); return false; }
-        r.__queue = target;
-        lockedFor(target).set(msgKey(r), r);
+        if (mode === 'peek') await peekMany(which, target, count);
+        else await receiveLocked(which, target, count);
+      } finally {
+        // Reset directly — renderTabs only knows about #btnReceive, so #btnReceiveDlq would
+        // otherwise stay disabled after the first click.
+        btn.disabled = false;
         renderTabs();
-        renderReceived();
-        loadEntities();
-        return true;
-      } catch (e) { toast(e.message, "err"); return false; }
+      }
     }
 
-    function renderReceived() {
-      const out = $("#receivedList");
+    async function peekMany(which, target, count) {
+      try {
+        const r = await api("POST", "/api/peek", {
+          connectionString: $("#connStr").value,
+          queue: target,
+          maxMessages: count,
+        });
+        const items = r.messages || [];
+        state.peekedMessages.set(target, items);
+        renderReceived(which);
+        if (items.length === 0) toast(`No messages in ${target}`, "info");
+        else toast(`Peeked ${items.length}${count > items.length ? `/${count}` : ''} from ${target}`, "ok");
+      } catch (e) { toast(e.message, "err"); }
+    }
+
+    async function receiveLocked(which, target, count) {
+      const requiresSession = which === 'main' && state.selected?.descriptor?.requiresSession === true;
+      const sessionId = requiresSession ? $("#receiveSessionId").value.trim() : null;
+      if (requiresSession && !sessionId) { toast("Session ID is required on session-enabled entities.", "err"); return; }
+      let pulled = 0;
+      for (let i = 0; i < count; i++) {
+        try {
+          const r = await api("POST", "/api/receive", {
+            connectionString: $("#connStr").value,
+            queue: target,
+            timeoutSeconds: 2,
+            sessionId,
+          });
+          if (!r.received) break;
+          r.__queue = target;
+          lockedFor(target).set(msgKey(r), r);
+          pulled++;
+        } catch (e) { toast(e.message, "err"); break; }
+      }
+      renderReceived(which);
+      loadEntities();
+      if (pulled === 0) toast(`No messages in ${target}`, "info");
+      else toast(`Locked ${pulled}${count > pulled ? `/${count}` : ''} from ${target}`, "ok");
+    }
+
+    function renderReceived(which = 'main') {
+      const out = $(RX[which].list);
+      if (!out) return;
       out.innerHTML = "";
-      const target = receiveTargetEntity();
-      const locks = lockedFor(target);
+      const target = receiveTargetEntity(which);
       if (!target) {
         out.innerHTML = '<div class="muted" style="padding:24px 0;text-align:center">Pick a queue or subscription first.</div>';
         return;
       }
-      if (locks.size === 0) {
+      const locked = [...lockedFor(target).values()];
+      const peeked = state.peekedMessages.get(target) || [];
+      // Skip peeked rows that duplicate a locked row at the same sequence number.
+      const lockedSeqs = new Set(locked.map(m => m.sequenceNumber));
+      const peekedShown = peeked.filter(m => !lockedSeqs.has(m.sequenceNumber));
+
+      if (locked.length === 0 && peekedShown.length === 0) {
         out.innerHTML = `
           <div style="text-align:center;padding:36px 12px;color:var(--text-mute)">
-            <div style="font-size:14px;margin-bottom:4px">No locked messages</div>
-            <div style="font-size:12.5px">Click <strong>Receive next</strong> to pull one from <code>${escapeHtml(target)}</code>.</div>
+            <div style="font-size:14px;margin-bottom:4px">No messages</div>
+            <div style="font-size:12.5px">Click <strong>Peek</strong> to browse <code>${escapeHtml(target)}</code>, or switch the mode to <em>Peek &amp; Lock</em>.</div>
           </div>`;
         return;
       }
-      for (const m of [...locks.values()].reverse()) {
-        out.appendChild(messageCard(m));
-      }
+      // Locked first (interactive), newest at top; peeked below in broker order.
+      for (const m of [...locked].reverse()) out.appendChild(compactCard(m, target));
+      for (const m of peekedShown) out.appendChild(compactCard(m, target));
     }
 
-    function messageCard(m) {
-      const tok = m.lockToken;
+    function renderBothReceives() {
+      renderReceived('main');
+      renderReceived('dlq');
+    }
+
+    function compactCard(m, target) {
+      const isLocked = !!m.lockToken;
       const card = document.createElement("div");
-      card.className = "msg-card";
+      card.className = "msg-card-compact" + (isLocked ? "" : " peek-only");
+      const expandKey = `${target}|${m.sequenceNumber ?? m.messageId ?? Math.random()}`;
+      const isExpanded = state.expandedMessages.has(expandKey);
+      if (isExpanded) card.classList.add("expanded");
 
-      const metaPills = [];
-      if (m.sequenceNumber !== null && m.sequenceNumber !== undefined) metaPills.push(`<span>seq <strong>${m.sequenceNumber}</strong></span>`);
-      if (m.deliveryCount !== null && m.deliveryCount !== undefined) metaPills.push(`<span>delivery <strong>${m.deliveryCount}</strong></span>`);
-      if (m.lockedUntil) metaPills.push(`<span>locked until <strong>${escapeHtml(formatTime(m.lockedUntil))}</strong></span>`);
-      if (m.expiresAt) metaPills.push(`<span>expires <strong>${escapeHtml(formatTime(m.expiresAt))}</strong></span>`);
+      const previewSrc = (m.body || "").replace(/\s+/g, " ").trim();
+      const bodyPreview = previewSrc.length > 140 ? previewSrc.slice(0, 140) + "…" : previewSrc;
 
+      const pills = [];
+      if (m.sequenceNumber !== null && m.sequenceNumber !== undefined) pills.push(`<span class="msg-pill mono">seq ${m.sequenceNumber}</span>`);
+      if (typeof m.deliveryCount === 'number' && m.deliveryCount > 1) pills.push(`<span class="msg-pill">×${m.deliveryCount}</span>`);
+      pills.push(isLocked
+        ? `<span class="msg-pill lock">locked</span>`
+        : `<span class="msg-pill peek">peek</span>`);
+      if (isLocked && m.lockedUntil) pills.push(`<span class="msg-pill">${escapeHtml(formatTime(m.lockedUntil))}</span>`);
+
+      const isDlq = target.endsWith("/$DeadLetterQueue");
+      const menuHtml = isLocked ? `
+        <div class="msg-menu-wrap">
+          <button class="icon-btn" data-menu title="Actions" aria-label="Actions">${ICON.kebab}</button>
+          <div class="msg-menu" hidden role="menu">
+            ${isDlq ? `
+              <button data-act="requeue" role="menuitem">Requeue</button>
+              <button data-act="delete" class="danger" role="menuitem">Delete</button>
+            ` : `
+              <button data-act="complete" role="menuitem">Complete</button>
+              <button data-act="abandon" role="menuitem">Abandon</button>
+              <button data-act="renew" role="menuitem">Renew lock</button>
+              <button data-act="defer" role="menuitem">Defer</button>
+              <button data-act="deadletter" class="danger" role="menuitem">Dead-letter</button>
+            `}
+          </div>
+        </div>` : '';
+
+      const meta = [];
+      if (m.correlationId) meta.push(`<div class="meta-row"><dt>CorrelationId</dt><dd>${escapeHtml(m.correlationId)}</dd></div>`);
+      if (m.subject) meta.push(`<div class="meta-row"><dt>Subject</dt><dd>${escapeHtml(m.subject)}</dd></div>`);
+      if (m.contentType) meta.push(`<div class="meta-row"><dt>ContentType</dt><dd>${escapeHtml(m.contentType)}</dd></div>`);
+      if (m.enqueuedTime) meta.push(`<div class="meta-row"><dt>Enqueued</dt><dd>${escapeHtml(formatTime(m.enqueuedTime))}</dd></div>`);
+      if (m.expiresAt) meta.push(`<div class="meta-row"><dt>Expires</dt><dd>${escapeHtml(formatTime(m.expiresAt))}</dd></div>`);
+      if (typeof m.deliveryCount === 'number') meta.push(`<div class="meta-row"><dt>DeliveryCount</dt><dd>${m.deliveryCount}</dd></div>`);
+      const propCount = m.applicationProperties ? Object.keys(m.applicationProperties).length : 0;
+      const propsRow = propCount > 0
+        ? `<div class="meta-row"><dt>App properties (${propCount})</dt><dd><pre style="margin:0;padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;font-size:11.5px;white-space:pre-wrap">${escapeHtml(JSON.stringify(m.applicationProperties, null, 2))}</pre></dd></div>`
+        : '';
       const dlqInfo = (m.deadLetterReason || m.deadLetterSource) ? `
-        <div class="dlq-banner">
+        <div class="dlq-banner" style="margin:0 0 10px">
           <strong>Dead-letter info</strong>
           ${m.deadLetterSource ? `<div>Source: <code>${escapeHtml(m.deadLetterSource)}</code></div>` : ""}
           ${m.deadLetterReason ? `<div>Reason: ${escapeHtml(m.deadLetterReason)}</div>` : ""}
           ${m.deadLetterErrorDescription ? `<div>Description: ${escapeHtml(m.deadLetterErrorDescription)}</div>` : ""}
         </div>` : "";
 
-      const extras = [];
-      if (m.correlationId) extras.push(`<div class="row"><dt>CorrelationId</dt><dd>${escapeHtml(m.correlationId)}</dd></div>`);
-      if (m.subject) extras.push(`<div class="row"><dt>Subject</dt><dd>${escapeHtml(m.subject)}</dd></div>`);
-      if (m.contentType) extras.push(`<div class="row"><dt>ContentType</dt><dd>${escapeHtml(m.contentType)}</dd></div>`);
-      const hasProps = m.applicationProperties && Object.keys(m.applicationProperties).length > 0;
-      if (hasProps) {
-        extras.push(`<details><summary class="muted" style="cursor:pointer;padding:6px 0">Application properties (${Object.keys(m.applicationProperties).length})</summary>
-          <pre style="margin:0;padding:10px;background:var(--code-bg);border-radius:6px;font-size:11.5px">${escapeHtml(JSON.stringify(m.applicationProperties, null, 2))}</pre></details>`);
-      }
-
       card.innerHTML = `
-        <div class="msg-head">
-          <div class="msg-title">
-            <div class="msg-id">${escapeHtml(m.messageId || "(no id)")}</div>
-            <div class="msg-meta">${metaPills.join("")}</div>
-          </div>
-          <div class="msg-actions">
-            <button class="btn success sm" data-complete="${escapeHtml(tok)}">${ICON.check} Complete</button>
-            <button class="btn warn sm" data-abandon="${escapeHtml(tok)}">Abandon</button>
-            <button class="btn ghost sm" data-renew="${escapeHtml(tok)}">${ICON.renew} Renew</button>
-            <button class="btn ghost sm" data-defer="${escapeHtml(tok)}">Defer</button>
-            <button class="btn danger sm" data-deadletter="${escapeHtml(tok)}">DLQ</button>
-          </div>
+        <div class="msg-row">
+          <span class="msg-id-compact" title="${escapeHtml(m.messageId || '(no id)')}">${escapeHtml(m.messageId || '(no id)')}</span>
+          ${pills.join('')}
+          <span class="msg-preview" title="${escapeHtml(previewSrc)}">${escapeHtml(bodyPreview)}</span>
+          ${menuHtml}
         </div>
-        ${dlqInfo}
-        ${extras.length ? `<div class="msg-extra">${extras.join("")}</div>` : ""}
-        <div class="msg-body">
-          <pre>${escapeHtml(m.body)}</pre>
+        <div class="msg-detail"${isExpanded ? '' : ' hidden'}>
+          ${dlqInfo}
+          ${meta.join('')}
+          ${propsRow}
+          <pre class="msg-body-full">${escapeHtml(m.body || '')}</pre>
         </div>
       `;
-      card.querySelector("[data-complete]")?.addEventListener("click", () => disposeMessage(tok, "complete"));
-      card.querySelector("[data-abandon]")?.addEventListener("click", () => disposeMessage(tok, "abandon"));
-      card.querySelector("[data-renew]")?.addEventListener("click", () => renewLock(tok));
-      card.querySelector("[data-defer]")?.addEventListener("click", () => deferMessage(tok));
-      card.querySelector("[data-deadletter]")?.addEventListener("click", () => deadLetterMessage(tok));
+
+      const row = card.querySelector('.msg-row');
+      const detail = card.querySelector('.msg-detail');
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.msg-menu-wrap')) return;
+        const opening = detail.hidden;
+        detail.hidden = !opening;
+        card.classList.toggle('expanded', opening);
+        if (opening) state.expandedMessages.add(expandKey);
+        else state.expandedMessages.delete(expandKey);
+      });
+      const menuBtn = card.querySelector('[data-menu]');
+      if (menuBtn) {
+        menuBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const menu = card.querySelector('.msg-menu');
+          const opening = menu.hidden;
+          document.querySelectorAll('.msg-menu').forEach(mm => mm.hidden = true);
+          if (opening) {
+            // position:fixed coords so the menu escapes any ancestor overflow/stacking context.
+            const r = menuBtn.getBoundingClientRect();
+            menu.style.top = (r.bottom + 4) + 'px';
+            // Right-align to the trigger; clamp so the menu doesn't slip off the left edge.
+            const menuWidth = 180; // matches min-width-ish; browser will widen if needed
+            menu.style.left = Math.max(8, r.right - menuWidth) + 'px';
+            menu.hidden = false;
+          }
+        });
+        card.querySelectorAll('.msg-menu button').forEach(b => {
+          b.addEventListener('click', (e) => {
+            e.stopPropagation();
+            card.querySelector('.msg-menu').hidden = true;
+            const tok = m.lockToken;
+            switch (b.dataset.act) {
+              case 'complete':   disposeMessage(tok, 'complete'); break;
+              case 'abandon':    disposeMessage(tok, 'abandon'); break;
+              case 'renew':      renewLock(tok); break;
+              case 'defer':      deferMessage(tok); break;
+              case 'deadletter': deadLetterMessage(tok); break;
+              case 'requeue':    requeueMessage(tok); break;
+              case 'delete':     deleteMessage(tok); break;
+            }
+          });
+        });
+      }
       return card;
     }
+
+    // Click outside any kebab menu closes it.
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.msg-menu-wrap')) {
+        document.querySelectorAll('.msg-menu').forEach(m => m.hidden = true);
+      }
+    });
+    // Scrolling or resizing detaches the menu from its trigger — easier to just close.
+    window.addEventListener('scroll', () => {
+      document.querySelectorAll('.msg-menu').forEach(m => m.hidden = true);
+    }, true);
+    window.addEventListener('resize', () => {
+      document.querySelectorAll('.msg-menu').forEach(m => m.hidden = true);
+    });
 
     function formatTime(iso) {
       if (!iso) return "-";
@@ -2142,7 +2640,7 @@
       try {
         await api("POST", `/api/${action}`, { connectionString: $("#connStr").value, queue: found.queue, lockToken });
         lockedFor(found.queue).delete(found.key);
-        renderTabs(); renderReceived(); loadEntities();
+        renderTabs(); renderBothReceives(); loadEntities();
         toast(`${action[0].toUpperCase() + action.slice(1)}d`, "ok");
       } catch (e) { toast(e.message, "err"); }
     }
@@ -2155,7 +2653,7 @@
       try {
         await api("POST", "/api/deadletter", { connectionString: $("#connStr").value, queue: found.queue, lockToken, reason: reason || null, description });
         lockedFor(found.queue).delete(found.key);
-        renderTabs(); renderReceived(); loadEntities();
+        renderTabs(); renderBothReceives(); loadEntities();
         toast("Dead-lettered", "ok");
       } catch (e) { toast(e.message, "err"); }
     }
@@ -2165,7 +2663,7 @@
       try {
         const r = await api("POST", "/api/renew", { connectionString: $("#connStr").value, queue: found.queue, lockToken });
         found.msg.lockedUntil = r.renewedUntil;
-        renderReceived();
+        renderBothReceives();
         toast(`Renewed until ${r.renewedUntil}`, "ok");
       } catch (e) { toast(e.message, "err"); }
     }
@@ -2175,8 +2673,35 @@
       try {
         const r = await api("POST", "/api/defer", { connectionString: $("#connStr").value, queue: found.queue, lockToken });
         lockedFor(found.queue).delete(found.key);
-        renderTabs(); renderReceived(); loadEntities();
+        renderTabs(); renderBothReceives(); loadEntities();
         toast(`Deferred (seq=${r.sequenceNumber})`, "ok");
+      } catch (e) { toast(e.message, "err"); }
+    }
+
+    // DLQ-only: publish a copy of the locked message back to the source entity and complete the
+    // DLQ original. The server figures out the target (parent queue or topic).
+    async function requeueMessage(lockToken) {
+      const found = findLocked(lockToken);
+      if (!found) return toast("Lock token no longer tracked locally", "err");
+      try {
+        const r = await api("POST", "/api/requeue", { connectionString: $("#connStr").value, queue: found.queue, lockToken });
+        lockedFor(found.queue).delete(found.key);
+        renderTabs(); renderBothReceives(); loadEntities();
+        toast(`Requeued to ${r.target}`, "ok");
+      } catch (e) { toast(e.message, "err"); }
+    }
+
+    // DLQ-only "Delete": settle the DLQ message by completing it - same wire op as Complete,
+    // exposed under a clearer label so users know it removes the message from the DLQ.
+    async function deleteMessage(lockToken) {
+      const found = findLocked(lockToken);
+      if (!found) return toast("Lock token no longer tracked locally", "err");
+      if (!confirm("Delete this dead-lettered message permanently?")) return;
+      try {
+        await api("POST", "/api/complete", { connectionString: $("#connStr").value, queue: found.queue, lockToken });
+        lockedFor(found.queue).delete(found.key);
+        renderTabs(); renderBothReceives(); loadEntities();
+        toast("Deleted", "ok");
       } catch (e) { toast(e.message, "err"); }
     }
 

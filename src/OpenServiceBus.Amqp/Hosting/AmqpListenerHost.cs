@@ -159,7 +159,6 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
     private void OnQueueDeleted(object? sender, QueueDescriptor descriptor)
     {
         if (_host is null) return;
-        if (EntityNames.IsDeadLetterQueue(descriptor.Name)) return;
 
         try
         {
@@ -174,10 +173,10 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
     private void RegisterManagementEndpoint(QueueDescriptor descriptor)
     {
         if (_host is null) return;
-        // DLQ siblings don't get their own $management endpoint - all management ops target the parent queue.
-        if (EntityNames.IsDeadLetterQueue(descriptor.Name)) return;
-        // Subscription backing queues are registered with subscription context separately (M13.5).
-        if (IsSubscriptionBackingQueue(descriptor.Name)) return;
+        // Subscription-backing queues are registered with subscription context separately
+        // (M13.5) - but their DLQ siblings still need a management endpoint of their own so the
+        // SDK's PeekMessagesAsync against <topic>/Subscriptions/<sub>/$DeadLetterQueue can land.
+        if (IsSubscriptionBackingQueue(descriptor.Name) && !EntityNames.IsDeadLetterQueue(descriptor.Name)) return;
 
         var processor = new ManagementRequestProcessor(
             descriptor.Name,
