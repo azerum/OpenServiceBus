@@ -9,12 +9,6 @@ on:
 permissions:
   contents: read
 
-# Forces every JavaScript-based action (setup-node, upload-artifact, etc.) to run on the
-# runner's Node 24 instead of Node 20, so we're ahead of the September 2026 deprecation
-# cutoff. Safe to leave on permanently — Node 24 is backwards-compatible for action authors.
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   build:
     name: Build & Test
@@ -22,7 +16,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
@@ -32,7 +26,7 @@ jobs:
             10.0.x
 
       - name: Setup Node (for Azure Functions Core Tools)
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version: 24
 
@@ -50,7 +44,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: test-results
           path: "**/TestResults/*.trx"
