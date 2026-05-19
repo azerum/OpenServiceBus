@@ -206,7 +206,7 @@ OpenServiceBus at it, get a broker shaped identically (modulo deferred features)
 
 ### M25 - Docker image + Helm chart (v2.0)
 
-- Multi-arch (amd64, arm64) `ghcr.io/mauritsarissen/openservicebus` image.
+- Multi-arch (amd64, arm64) `mauritsarissen/openservicebus` image.
 - Bundled `config.json`/Bicep bootstrap support via mounted volume.
 - SQLite persistence path mounted from a volume.
 - Health/readiness probes wired through the existing `/health` endpoint.

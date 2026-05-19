@@ -8,11 +8,12 @@
 #   func start
 services:
   openservicebus:
-    image: ghcr.io/mauritsarissen/openservicebus:latest
+    image: mauritsarissen/openservicebus:latest
     container_name: osb-samples-functions
     ports:
       - "5672:5672"   # AMQP — the ServiceBusTrigger connects here
       - "5300:5300"   # REST management API + /health
+      - "5400:5400"   # Explorer browser UI
     environment:
       OPENSERVICEBUS__STORAGE__MODE: Sqlite
       OPENSERVICEBUS__STORAGE__DATASOURCE: /data/broker.db

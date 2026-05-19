@@ -61,7 +61,7 @@ in the repo - every page here is committed in source.
 dotnet add package OpenServiceBus.Testing
 
 # Docker
-docker run -d -p 5672:5672 -p 5300:5300 -v osb-data:/data ghcr.io/mauritsarissen/openservicebus:latest
+docker run -d -p 5672:5672 -p 5300:5300 -v osb-data:/data mauritsarissen/openservicebus:latest
 
 # Source
 git clone https://github.com/mauritsarissen/OpenServiceBus && cd OpenServiceBus

@@ -55,19 +55,22 @@ The host binds `amqp://localhost:5672` (Service Bus SDK) and `http://localhost:5
 docker run -d --name openservicebus \
   -p 5672:5672 \
   -p 5300:5300 \
+  -p 5400:5400 \
   -v osb-data:/data \
-  ghcr.io/mauritsarissen/openservicebus:latest
+  mauritsarissen/openservicebus:latest
 ```
 
 | Port   | What                                                                 |
 | ------ | -------------------------------------------------------------------- |
 | `5672` | AMQP (use this in the Azure SDK connection string)                   |
 | `5300` | REST management API + `/health`                                      |
+| `5400` | Explorer browser UI — open <http://localhost:5400>                   |
 | `5673` | AMQP-over-WebSocket (when `OPENSERVICEBUS__WEBSOCKETS__ENABLED=true`) |
 
-The image runs SQLite-backed at `/data/broker.db` — mount the named volume and queues +
-messages survive container recreates. See [Docker](docs/Docker.md) for the compose recipe,
-every env var, and the WebSocket-transport setup.
+The image runs the broker **and** the Explorer UI side-by-side. SQLite-backed at
+`/data/broker.db` — mount the named volume and queues + messages survive container
+recreates. See [Docker](docs/Docker.md) for the compose recipe, every env var, and the
+WebSocket-transport setup.
 
 ### Connect
 

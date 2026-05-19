@@ -7,7 +7,8 @@ using OpenServiceBus.Core.Storage;
 namespace OpenServiceBus.Host;
 
 /// <summary>
-/// At startup, declares any queues listed in a Microsoft-emulator-compatible <c>config.json</c>.
+/// At startup, declares everything listed in a Microsoft-emulator-compatible <c>config.json</c>:
+/// queues, topics, subscriptions, and filter rules.
 /// Resolution order:
 ///   1. <c>--config &lt;path&gt;</c> CLI argument
 ///   2. <c>OPENSERVICEBUS_CONFIG</c> environment variable
@@ -20,12 +21,18 @@ public sealed class ConfigBootstrapHostedService : IHostedService
     private const string DefaultFileName = "config.json";
 
     private readonly IQueueRegistry _queues;
+    private readonly ITopicRegistry? _topics;
     private readonly ILogger<ConfigBootstrapHostedService> _logger;
     private readonly IHostEnvironment _env;
 
-    public ConfigBootstrapHostedService(IQueueRegistry queues, IHostEnvironment env, ILogger<ConfigBootstrapHostedService> logger)
+    public ConfigBootstrapHostedService(
+        IQueueRegistry queues,
+        IHostEnvironment env,
+        ILogger<ConfigBootstrapHostedService> logger,
+        ITopicRegistry? topics = null)
     {
         _queues = queues;
+        _topics = topics;
         _env = env;
         _logger = logger;
     }
@@ -60,14 +67,64 @@ public sealed class ConfigBootstrapHostedService : IHostedService
 
         foreach (var descriptor in result.Queues)
         {
-            await _queues.CreateAsync(descriptor);
-            _logger.LogInformation("Bootstrapped queue '{Name}' (lockDuration={Lock}, maxDeliveryCount={Max}, ttl={Ttl}, dlqOnExpire={Dlq})",
+            await _queues.CreateAsync(descriptor, cancellationToken).ConfigureAwait(false);
+            _logger.LogInformation(
+                "Bootstrapped queue '{Name}' (lockDuration={Lock}, maxDeliveryCount={Max}, ttl={Ttl}, sessions={Sessions}, dedup={Dedup}, forwardTo={Forward})",
                 descriptor.Name, descriptor.LockDuration, descriptor.MaxDeliveryCount,
                 descriptor.DefaultMessageTimeToLive?.ToString() ?? "(none)",
-                descriptor.DeadLetteringOnMessageExpiration);
+                descriptor.RequiresSession, descriptor.RequiresDuplicateDetection,
+                descriptor.ForwardTo ?? "(none)");
         }
 
-        _logger.LogInformation("Bootstrap complete: {Count} queue(s) declared.", result.Queues.Count);
+        if (_topics is not null)
+        {
+            foreach (var topic in result.Topics)
+            {
+                await _topics.CreateTopicAsync(topic, cancellationToken).ConfigureAwait(false);
+                _logger.LogInformation("Bootstrapped topic '{Name}' (ttl={Ttl})",
+                    topic.Name, topic.DefaultMessageTimeToLive?.ToString() ?? "(none)");
+            }
+
+            foreach (var sub in result.Subscriptions)
+            {
+                try
+                {
+                    await _topics.CreateSubscriptionAsync(sub, cancellationToken).ConfigureAwait(false);
+                    _logger.LogInformation(
+                        "Bootstrapped subscription '{Topic}/{Name}' (sessions={Sessions}, forwardTo={Forward})",
+                        sub.TopicName, sub.Name, sub.RequiresSession, sub.ForwardTo ?? "(none)");
+                }
+                catch (InvalidOperationException ex)
+                {
+                    _logger.LogError(ex, "Failed to declare subscription '{Topic}/{Name}'.", sub.TopicName, sub.Name);
+                }
+            }
+
+            foreach (var rule in result.Rules)
+            {
+                try
+                {
+                    await _topics.CreateOrReplaceRuleAsync(rule, cancellationToken).ConfigureAwait(false);
+                    _logger.LogInformation("Bootstrapped rule '{Topic}/{Sub}/{Name}' (filter={Filter})",
+                        rule.TopicName, rule.SubscriptionName, rule.Name, rule.Filter.GetType().Name);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    _logger.LogError(ex, "Failed to declare rule '{Topic}/{Sub}/{Name}'.",
+                        rule.TopicName, rule.SubscriptionName, rule.Name);
+                }
+            }
+        }
+        else if (result.Topics.Count > 0)
+        {
+            _logger.LogWarning(
+                "config.json declares {Count} topic(s) but no ITopicRegistry is registered - skipping topics.",
+                result.Topics.Count);
+        }
+
+        _logger.LogInformation(
+            "Bootstrap complete: {Queues} queue(s), {Topics} topic(s), {Subs} subscription(s), {Rules} rule(s) declared.",
+            result.Queues.Count, result.Topics.Count, result.Subscriptions.Count, result.Rules.Count);
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;

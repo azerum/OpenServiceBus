@@ -112,9 +112,9 @@ public class EmulatorConfigLoaderTests
   }
 
   [Fact]
-  public void LoadFromJson_TopicsDeclared_EmitsWarningAndIgnoresThem()
+  public void LoadFromJson_TopicsDeclared_AreProjectedOntoTopicDescriptors()
   {
-    // Arrange
+    // Arrange — topics + nested subscriptions + a SQL rule.
     const string json = """
                             {
                               "UserConfig": {
@@ -122,7 +122,31 @@ public class EmulatorConfigLoaderTests
                                   {
                                     "Name": "ns",
                                     "Queues": [],
-                                    "Topics": [ { "Name": "t1" }, { "Name": "t2" } ]
+                                    "Topics": [
+                                      {
+                                        "Name": "events",
+                                        "Properties": { "DefaultMessageTimeToLive": "PT1H" },
+                                        "Subscriptions": [
+                                          {
+                                            "Name": "all",
+                                            "Properties": { "MaxDeliveryCount": 7 }
+                                          },
+                                          {
+                                            "Name": "eu-only",
+                                            "Properties": { "RequiresSession": true, "ForwardTo": "downstream" },
+                                            "Rules": [
+                                              {
+                                                "Name": "EuFilter",
+                                                "Properties": {
+                                                  "FilterType": "Sql",
+                                                  "SqlFilter": { "SqlExpression": "region = 'eu'" }
+                                                }
+                                              }
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    ]
                                   }
                                 ]
                               }
@@ -132,9 +156,20 @@ public class EmulatorConfigLoaderTests
     // Act
     var result = EmulatorConfigLoader.LoadFromJson(json);
 
-    // Assert
-    result.Queues.ShouldBeEmpty();
-    result.Warnings.ShouldContain(w => w.Contains("topic"));
+    // Assert — topic, subscriptions, and rules all surface; no warnings.
+    result.Topics.Count.ShouldBe(1);
+    result.Topics[0].Name.ShouldBe("events");
+    result.Topics[0].DefaultMessageTimeToLive.ShouldBe(TimeSpan.FromHours(1));
+
+    result.Subscriptions.Count.ShouldBe(2);
+    var euOnly = result.Subscriptions.Single(s => s.Name == "eu-only");
+    euOnly.TopicName.ShouldBe("events");
+    euOnly.RequiresSession.ShouldBeTrue();
+    euOnly.ForwardTo.ShouldBe("downstream");
+
+    result.Rules.Count.ShouldBe(1);
+    result.Rules[0].SubscriptionName.ShouldBe("eu-only");
+    result.Rules[0].Filter.ShouldBeOfType<OpenServiceBus.Core.Filters.SqlFilter>();
   }
 
   [Fact]

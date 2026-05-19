@@ -51,7 +51,7 @@ docker run -d --name openservicebus \
   -p 5672:5672 \
   -p 5300:5300 \
   -v osb-data:/data \
-  ghcr.io/mauritsarissen/openservicebus:latest
+  mauritsarissen/openservicebus:latest
 ```
 
 The default image runs SQLite-backed at `/data/broker.db` - mount the volume and your

@@ -3,11 +3,12 @@
 # mounted config.json so they're ready the moment the broker starts.
 services:
   openservicebus:
-    image: ghcr.io/mauritsarissen/openservicebus:latest
+    image: mauritsarissen/openservicebus:latest
     container_name: osb-samples-trigger-demo
     ports:
       - "5672:5672"   # AMQP
       - "5300:5300"   # REST + /health
+      - "5400:5400"   # Explorer browser UI
     environment:
       OPENSERVICEBUS__STORAGE__MODE: Sqlite
       OPENSERVICEBUS__STORAGE__DATASOURCE: /data/broker.db

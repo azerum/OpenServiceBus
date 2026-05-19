@@ -26,14 +26,14 @@ dotnet run                     # or `func start` for the Functions samples
 docker compose down -v         # cleanup (the -v wipes the volume)
 ```
 
-The compose files all use `ghcr.io/mauritsarissen/openservicebus:latest` and bind-mount
+The compose files all use `mauritsarissen/openservicebus:latest` and bind-mount
 the sample's `config.json` to `/etc/openservicebus/config.json` inside the container. The
 container reads it at startup and declares the queues + topics + rules described in the
 sample's README.
 
 ## What's identical across samples
 
-- **Broker image** — `ghcr.io/mauritsarissen/openservicebus:latest`
+- **Broker image** — `mauritsarissen/openservicebus:latest`
 - **Ports** — `5672` (AMQP) + `5300` (REST + `/health`)
 - **Connection string** — the standard development-emulator shape:
   ```

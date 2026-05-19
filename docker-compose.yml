@@ -1,21 +1,25 @@
-# Quickstart: persistent OpenServiceBus broker with the management UI / API.
+# Quickstart: persistent OpenServiceBus broker + Explorer UI in one container.
 #
 #   docker compose up --build
 #
 # Then point the Azure SDK at:
 #   Endpoint=sb://localhost:5672;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true
 #
+# Open the Explorer UI at:  http://localhost:5400
 # Management REST + /health: http://localhost:5300
+#
 # Optional: drop a config.json next to this file and uncomment the bind mount below to have
-# the broker bootstrap queues at startup (Microsoft-emulator-compatible format).
+# the broker bootstrap queues / topics / subscriptions / forwarding at startup. See
+# docs/Docker.md for a richer example.
 services:
   openservicebus:
     build: .
-    image: ghcr.io/mauritsarissen/openservicebus:latest
+    image: mauritsarissen/openservicebus:latest
     container_name: openservicebus
     ports:
       - "5672:5672"      # AMQP
-      - "5300:5300"      # management API
+      - "5300:5300"      # management REST + /health
+      - "5400:5400"      # Explorer browser UI
     environment:
       OPENSERVICEBUS__STORAGE__MODE: Sqlite
       OPENSERVICEBUS__STORAGE__DATASOURCE: /data/broker.db
