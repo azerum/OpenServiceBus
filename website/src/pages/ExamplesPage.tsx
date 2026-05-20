@@ -12,8 +12,8 @@ export default function ExamplesPage() {
   return (
     <>
       <Nav />
-      <header className="border-b border-neutral-900 bg-grid">
-        <div className="mx-auto max-w-5xl px-6 pt-24 pb-14 sm:pt-32 sm:pb-20">
+      <header className="border-b border-neutral-900 bg-grid min-w-0">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6 pt-24 pb-14 sm:pt-32 sm:pb-20">
           <div className="text-xs font-medium text-neutral-500 mb-3">
             <Link to="/" className="hover:text-neutral-300 transition">Home</Link>
             <span className="px-1.5 text-neutral-700">/</span>
@@ -31,7 +31,7 @@ export default function ExamplesPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-6">
+      <main className="mx-auto max-w-5xl w-full min-w-0 px-4 sm:px-6">
         <Examples />
 
         <div className="mb-20 mt-6 rounded-xl border border-neutral-800 bg-neutral-900/40 p-5 sm:p-6">

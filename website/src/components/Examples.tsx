@@ -147,14 +147,15 @@ export default function Examples() {
   const active = EXAMPLES.find((e) => e.id === activeId)!;
 
   return (
-    <section className="py-12">
-      {/* Tab strip */}
-      <div className="flex flex-wrap gap-1 rounded-lg border border-neutral-800 bg-neutral-900/40 p-1 mb-6 w-fit max-w-full">
+    <section className="py-12 w-full min-w-0">
+      {/* Tab strip - w-full + grid (not flex) so the layout never tracks tab-label
+          length or the code box width. Equal columns on mobile, content-sized on sm+. */}
+      <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-1 rounded-lg border border-neutral-800 bg-neutral-900/40 p-1 mb-6 w-full sm:w-fit sm:max-w-full">
         {EXAMPLES.map((ex) => (
           <button
             key={ex.id}
             onClick={() => setActiveId(ex.id)}
-            className={`px-3.5 py-2 rounded-md text-sm font-medium transition ${
+            className={`px-3 sm:px-3.5 py-2 rounded-md text-sm font-medium transition text-center ${
               activeId === ex.id
                 ? "bg-neutral-800 text-white"
                 : "text-neutral-400 hover:text-neutral-100 hover:bg-neutral-900"
@@ -165,21 +166,24 @@ export default function Examples() {
         ))}
       </div>
 
-      {/* Blurb */}
+      {/* Blurb - height varies per tab but width is locked by the section. */}
       <p className="mb-4 text-neutral-400 max-w-2xl">{active.blurb}</p>
 
-      {/* Code block */}
-      <div className="relative rounded-xl border border-neutral-800 bg-neutral-900/60 p-4 sm:p-5">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-red-500/70" />
-            <span className="h-2.5 w-2.5 rounded-full bg-amber-500/70" />
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/70" />
-            <span className="ml-2 text-xs text-neutral-500 font-mono">{active.language}</span>
+      {/* Code block - w-full + overflow-hidden on the outer card guarantees the
+          card is exactly the section width, no matter how wide the code is.
+          The inner <pre> with overflow-x-auto then takes the internal horizontal
+          scroll. The card no longer breathes in/out as tabs switch. */}
+      <div className="w-full rounded-xl border border-neutral-800 bg-neutral-900/60 overflow-hidden">
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-5 pt-4 sm:pt-5 pb-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="h-2.5 w-2.5 rounded-full bg-red-500/70 shrink-0" />
+            <span className="h-2.5 w-2.5 rounded-full bg-amber-500/70 shrink-0" />
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/70 shrink-0" />
+            <span className="ml-2 text-xs text-neutral-500 font-mono truncate">{active.language}</span>
           </div>
           <CopyButton text={active.code} />
         </div>
-        <pre className="overflow-x-auto font-mono text-[12.5px] sm:text-sm leading-relaxed text-neutral-100">
+        <pre className="overflow-x-auto px-4 sm:px-5 pb-4 sm:pb-5 font-mono text-[12.5px] sm:text-sm leading-relaxed text-neutral-100">
           <Code text={active.code} />
         </pre>
       </div>

@@ -22,7 +22,7 @@ export default function NotFoundPage() {
   return (
     <>
       <Nav />
-      <main className="flex-1 mx-auto max-w-3xl px-6 py-20 sm:py-32 text-center">
+      <main className="flex-1 w-full min-w-0 mx-auto max-w-3xl px-4 sm:px-6 py-20 sm:py-32 text-center">
         <div className="text-7xl sm:text-8xl font-extrabold bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
           404
         </div>

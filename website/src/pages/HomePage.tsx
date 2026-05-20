@@ -11,7 +11,7 @@ export default function HomePage() {
     <>
       <Nav />
       <Hero />
-      <main className="mx-auto max-w-5xl px-6">
+      <main className="mx-auto max-w-5xl w-full min-w-0 px-4 sm:px-6">
         <Quickstart />
         <Links />
         <Comparison />

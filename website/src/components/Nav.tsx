@@ -22,12 +22,12 @@ export default function Nav() {
           : "border-b border-transparent bg-transparent"
       }`}
     >
-      <div className="mx-auto max-w-5xl px-6 h-14 flex items-center justify-between">
+      <div className="mx-auto max-w-5xl px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
         <Link
           to="/"
-          className="flex items-center gap-2 text-sm font-semibold text-neutral-100 hover:text-white transition"
+          className="flex items-center gap-2 text-sm font-semibold text-neutral-100 hover:text-white transition min-w-0"
         >
-          <span className="inline-flex h-6 w-6 items-center justify-center rounded bg-violet-600">
+          <span className="inline-flex h-6 w-6 items-center justify-center rounded bg-violet-600 shrink-0">
             <svg
               viewBox="0 0 24 24"
               className="h-3.5 w-3.5 text-white"
@@ -39,14 +39,15 @@ export default function Nav() {
               <path d="M5 8h14M5 12h14M5 16h14" />
             </svg>
           </span>
-          OpenServiceBus
+          {/* Logo-only on phones (under 640px) so the three nav links don't get pushed off. */}
+          <span className="hidden sm:inline truncate">OpenServiceBus</span>
         </Link>
-        <div className="flex items-center gap-1 sm:gap-2 text-sm">
+        <div className="flex items-center gap-0.5 sm:gap-2 text-sm shrink-0">
           <NavLink
             to="/"
             end
             className={({ isActive }) =>
-              `px-3 py-1.5 rounded-md transition ${
+              `px-2 sm:px-3 py-1.5 rounded-md transition ${
                 isActive
                   ? "text-white bg-neutral-900/70"
                   : "text-neutral-300 hover:text-white hover:bg-neutral-900/50"
@@ -58,7 +59,7 @@ export default function Nav() {
           <NavLink
             to="/examples"
             className={({ isActive }) =>
-              `px-3 py-1.5 rounded-md transition ${
+              `px-2 sm:px-3 py-1.5 rounded-md transition ${
                 isActive
                   ? "text-white bg-neutral-900/70"
                   : "text-neutral-300 hover:text-white hover:bg-neutral-900/50"
@@ -71,7 +72,7 @@ export default function Nav() {
             href="https://github.com/mauritsarissen/OpenServiceBus"
             target="_blank"
             rel="noreferrer"
-            className="px-3 py-1.5 rounded-md text-neutral-300 hover:text-white hover:bg-neutral-900/50 transition"
+            className="px-2 sm:px-3 py-1.5 rounded-md text-neutral-300 hover:text-white hover:bg-neutral-900/50 transition"
           >
             GitHub
           </a>

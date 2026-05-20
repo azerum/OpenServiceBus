@@ -5,13 +5,22 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-html { scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+  /* Belt-and-braces: if any descendant accidentally overflows horizontally we'd rather
+     clip it than let the viewport scroll. `clip` (vs `hidden`) keeps fixed/sticky
+     positioning working correctly. */
+  overflow-x: clip;
+}
 body {
   background: #0a0a0a;
   color: #f5f5f5;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Some Android browsers ignore html-level overflow; pin body width as well. */
+  max-width: 100vw;
+  overflow-x: clip;
 }
 
 /* subtle ambient glow behind the hero */

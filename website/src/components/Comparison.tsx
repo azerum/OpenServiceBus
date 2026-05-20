@@ -50,13 +50,42 @@ export default function Comparison() {
         </p>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-neutral-800">
-        <table className="w-full text-sm">
+      {/* Mobile (< sm): a stacked-card layout. Each feature is its own card with the two
+          values side-by-side underneath the label. Avoids the horizontal scroll trap a
+          three-column table forces onto a phone-sized viewport. */}
+      <div className="space-y-2 sm:hidden">
+        {ROWS.map((row) => (
+          <div
+            key={row.feature}
+            className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-3"
+          >
+            <div className="text-sm font-medium text-neutral-100 mb-2 break-words">
+              {row.feature}
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-violet-300 mb-1 font-semibold">
+                  OpenServiceBus
+                </div>
+                <Cell value={row.osb} />
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-neutral-500 mb-1 font-semibold">
+                  MS Emulator
+                </div>
+                <Cell value={row.ms} />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Tablet+ (sm:): traditional three-column table. */}
+      <div className="hidden sm:block overflow-hidden rounded-xl border border-neutral-800">
+        <table className="w-full text-sm border-collapse">
           <thead className="bg-neutral-900/80 text-left">
             <tr className="border-b border-neutral-800">
-              <th className="px-4 py-3 font-semibold text-neutral-300">
-                Feature
-              </th>
+              <th className="px-4 py-3 font-semibold text-neutral-300">Feature</th>
               <th className="px-4 py-3 font-semibold">
                 <span className="text-violet-300">OpenServiceBus</span>
               </th>

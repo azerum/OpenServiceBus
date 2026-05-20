@@ -1,13 +1,13 @@
 export default function Hero() {
   return (
-    <header className="bg-grid border-b border-neutral-900">
-      <div className="mx-auto max-w-5xl px-6 pt-16 pb-20 sm:pt-24 sm:pb-28">
-        <div className="flex items-center gap-2 text-xs font-medium text-neutral-400 mb-6">
+    <header className="bg-grid border-b border-neutral-900 min-w-0">
+      <div className="mx-auto max-w-5xl px-4 sm:px-6 pt-20 pb-16 sm:pt-24 sm:pb-28">
+        <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-neutral-400 mb-6">
           <span className="rounded-full border border-neutral-800 bg-neutral-900/60 px-2.5 py-1">MIT licensed</span>
           <span className="rounded-full border border-neutral-800 bg-neutral-900/60 px-2.5 py-1">.NET 8 &amp; .NET 10</span>
-          <span className="hidden sm:inline rounded-full border border-neutral-800 bg-neutral-900/60 px-2.5 py-1">AMQP 1.0</span>
+          <span className="rounded-full border border-neutral-800 bg-neutral-900/60 px-2.5 py-1">AMQP 1.0</span>
         </div>
-        <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight">
+        <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight break-words">
           <span className="text-white">Open</span>
           <span className="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">ServiceBus</span>
         </h1>
