@@ -1,19 +1,18 @@
-import Hero from "./components/Hero";
-import Quickstart from "./components/Quickstart";
-import Links from "./components/Links";
-import Comparison from "./components/Comparison";
-import Footer from "./components/Footer";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import HomePage from "./pages/HomePage";
+import ExamplesPage from "./pages/ExamplesPage";
+import NotFoundPage from "./pages/NotFoundPage";
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100">
-      <Hero />
-      <main className="mx-auto max-w-5xl px-6">
-        <Quickstart />
-        <Links />
-        <Comparison />
-      </main>
-      <Footer />
-    </div>
+    <BrowserRouter>
+      <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col">
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/examples" element={<ExamplesPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </div>
+    </BrowserRouter>
   );
 }
