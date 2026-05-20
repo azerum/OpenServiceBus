@@ -102,7 +102,7 @@ public class EmulatorConfigLoaderTests
     // Act
     var result = EmulatorConfigLoader.LoadFromJson(json);
 
-    // Assert - M14/M15/M16 fields are all now honored from config.json.
+    // Assert -  fields are all now honored from config.json.
     result.Queues.Count.ShouldBe(1);
     result.Queues[0].RequiresSession.ShouldBeTrue();
     result.Queues[0].RequiresDuplicateDetection.ShouldBeTrue();

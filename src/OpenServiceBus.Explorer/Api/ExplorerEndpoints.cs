@@ -366,13 +366,13 @@ public static class ExplorerEndpoints
         contentType = msg.ContentType,
         enqueuedTime = SafeTime(() => msg.EnqueuedTime),
         lockedUntil = peekOnly ? null : SafeTime(() => msg.LockedUntil),
-        expiresAt = SafeTime(() => msg.ExpiresAt),  // M6 TTL deadline
+        expiresAt = SafeTime(() => msg.ExpiresAt),  // TTL deadline
         timeToLive = Safe(() => (TimeSpan?)msg.TimeToLive),
         deliveryCount = Safe(() => (int?)msg.DeliveryCount),
         lockToken = peekOnly ? null : msg.LockToken,
         body = SafeBody(msg.Body),
         applicationProperties = msg.ApplicationProperties.ToDictionary(kv => kv.Key, kv => kv.Value?.ToString()),
-        // M5: dead-letter metadata - populated only on messages received from a DLQ.
+        // Dead-letter metadata - populated only on messages received from a DLQ.
         deadLetterReason = msg.DeadLetterReason,
         deadLetterErrorDescription = msg.DeadLetterErrorDescription,
         deadLetterSource = msg.DeadLetterSource,

@@ -4,7 +4,7 @@ using OpenServiceBus.Core.Entities;
 namespace OpenServiceBus.IntegrationTests;
 
 /// <summary>
-/// M8 defer flow via the real Azure SDK:
+/// Defer flow via the real Azure SDK:
 ///   1. <c>DeferMessageAsync</c> parks the message in Deferred state.
 ///   2. <c>ReceiveDeferredMessagesAsync</c> retrieves by sequence number.
 ///   3. The retrieved message can be Completed / Abandoned / Dead-lettered via <c>$management</c>.

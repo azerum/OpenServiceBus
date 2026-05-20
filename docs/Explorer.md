@@ -42,8 +42,8 @@ Open <http://localhost:5400>. The Explorer talks to the broker's REST management
 - **Entity tree** - queues + DLQ siblings, topics with collapsible subscription children
   and per-subscription DLQs. Live filter box. Click any entity to inspect.
 - **Create dropdown** - modals for queue, topic, subscription with **every** feature flag
-  exposed: lock duration, max-delivery, TTL, sessions (M14), dedup (M15) + window,
-  forward-to + forward-DLQ-to (M16).
+  exposed: lock duration, max-delivery, TTL, sessions, dedup + window,
+  forward-to + forward-DLQ-to.
 - **Overview tab** - full property dump, quick-action buttons (Send, Receive, Manage rules).
 - **Send tab** - body editor, advanced fields (CorrelationId, Subject, ContentType,
   SessionId, PartitionKey, TTL, scheduled-for) and a custom application-properties editor

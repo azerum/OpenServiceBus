@@ -2,7 +2,7 @@
 
 The minimal Azure Functions sample - a single isolated-worker function with one
 `ServiceBusTrigger` pointed at the queue `integration-queue`. This is also the project the
-**M11 integration test** spins up via `func` to prove OpenServiceBus is a drop-in
+The Functions integration test spins up via `func` to prove OpenServiceBus is a drop-in
 replacement for Azure Service Bus.
 
 What it demonstrates:

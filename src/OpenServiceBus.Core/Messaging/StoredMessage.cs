@@ -3,7 +3,7 @@ namespace OpenServiceBus.Core.Messaging;
 /// <summary>
 /// A message persisted in the broker. The body is the raw, encoded AMQP message bytes
 /// so the wire data round-trips exactly. Decoding happens only at delivery time
-/// when the broker stamps system properties (M4) or applies disposition logic (M5+).
+/// when the broker stamps system properties or applies disposition logic during dispositions.
 /// </summary>
 public sealed record StoredMessage
 {
@@ -21,7 +21,7 @@ public sealed record StoredMessage
     public int DeliveryCount { get; init; }
 
     /// <summary>
-    /// Absolute UTC deadline after which the message is considered expired (M6). Null = no TTL.
+    /// Absolute UTC deadline after which the message is considered expired. Null = no TTL.
     /// Computed at enqueue time as <c>now + min(perMessageTtl, queueDefaultTtl)</c>.
     /// </summary>
     public DateTimeOffset? ExpiresAt { get; init; }
@@ -30,7 +30,7 @@ public sealed record StoredMessage
     public bool IsExpired(DateTimeOffset now) => ExpiresAt is not null && ExpiresAt.Value <= now;
 
     /// <summary>
-    /// Absolute UTC time at which this scheduled message becomes available for delivery (M7).
+    /// Absolute UTC time at which this scheduled message becomes available for delivery.
     /// Null means the message is not scheduled (available immediately on enqueue).
     /// </summary>
     public DateTimeOffset? ScheduledEnqueueTime { get; init; }
@@ -39,7 +39,7 @@ public sealed record StoredMessage
     public bool IsScheduled(DateTimeOffset now) => ScheduledEnqueueTime is not null && ScheduledEnqueueTime.Value > now;
 
     /// <summary>
-    /// True when this message has been deferred via <c>DeferAsync</c> (M8). Deferred messages
+    /// True when this message has been deferred via <c>DeferAsync</c>. Deferred messages
     /// are invisible to the normal receive path and can only be retrieved by sequence number
     /// via <c>ReceiveDeferredMessagesAsync</c>.
     /// </summary>

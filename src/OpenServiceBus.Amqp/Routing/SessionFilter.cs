@@ -8,7 +8,7 @@ namespace OpenServiceBus.Amqp.Routing;
 /// key in <see cref="Source.FilterSet"/> whose value carries the requested
 /// <see cref="SessionId"/>. A null value means "next available session".
 ///
-/// NOTE (M14.4): The SDK's <c>AmqpReceiver.OpenReceiverLinkAsync</c> reads additional fields
+/// NOTE: The SDK's <c>AmqpReceiver.OpenReceiverLinkAsync</c> reads additional fields
 /// on the attach response that aren't currently round-tripped through AMQPNetLite's
 /// ListenerLink in a way the SDK accepts; the resulting <c>SessionLockedUntil</c> dereference
 /// throws. The storage layer + <c>$management</c> session ops are fully wired and exercised

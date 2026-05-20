@@ -1,7 +1,7 @@
 namespace OpenServiceBus.Amqp.WebSockets;
 
 /// <summary>
-/// Configuration for the AMQP-over-WebSocket bridge (M21). When enabled, the broker exposes
+/// Configuration for the AMQP-over-WebSocket bridge. When enabled, the broker exposes
 /// <c>ws://&lt;host&gt;:&lt;port&gt;/$servicebus/websocket/</c> for clients that can't open a raw
 /// TCP AMQP socket (browsers, restrictive corporate firewalls). Incoming WebSocket binary
 /// frames are pumped to the local AMQP listener and vice versa.

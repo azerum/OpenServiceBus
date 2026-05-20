@@ -9,7 +9,7 @@ using OpenServiceBus.Core.Transactions;
 namespace OpenServiceBus.Amqp.Transactions;
 
 /// <summary>
-/// AMQP transaction coordinator (M17). Handles attaches whose <c>Target</c> is a
+/// AMQP transaction coordinator. Handles attaches whose <c>Target</c> is a
 /// <see cref="Coordinator"/> - the SDK's <c>TransactionScope</c> integration opens such a
 /// link automatically. Two message bodies are recognised:
 ///

@@ -4,7 +4,7 @@ using OpenServiceBus.Core.Entities;
 namespace OpenServiceBus.IntegrationTests;
 
 /// <summary>
-/// M15 gate: a dup-detection-enabled queue silently drops repeat sends with the same
+/// A dup-detection-enabled queue silently drops repeat sends with the same
 /// <c>MessageId</c>. The Azure SDK sees a normal "accepted" disposition each time, but
 /// only the first message is stored and delivered.
 /// </summary>

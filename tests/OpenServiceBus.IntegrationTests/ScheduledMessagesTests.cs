@@ -4,7 +4,7 @@ using OpenServiceBus.Core.Entities;
 namespace OpenServiceBus.IntegrationTests;
 
 /// <summary>
-/// Exercises M7 scheduled-message support through the real Azure SDK:
+/// Exercises scheduled-message support through the real Azure SDK:
 /// <list type="bullet">
 ///   <item><c>ServiceBusSender.ScheduleMessageAsync</c> schedules a message for future delivery.</item>
 ///   <item>The message is invisible to receivers until its scheduled time.</item>

@@ -8,7 +8,7 @@ namespace OpenServiceBus.Core.Routing;
 ///
 ///   1. Topic fan-out - a topic isn't a queue, so a send to a topic must evaluate every
 ///      subscription's rules and enqueue to the matching backing queues.
-///   2. Auto-forwarding (M16) - a queue or subscription with <c>ForwardTo</c> set is a
+///   2. Auto-forwarding - a queue or subscription with <c>ForwardTo</c> set is a
 ///      transparent passthrough: the original destination never accumulates messages, the
 ///      router redirects to the configured destination, chaining up to <see cref="MaxForwardDepth"/> hops.
 ///

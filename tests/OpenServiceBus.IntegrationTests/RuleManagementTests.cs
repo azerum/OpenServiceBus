@@ -5,7 +5,7 @@ using OpenServiceBus.Core.Entities;
 namespace OpenServiceBus.IntegrationTests;
 
 /// <summary>
-/// M13.5 gate: <see cref="ServiceBusRuleManager"/> (the SDK's AMQP-based rule manager)
+/// Gate: <see cref="ServiceBusRuleManager"/> (the SDK's AMQP-based rule manager)
 /// drives add-rule, enumerate-rules, and remove-rule end-to-end over the broker's
 /// subscription <c>$management</c> endpoint. After managing rules over the wire,
 /// publishing to the topic fans out exactly to the subscriptions whose rule matches.

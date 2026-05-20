@@ -5,7 +5,7 @@ using OpenServiceBus.Core.Filters;
 namespace OpenServiceBus.IntegrationTests;
 
 /// <summary>
-/// The M13 gate: a Service Bus client publishes to a topic with three subscriptions whose
+/// A Service Bus client publishes to a topic with three subscriptions whose
 /// rules use different SQL filters; only the subscriptions whose filter matches receive the
 /// message. Exercises the full topic-send → filter-evaluate → fan-out-to-backing-queue path
 /// through the actual Azure SDK and real AMQP.

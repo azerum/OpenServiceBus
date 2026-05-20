@@ -12,7 +12,7 @@ public static class QueueEndpoints
     /// <summary>
     /// Maps the REST surface for queue entity CRUD under <c>/queues</c>.
     /// Shape is kept close to the official emulator's HTTP management surface where it overlaps;
-    /// full config.json compatibility lands in M12.
+    /// full config.json compatibility lands.
     /// </summary>
     public static IEndpointRouteBuilder MapQueueEndpoints(this IEndpointRouteBuilder endpoints)
     {

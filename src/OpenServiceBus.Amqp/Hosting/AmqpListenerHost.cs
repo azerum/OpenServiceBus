@@ -76,7 +76,7 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
 
         host.RegisterRequestProcessor("$cbs", new CbsRequestProcessor(_options, _loggerFactory.CreateLogger<CbsRequestProcessor>()));
 
-        // M17: AMQP transaction coordinator. Coordinator-targeted attaches have no Address,
+        // AMQP transaction coordinator. Coordinator-targeted attaches have no Address,
         // and the framework's default address lookup would throw on the (Target)attach.Target
         // cast. The AddressResolver hook lets us redirect those attaches to a synthetic
         // "$coordinator" address where our IMessageProcessor lives.
@@ -100,7 +100,7 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
             RegisterManagementEndpoint(existing);
         }
 
-        // Per-subscription $management endpoint registration (M13.5). Subscription backing
+        // Per-subscription $management endpoint registration. Subscription backing
         // queues route here so rule-management ops can resolve through the topic registry.
         if (_topicRegistry is not null)
         {
@@ -174,7 +174,7 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
     {
         if (_host is null) return;
         // Subscription-backing queues are registered with subscription context separately
-        // (M13.5) - but their DLQ siblings still need a management endpoint of their own so the
+        // - but their DLQ siblings still need a management endpoint of their own so the
         // SDK's PeekMessagesAsync against <topic>/Subscriptions/<sub>/$DeadLetterQueue can land.
         if (IsSubscriptionBackingQueue(descriptor.Name) && !EntityNames.IsDeadLetterQueue(descriptor.Name)) return;
 

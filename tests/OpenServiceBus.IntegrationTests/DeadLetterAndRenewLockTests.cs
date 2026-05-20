@@ -4,7 +4,7 @@ using OpenServiceBus.Core.Entities;
 namespace OpenServiceBus.IntegrationTests;
 
 /// <summary>
-/// Full Azure SDK exercise of M5: explicit dead-letter via <c>DeadLetterMessageAsync</c>,
+/// Full Azure SDK exercise: explicit dead-letter via <c>DeadLetterMessageAsync</c>,
 /// lock renewal via <c>RenewMessageLockAsync</c>, and auto-dead-letter when MaxDeliveryCount is exceeded.
 /// </summary>
 public class DeadLetterAndRenewLockTests

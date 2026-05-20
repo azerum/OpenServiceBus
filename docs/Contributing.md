@@ -31,7 +31,7 @@ samples/
   OpenServiceBus.Samples.TopicsAndFilters/       Pub-sub with SQL + correlation filters
   OpenServiceBus.Samples.Sessions/               Session-locked workers
   OpenServiceBus.Samples.WorkerService/          Background-worker pattern via Microsoft.Extensions.Hosting
-  OpenServiceBus.Samples.Functions/              Minimal Azure Functions ServiceBusTrigger (M11 target)
+  OpenServiceBus.Samples.Functions/              Minimal Azure Functions ServiceBusTrigger (integration test target)
   OpenServiceBus.Samples.FunctionsTriggerDemo/   Interactive multi-trigger Functions app
   config.sample.json
 
@@ -54,7 +54,7 @@ Multi-targets:
 - Libraries: `net8.0` + `net10.0`
 - Executable host + Explorer: `net10.0`
 
-Full regression takes ~30s on a modern laptop. The Azure Functions test (M11) needs
+Full regression takes ~30s on a modern laptop. The Azure Functions test needs
 `func` (Azure Functions Core Tools v4) and the .NET 8 runtime on PATH; it skips when
 either is missing.
 

@@ -131,7 +131,7 @@ public sealed class SqliteMessageStore : IMessageStore, IAsyncDisposable
             var now = _timeProvider.GetUtcNow();
             EnsureQueueRow(queueName);
 
-            // M15: dedup check happens before sequence allocation so duplicate sends don't burn ids.
+            // Dedup check happens before sequence allocation so duplicate sends don't burn ids.
             if (duplicateDetectionWindow is not null && !string.IsNullOrEmpty(messageId))
             {
                 SweepDedupHistory(queueName, now);
@@ -769,7 +769,7 @@ public sealed class SqliteMessageStore : IMessageStore, IAsyncDisposable
         finally { _gate.Release(); }
     }
 
-    // ── Sessions (M14) ───────────────────────────────────────────────
+    // ── Sessions ───────────────────────────────────────────────
 
     public async Task<SessionLock?> TryAcceptSessionAsync(
         string queueName,

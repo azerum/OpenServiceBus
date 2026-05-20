@@ -5,7 +5,7 @@ using OpenServiceBus.Core.Entities;
 namespace OpenServiceBus.IntegrationTests;
 
 /// <summary>
-/// M17 gate: AMQP transactions. The Azure SDK enlists in <see cref="TransactionScope"/>
+/// AMQP transactions. The Azure SDK enlists in <see cref="TransactionScope"/>
 /// automatically - opens a coordinator link on first transactional op, sends ops with
 /// <c>TransactionalState</c>, and discharges on scope completion.
 /// </summary>

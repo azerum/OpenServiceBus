@@ -106,7 +106,7 @@ await receiver.CompleteMessageAsync(msg);`,
     id: "functions",
     label: "Azure Functions",
     blurb:
-      "Isolated-worker Functions app with a ServiceBusTrigger pointed at OpenServiceBus. Verified end-to-end in the project's M11 integration test.",
+      "Isolated-worker Functions app with a ServiceBusTrigger pointed at OpenServiceBus. Verified end-to-end in the project's integration test suite.",
     language: "csharp",
     code: `using Azure.Messaging.ServiceBus;
 using Microsoft.Azure.Functions.Worker;

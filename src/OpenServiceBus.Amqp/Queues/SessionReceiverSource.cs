@@ -130,7 +130,7 @@ public sealed class SessionReceiverSource : IMessageSource
 
         try
         {
-            // M17: transactional disposition - buffer the store op under the txn.
+            // Transactional disposition - buffer the store op under the txn.
             if (dispositionContext.DeliveryState is TransactionalState txnState && txnState.TxnId is { Length: > 0 } txnId)
             {
                 var inner = txnState.Outcome;
@@ -224,7 +224,7 @@ public sealed class SessionReceiverSource : IMessageSource
         var removed = await _store.TryRemoveLockedAsync(_entityName, lockToken, cancellationToken).ConfigureAwait(false);
         if (removed is null) return;
         var dlqBytes = DeadLetterEncoder.AppendDeadLetterHeaders(removed.EncodedMessage, _entityName, reason, description);
-        // M16: honor ForwardDeadLetteredMessagesTo, falling back to the local DLQ.
+        // Honor ForwardDeadLetteredMessagesTo, falling back to the local DLQ.
         var dlqTarget = string.IsNullOrEmpty(_descriptor.ForwardDeadLetteredMessagesTo)
             ? _entityName + EntityNames.DeadLetterSuffix
             : _descriptor.ForwardDeadLetteredMessagesTo!;

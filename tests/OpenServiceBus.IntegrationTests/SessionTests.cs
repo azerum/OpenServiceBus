@@ -4,7 +4,7 @@ using OpenServiceBus.Core.Entities;
 namespace OpenServiceBus.IntegrationTests;
 
 /// <summary>
-/// The M14 gate: the Azure SDK's session receiver claims a session over AMQP, receives only
+/// The Azure SDK's session receiver claims a session over AMQP, receives only
 /// messages belonging to that session in order, round-trips per-session state, renews the
 /// session lock, and releases on dispose so another receiver can take over.
 /// </summary>

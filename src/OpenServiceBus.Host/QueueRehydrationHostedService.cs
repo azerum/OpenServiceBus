@@ -8,7 +8,7 @@ namespace OpenServiceBus.Host;
 /// <summary>
 /// After config bootstrap, ensure the in-memory <see cref="IQueueRegistry"/> has a descriptor
 /// for every queue the backing <see cref="IMessageStore"/> knows about. Only relevant with a
-/// persistent store (M18 SQLite) - on restart the SQLite file still has the queue rows but
+/// persistent store (SQLite) - on restart the SQLite file still has the queue rows but
 /// the registry is empty memory. Rehydrating with default descriptors means existing messages
 /// are visible to receivers and counts surface in the management API; per-queue settings reset
 /// to defaults though, so prefer bootstrapping settings via <c>config.json</c>.

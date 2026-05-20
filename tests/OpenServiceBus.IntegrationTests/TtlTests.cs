@@ -4,7 +4,7 @@ using OpenServiceBus.Core.Entities;
 namespace OpenServiceBus.IntegrationTests;
 
 /// <summary>
-/// Verifies M6 TTL behavior end-to-end through the real Azure SDK:
+/// Verifies TTL behavior end-to-end through the real Azure SDK:
 /// <list type="bullet">
 ///   <item><c>ServiceBusMessage.TimeToLive</c> sets <c>header.ttl</c>, expired messages drop or dead-letter.</item>
 ///   <item>The dead-lettered message has <c>DeadLetterReason="TTLExpiredException"</c>.</item>

@@ -45,7 +45,7 @@ public sealed class QueueManager : IQueueRegistry
         ArgumentNullException.ThrowIfNull(descriptor);
         ArgumentException.ThrowIfNullOrWhiteSpace(descriptor.Name);
 
-        // M16: reject obviously broken auto-forward configs. We only do the cheap self-equality
+        // Reject obviously broken auto-forward configs. We only do the cheap self-equality
         // check at creation; target-exists is checked lazily by the router at runtime - that lets
         // config.json bootstrap entities in arbitrary order without forcing a topological sort.
         if (!string.IsNullOrEmpty(descriptor.ForwardTo) && string.Equals(descriptor.ForwardTo, descriptor.Name, StringComparison.OrdinalIgnoreCase))

@@ -114,7 +114,7 @@ public static class EmulatorConfigLoader
             RequiresSession = props.RequiresSession ?? false,
             RequiresDuplicateDetection = props.RequiresDuplicateDetection ?? false,
             DuplicateDetectionHistoryTimeWindow = ParseDuration(props.DuplicateDetectionHistoryTimeWindow, $"Queue '{q.Name}'.DuplicateDetectionHistoryTimeWindow", warnings),
-            // M16: auto-forwarding. The router enforces target-exists lazily at runtime so
+            // Auto-forwarding. The router enforces target-exists lazily at runtime so
             // queues and topics may appear in config.json in any order.
             ForwardTo = string.IsNullOrEmpty(props.ForwardTo) ? null : props.ForwardTo,
             ForwardDeadLetteredMessagesTo = string.IsNullOrEmpty(props.ForwardDeadLetteredMessagesTo) ? null : props.ForwardDeadLetteredMessagesTo,

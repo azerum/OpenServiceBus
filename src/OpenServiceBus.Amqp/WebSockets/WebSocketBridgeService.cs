@@ -9,7 +9,7 @@ using OpenServiceBus.Amqp.Hosting;
 namespace OpenServiceBus.Amqp.WebSockets;
 
 /// <summary>
-/// AMQP-over-WebSocket bridge (M21). Hosts an <see cref="HttpListener"/> on a dedicated port
+/// AMQP-over-WebSocket bridge. Hosts an <see cref="HttpListener"/> on a dedicated port
 /// that accepts WebSocket upgrades with the <c>amqp</c> sub-protocol, then tunnels every
 /// incoming binary frame to a loopback TCP connection on the running AMQP listener - and the
 /// upstream replies back, framed as binary WebSocket messages.

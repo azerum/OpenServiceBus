@@ -10,7 +10,7 @@ namespace OpenServiceBus.Management.Endpoints;
 public static class TopicEndpoints
 {
     /// <summary>
-    /// REST surface for the M13 topic/subscription/rule pub-sub model, under <c>/topics</c>.
+    /// REST surface for the topic/subscription/rule pub-sub model, under <c>/topics</c>.
     /// Mirrors the shape of <c>/queues</c>; subscriptions live under <c>/topics/{topic}/subscriptions</c>
     /// and their rules under <c>.../rules</c>. The Explorer UI proxies this surface so a browser
     /// can drive the full topology end-to-end without touching the AMQP wire directly.

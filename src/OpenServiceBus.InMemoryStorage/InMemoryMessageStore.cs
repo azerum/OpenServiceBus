@@ -57,7 +57,7 @@ public sealed class InMemoryMessageStore : IMessageStore
         var state = GetQueue(queueName);
         var now = _timeProvider.GetUtcNow();
 
-        // M15: silent-drop duplicate sends. Azure SB does not surface the dup to the sender -
+        // Silent-drop duplicate sends. Azure SB does not surface the dup to the sender -
         // the SDK gets an "accepted" disposition either way. We return the *original*
         // StoredMessage so callers that propagate sequence numbers stay consistent.
         if (duplicateDetectionWindow is not null && !string.IsNullOrEmpty(messageId))
@@ -434,7 +434,7 @@ public sealed class InMemoryMessageStore : IMessageStore
         return result;
     }
 
-    // ── M14: Sessions ──
+    // ── Sessions ──
 
     public Task<SessionLock?> TryAcceptSessionAsync(
         string queueName,
@@ -628,13 +628,13 @@ public sealed class InMemoryMessageStore : IMessageStore
             SingleWriter = false,
         });
 
-        // M14 - sessions. Lazy per-session state container keyed by SessionId.
+        // Sessions. Lazy per-session state container keyed by SessionId.
         public readonly ConcurrentDictionary<string, SessionState> Sessions = new(StringComparer.Ordinal);
 
         public SessionState GetOrAddSession(string sessionId) =>
             Sessions.GetOrAdd(sessionId, _ => new SessionState());
 
-        // M15 - duplicate detection sliding window keyed on MessageId. Two parallel maps:
+        // Duplicate detection sliding window keyed on MessageId. Two parallel maps:
         // SeenMessageIds tracks expiry (for the cheap eviction sweep), OriginalsByMessageId
         // gives us back the StoredMessage so a duplicate send returns the same sequence number.
         public readonly ConcurrentDictionary<string, DateTimeOffset> SeenMessageIds = new(StringComparer.Ordinal);

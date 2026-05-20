@@ -22,7 +22,7 @@ namespace OpenServiceBus.Amqp.WireTests;
 /// <summary>
 /// Spins up an <see cref="AmqpListenerHost"/> bound to a random free TCP port on 127.0.0.1
 /// with an in-memory broker behind it. Intended for wire-level tests until the full
-/// <c>OpenServiceBusTestHost</c> lands in M10.
+/// <c>OpenServiceBusTestHost</c> lands.
 ///
 /// Tests needing deterministic time control (e.g. lock expiration) can pass a custom
 /// <see cref="TimeProvider"/> (typically <c>FakeTimeProvider</c>) and drive expiration

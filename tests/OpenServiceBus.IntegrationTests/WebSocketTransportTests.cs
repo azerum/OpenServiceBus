@@ -4,7 +4,7 @@ using OpenServiceBus.Core.Entities;
 namespace OpenServiceBus.IntegrationTests;
 
 /// <summary>
-/// M21 gate: AMQP-over-WebSocket. The bridge accepts a WebSocket upgrade at
+/// AMQP-over-WebSocket. The bridge accepts a WebSocket upgrade at
 /// <c>/$servicebus/websocket/</c> on its own port, then tunnels binary frames to the AMQP
 /// listener. With <see cref="ServiceBusTransportType.AmqpWebSockets"/> the SDK builds
 /// <c>ws://{host}:{port}/$servicebus/websocket/</c> from the connection string - exactly

@@ -295,7 +295,7 @@ Each sample is self-contained: it ships a `docker-compose.yml`, a `config.json`,
 - **[`samples/OpenServiceBus.Samples.TopicsAndFilters`](samples/OpenServiceBus.Samples.TopicsAndFilters)** - pub-sub with SQL + correlation filter rules.
 - **[`samples/OpenServiceBus.Samples.Sessions`](samples/OpenServiceBus.Samples.Sessions)** - session-locked workers with per-session FIFO ordering.
 - **[`samples/OpenServiceBus.Samples.WorkerService`](samples/OpenServiceBus.Samples.WorkerService)** - `Microsoft.Extensions.Hosting` background-worker pattern.
-- **[`samples/OpenServiceBus.Samples.Functions`](samples/OpenServiceBus.Samples.Functions)** - minimal Azure Functions `ServiceBusTrigger` app (the M11 integration-test target).
+- **[`samples/OpenServiceBus.Samples.Functions`](samples/OpenServiceBus.Samples.Functions)** - minimal Azure Functions `ServiceBusTrigger` app (the integration-test target).
 - **[`samples/OpenServiceBus.Samples.FunctionsTriggerDemo`](samples/OpenServiceBus.Samples.FunctionsTriggerDemo)** - interactive multi-trigger Functions app driven via the Explorer or HTTP.
 
 See [`samples/README.md`](samples/README.md) for the full index and a quick chooser table.
@@ -333,7 +333,7 @@ dotnet test          # full regression suite (~210 tests)
 docker build -t openservicebus:dev .
 ```
 
-The Azure Functions integration test (M11) requires `func` (Azure Functions Core Tools v4)
+The Azure Functions integration test requires `func` (Azure Functions Core Tools v4)
 and the .NET 8 runtime; it skips when either is missing. See [Contributing](docs/Contributing.md)
 for repo conventions, the release flow, and how to add a new milestone.
 

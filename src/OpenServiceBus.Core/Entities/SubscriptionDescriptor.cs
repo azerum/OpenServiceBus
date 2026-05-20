@@ -23,13 +23,13 @@ public sealed record SubscriptionDescriptor
 
     /// <summary>
     /// Auto-forward target for messages that match this subscription's rules.
-    /// See <see cref="QueueDescriptor.ForwardTo"/>. Enforced in M16.
+    /// See <see cref="QueueDescriptor.ForwardTo"/>. Enforced.
     /// </summary>
     public string? ForwardTo { get; init; }
 
     /// <summary>
     /// Auto-forward target for dead-lettered messages on this subscription.
-    /// See <see cref="QueueDescriptor.ForwardDeadLetteredMessagesTo"/>. Enforced in M16.
+    /// See <see cref="QueueDescriptor.ForwardDeadLetteredMessagesTo"/>. Enforced.
     /// </summary>
     public string? ForwardDeadLetteredMessagesTo { get; init; }
 

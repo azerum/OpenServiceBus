@@ -7,7 +7,7 @@ using OpenServiceBus.Core.Entities;
 namespace OpenServiceBus.IntegrationTests;
 
 /// <summary>
-/// M20 gate: the broker emits OpenTelemetry-shaped <see cref="ActivitySource"/> spans and
+/// The broker emits OpenTelemetry-shaped <see cref="ActivitySource"/> spans and
 /// <see cref="Meter"/> measurements on the send / receive / settle / DLQ paths. Tests subscribe
 /// via <see cref="ActivityListener"/> and <see cref="MeterListener"/> - the same way an OTel
 /// pipeline would - and assert the conventional tag values.

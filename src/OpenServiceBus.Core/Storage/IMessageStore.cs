@@ -17,7 +17,7 @@ public interface IMessageStore
 
     /// <summary>
     /// Names of every queue the store currently has rows for. Used at broker startup by
-    /// persistent stores (M18) so the in-memory <c>QueueManager</c> can rehydrate after a
+    /// persistent stores so the in-memory <c>QueueManager</c> can rehydrate after a
     /// restart - without this the queues exist in the backing file but the registry has
     /// forgotten about them.
     /// </summary>
@@ -27,15 +27,15 @@ public interface IMessageStore
     /// Enqueue an encoded message. The returned record carries the assigned sequence number.
     /// </summary>
     /// <param name="expiresAt">
-    /// Absolute UTC deadline after which the message is considered expired (M6). Null = no TTL.
+    /// Absolute UTC deadline after which the message is considered expired. Null = no TTL.
     /// The caller is responsible for computing this from per-message TTL and queue-default TTL.
     /// </param>
     /// <param name="scheduledEnqueueTime">
-    /// Absolute UTC time at which the message becomes available for delivery (M7). Null or
+    /// Absolute UTC time at which the message becomes available for delivery. Null or
     /// past = available immediately. The store assigns a sequence number even for scheduled
     /// messages so callers (and the SDK) can reference them for cancellation.
     /// </param>
-    /// <param name="messageId">The send-side message id. Required for duplicate detection (M15).</param>
+    /// <param name="messageId">The send-side message id. Required for duplicate detection.</param>
     /// <param name="duplicateDetectionWindow">
     /// When non-null, the broker checks whether the same <paramref name="messageId"/> was
     /// enqueued within this sliding window and silently drops the duplicate. The returned
@@ -144,7 +144,7 @@ public interface IMessageStore
     IReadOnlyList<StoredMessage> Peek(string queueName, long fromSequenceNumber, int maxCount);
 
     /// <summary>
-    /// Defer a locked message (M8). Removes the lock, marks the message as deferred, and keeps
+    /// Defer a locked message. Removes the lock, marks the message as deferred, and keeps
     /// it in storage. Deferred messages are invisible to <see cref="TryDequeueAsync"/>; the only
     /// way to retrieve one is by sequence number via <see cref="TryReceiveDeferredAsync"/>.
     /// </summary>
@@ -163,7 +163,7 @@ public interface IMessageStore
         string? associatedLinkName = null,
         CancellationToken cancellationToken = default);
 
-    // ── Sessions (M14) ──
+    // ── Sessions ──
 
     /// <summary>
     /// Claim an exclusive lock on a specific session. Returns the lock on success, or null

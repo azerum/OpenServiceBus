@@ -6,12 +6,12 @@ phase ends with a tagged release; you don't have to ship the whole arc to make i
 
 ## Locked decisions
 
-- **Bicep/ARM bootstrap lands late (Phase 4, M22)** so it can map the full Service Bus
+- **Bicep/ARM bootstrap lands late (Phase 4)** so it can map the full Service Bus
   resource surface from day one - including topics, subscription rules, forwarding,
   sessions, and duplicate detection.
-- **Transactions are in-scope for Phase 2 (M17).** v1.x targets genuine Service Bus parity,
+- **Transactions are in-scope for Phase 2.** v1.x targets genuine Service Bus parity,
   not a subset.
-- **Persistence is SQLite-only** (M18). The "zero-dependency, embeddable in your test
+- **Persistence is SQLite-only**. The "zero-dependency, embeddable in your test
   fixture" pitch is the differentiator. SQL Server parity with the official emulator is
   not in scope unless real demand surfaces.
 - **Cluster/HA, schema registry, claim-check helpers, partitioning** are explicitly out of
@@ -24,7 +24,7 @@ phase ends with a tagged release; you don't have to ship the whole arc to make i
 The biggest gaps in the SB feature surface. Ordered so each milestone builds on the
 routing/storage primitives the previous one added.
 
-### M13 - Topics + Subscriptions + Filters (v1.1)
+### Topics + Subscriptions + Filters (v1.1)
 
 The flagship feature of Phase 2 and the largest single milestone in the roadmap.
 
@@ -43,14 +43,14 @@ The flagship feature of Phase 2 and the largest single milestone in the roadmap.
   subscription gets its own copy with its own peek-lock lifecycle.
 - Tests: in-memory store unit tests, AMQP wire tests, Azure SDK integration tests
   for fan-out, filter matching, and rule CRUD via the SDK's `AdministrationClient`
-  (the one feature we'll need to revisit from the M2.5 decision).
+  (the one feature we'll need to revisit from an earlier decision).
 
 **Gate:** SDK publishes to a topic with three subscriptions on different SQL filters;
 only matching subs receive the message.
 
-### M14 - Sessions (v1.2)
+### Sessions (v1.2)
 
-Can run parallel to M13 - independent code paths.
+Can run parallel to topics work - independent code paths.
 
 - New queue/subscription property: `RequiresSession`.
 - `SessionId` propagation on send and receive.
@@ -65,9 +65,9 @@ Can run parallel to M13 - independent code paths.
 **Gate:** SDK `CreateSessionReceiverAsync` + ordered receive of all messages with the
 same `SessionId` + state round-trip.
 
-### M15 - Duplicate detection (v1.3)
+### Duplicate detection (v1.3)
 
-Smallest milestone - a quick win after the heavier M13/M14.
+Smallest milestone - a quick win after the heavier .
 
 - New queue property: `RequiresDuplicateDetection`, `DuplicateDetectionHistoryTimeWindow`.
 - Per-entity sliding-window hash set keyed on `MessageId`.
@@ -77,21 +77,21 @@ Smallest milestone - a quick win after the heavier M13/M14.
 
 **Gate:** Send the same `MessageId` twice within the window → receiver sees only one.
 
-### M16 - Auto-forwarding (v1.4)
+### Auto-forwarding (v1.4)
 
-Builds on the routing layer from M13.
+Builds on the routing layer.
 
 - New queue/subscription properties: `ForwardTo`, `ForwardDeadLetteredMessagesTo`.
 - On enqueue (or DLQ-arrival), the broker re-sends to the configured target.
 - Loop detection via a forward-hop counter (`x-opt-forward-count` annotation,
   matching Azure's behavior); reject with `amqp:not-allowed` past 4 hops.
 - Cross-entity-type forwarding (queue → topic, topic-sub → queue) works because of
-  the unified routing in M13.
+  the unified routing.
 
 **Gate:** Send to queue A configured `ForwardTo: B` → message lands in B only.
 Loop A→B→A → 4th hop rejected.
 
-### M17 - Transactions (v1.5)
+### Transactions (v1.5)
 
 The complex one. The AMQP spec is precise but the implementation has many edge cases.
 
@@ -105,7 +105,7 @@ The complex one. The AMQP spec is precise but the implementation has many edge c
 **Gate:** SDK `ServiceBusClient.CreateTransactionalBatch()` round-trip with mixed
 ops across two queues, committed atomically; same flow rolled back on discharge-fail.
 
-### M17.5 - v1.5 hardening + release (v1.5 final)
+### v1.5 hardening + release (v1.5 final)
 
 Bug bash, wire-protocol conformance test expansion, performance baseline run. Not a
 feature milestone - a release-stabilization milestone.
@@ -116,7 +116,7 @@ feature milestone - a release-stabilization milestone.
 
 The "this broker can run unattended for weeks" phase.
 
-### M18 - Persistent storage (SQLite) (v1.6)
+### Persistent storage (SQLite) (v1.6)
 
 - `OpenServiceBus.SqliteStorage` package exposing `ISqlitePersistenceOptions` and an
   `AddOpenServiceBusSqliteStorage` DI extension.
@@ -127,7 +127,7 @@ The "this broker can run unattended for weeks" phase.
   the process died (lock-expired-on-restart).
 - Performance gate: 10k msg/sec sustained send+receive on a laptop SSD.
 
-### M19 - OpenTelemetry (v1.7)
+### OpenTelemetry (v1.7)
 
 - `ActivitySource` for AMQP frame lifecycle, message lifecycle, lock lifecycle.
 - Metric instruments: queue depth (gauge), message-rate by op (counter), lock
@@ -136,7 +136,7 @@ The "this broker can run unattended for weeks" phase.
   names per subsystem.
 - OTel resource attributes (`service.namespace`, `service.name`, `service.version`).
 
-### M20 - AMQP-over-WebSocket (v1.8)
+### AMQP-over-WebSocket (v1.8)
 
 - ASP.NET Core WebSocket endpoint on the same Kestrel host as the management API.
 - Routes `Upgrade: websocket` requests through AMQPNetLite's `WebSocketTransport`.
@@ -144,7 +144,7 @@ The "this broker can run unattended for weeks" phase.
   firewalled environments).
 - Tested end-to-end with the Azure SDK in WebSocket mode.
 
-### M21 - Backpressure + memory bounds (v1.9)
+### Backpressure + memory bounds (v1.9)
 
 - Per-queue depth ceiling (configurable, default 100k messages or 256 MB whichever
   first).
@@ -159,7 +159,7 @@ The "this broker can run unattended for weeks" phase.
 
 This phase makes OpenServiceBus pleasant to use, not just functional.
 
-### M22 - Bicep / ARM template bootstrap (v2.0)
+### Bicep / ARM template bootstrap (v2.0)
 
 The single most-requested ergonomic feature.
 
@@ -174,7 +174,7 @@ The single most-requested ergonomic feature.
   - `Microsoft.ServiceBus/namespaces/topics`
   - `Microsoft.ServiceBus/namespaces/topics/subscriptions`
   - `Microsoft.ServiceBus/namespaces/topics/subscriptions/rules`
-- Maps every property landed in Phase 2 (M13–M17) to OpenServiceBus's descriptors.
+- Maps every property landed in Phase 2 () to OpenServiceBus's descriptors.
 - Logs `parameters` and `outputs` blocks as info; doesn't try to evaluate ARM
   expressions beyond what's needed for resource names.
 - Warns on features still not supported (premium-tier-only fields, geo-replication,
@@ -185,7 +185,7 @@ The single most-requested ergonomic feature.
 **Gate:** Take a real production Bicep file used by an Azure deployment, point
 OpenServiceBus at it, get a broker shaped identically (modulo deferred features).
 
-### M23 - Explorer v2 (v2.0)
+### Explorer v2 (v2.0)
 
 - Topics + subscription tree view.
 - Subscription rule editor with a **"test this message against this filter"**
@@ -196,7 +196,7 @@ OpenServiceBus at it, get a broker shaped identically (modulo deferred features)
 - Session viewer.
 - All built on the management REST API - no Explorer-specific server code.
 
-### M24 - `openservicebus` CLI (v2.0)
+### `openservicebus` CLI (v2.0)
 
 - Scriptable wrapper around the management REST API.
 - Verbs: `queue create/delete/list/describe`, `topic create`, `subscription create`,
@@ -204,16 +204,16 @@ OpenServiceBus at it, get a broker shaped identically (modulo deferred features)
 - Output formats: `--output json|table|jsonl` for piping into other tools.
 - Connection string read from `OPENSERVICEBUS_CONNECTION` env var or `--endpoint`.
 
-### M25 - Docker image + Helm chart (v2.0)
+### Docker image + Helm chart (v2.0)
 
 - Multi-arch (amd64, arm64) `mauritsarissen/openservicebus` image.
 - Bundled `config.json`/Bicep bootstrap support via mounted volume.
 - SQLite persistence path mounted from a volume.
 - Health/readiness probes wired through the existing `/health` endpoint.
 - Helm chart with sensible defaults; PVC for the SQLite file; ServiceMonitor for
-  the OTel metrics from M19.
+  the OTel metrics.
 
-### M26 - Documentation site (v2.0)
+### Documentation site (v2.0)
 
 - mkdocs-material site at `docs.openservicebus.dev` (or similar).
 - Sections: Getting Started, Concepts (queues/topics/subs/sessions/transactions),
@@ -250,7 +250,7 @@ The following have been considered and intentionally rejected from this roadmap:
 - **Claim-check / large-message helpers.** SB's 256 KB / 1 MB limits are
   intentional; we won't paper over them.
 - **Premium-tier partitioning semantics.** Beyond the test/dev sweet spot.
-- **SQL Server persistence.** Use SQLite (M18) or the official emulator if you
+- **SQL Server persistence.** Use SQLite or the official emulator if you
   need SQL Server. Revisit if real demand surfaces.
 
 ---

@@ -22,7 +22,7 @@ builder.Services
     .AddOptions<WebSocketBridgeOptions>()
     .Bind(builder.Configuration.GetSection("OpenServiceBus:WebSockets"));
 
-// M19: storage mode selectable via OpenServiceBus:Storage:Mode (defaults to InMemory). When
+// Storage mode selectable via OpenServiceBus:Storage:Mode (defaults to InMemory). When
 // set to Sqlite the SQLite store registers IMessageStore first; the in-memory DI's TryAdd
 // then becomes a no-op for the store while still wiring the queue/topic registries,
 // transaction manager, lock manager, and message router that the rest of the broker needs.
@@ -38,7 +38,7 @@ if (string.Equals(storageMode, "Sqlite", StringComparison.OrdinalIgnoreCase))
 builder.Services.AddOpenServiceBusInMemoryStorage();
 builder.Services.AddOpenServiceBusAmqp();
 builder.Services.AddHostedService<ConfigBootstrapHostedService>();
-// M19: when a persistent store is in use, recover the queue catalog from disk on startup
+// When a persistent store is in use, recover the queue catalog from disk on startup
 // so the registry agrees with the SQLite file after a restart.
 builder.Services.AddHostedService<QueueRehydrationHostedService>();
 

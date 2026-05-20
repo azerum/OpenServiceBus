@@ -30,7 +30,7 @@ public static class ServiceCollectionExtensions
         services.AddHostedService<ScheduledMessageActivator>();
         services.AddHostedService<DiagnosticsHostedService>();
 
-        // M21: AMQP-over-WebSocket bridge. Stays off until either an Options binding sets Enabled
+        // AMQP-over-WebSocket bridge. Stays off until either an Options binding sets Enabled
         // (e.g. the Host's "OpenServiceBus:WebSockets" config section) or the caller opts in via
         // AddOpenServiceBusAmqpWebSockets below. The hosted service early-returns when disabled,
         // so this registration is essentially free.

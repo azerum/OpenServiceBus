@@ -69,7 +69,7 @@ public sealed class QueueSenderProcessor : IMessageProcessor
             // enqueues so each inner message gets its own sequence number and lifecycle.
             if (msg.Format == AmqpBatchedMessageFormat && msg.BodySection is DataList dataList)
             {
-                // M17: a transactional batch sends all inner messages under the same txn.
+                // A transactional batch sends all inner messages under the same txn.
                 var batchTxnId = (messageContext.DeliveryState as TransactionalState)?.TxnId;
                 _ = EnqueueBatchAsync(messageContext, dataList, batchTxnId);
                 return;
@@ -77,24 +77,24 @@ public sealed class QueueSenderProcessor : IMessageProcessor
 
             var encoded = CopyEncoded(msg);
             var expiresAt = ComputeExpiresAt(msg);
-            // M7: clients can schedule via SendMessageAsync (this path) by stamping the
+            // Clients can schedule via SendMessageAsync (this path) by stamping the
             // x-opt-scheduled-enqueue-time annotation; or via the dedicated ScheduleMessageAsync
             // which goes through $management. Both end up at IMessageStore.EnqueueAsync(..., scheduledEnqueueTime).
             var scheduledFor = ReadScheduledEnqueueTime(msg);
-            // M14: AMQP properties.group-id IS Service Bus's SessionId - but only route by it
+            // AMQP properties.group-id IS Service Bus's SessionId - but only route by it
             // when the queue is session-enabled; on a plain queue the GroupId is preserved as
             // metadata via the encoded bytes and the message stays on the regular delivery path.
             var sessionId = _descriptor.RequiresSession ? msg.Properties?.GroupId : null;
-            // M15: when dedup is required, pass messageId + window to the store so repeats are dropped.
+            // When dedup is required, pass messageId + window to the store so repeats are dropped.
             var messageId = _descriptor.RequiresDuplicateDetection ? msg.Properties?.MessageId?.ToString() : null;
             var dedupWindow = _descriptor.RequiresDuplicateDetection
                 ? _descriptor.DuplicateDetectionHistoryTimeWindow ?? TimeSpan.FromMinutes(10)
                 : (TimeSpan?)null;
-            // M16: forward target may be a topic - build a filter context unconditionally so
+            // Forward target may be a topic - build a filter context unconditionally so
             // the router can fan-out if the chain hits one. Cheap when not forwarded.
             var filterContext = BuildFilterContext(msg, _timeProvider.GetUtcNow());
 
-            // M17: if the client wrapped this transfer in a TransactionalState, buffer the
+            // If the client wrapped this transfer in a TransactionalState, buffer the
             // enqueue under the txn and reply with a transactional Accepted instead of running
             // the actual store op now. Commit/rollback happens via the coordinator link.
             if (messageContext.DeliveryState is TransactionalState txnState && txnState.TxnId is { Length: > 0 } txnId)
@@ -217,7 +217,7 @@ public sealed class QueueSenderProcessor : IMessageProcessor
     }
 
     /// <summary>
-    /// Hook for auto-forwarding (M16) + the M20 send-instrumentation point. Every accepted send
+    /// Hook for auto-forwarding + the send-instrumentation point. Every accepted send
     /// (single, batched, or transactional commit-replay) flows through here exactly once per
     /// message - making it the single right place to emit the <c>osb.send</c> activity and bump
     /// the sent counter.

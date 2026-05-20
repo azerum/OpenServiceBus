@@ -1359,8 +1359,8 @@
         </div>
         <div style="margin-top:8px">
           <label class="checkbox"><input id="cqDleOnExpiration" type="checkbox"> Dead-letter on message expiration</label>
-          <label class="checkbox"><input id="cqRequiresSession" type="checkbox"> Sessions required <span class="mono-tag">M14</span></label>
-          <label class="checkbox"><input id="cqRequiresDedup" type="checkbox"> Duplicate detection <span class="mono-tag">M15</span></label>
+          <label class="checkbox"><input id="cqRequiresSession" type="checkbox"> Sessions required</label>
+          <label class="checkbox"><input id="cqRequiresDedup" type="checkbox"> Duplicate detection</label>
         </div>
         <div class="field" style="margin-top:10px">
           <label>Dedup window (seconds)</label>
@@ -1369,12 +1369,12 @@
         </div>
         <div class="field-grid" style="margin-top:14px">
           <div class="field">
-            <label>Forward to <span class="mono-tag">M16</span></label>
+            <label>Forward to</label>
             <input id="cqForwardTo" placeholder="another-queue or topic">
             <div class="help">All accepted sends are transparently routed to this destination.</div>
           </div>
           <div class="field">
-            <label>Forward dead-lettered to <span class="mono-tag">M16</span></label>
+            <label>Forward dead-lettered to</label>
             <input id="cqForwardDlq" placeholder="another-queue">
             <div class="help">Dead-letters land here instead of the local <code>$DeadLetterQueue</code>.</div>
           </div>
@@ -1431,16 +1431,16 @@
         </div>
         <div style="margin-top:8px">
           <label class="checkbox"><input id="csDleOnExpiration" type="checkbox"> Dead-letter on expiration</label>
-          <label class="checkbox"><input id="csRequiresSession" type="checkbox"> Sessions required <span class="mono-tag">M14</span></label>
+          <label class="checkbox"><input id="csRequiresSession" type="checkbox"> Sessions required</label>
         </div>
         <div class="field-grid" style="margin-top:14px">
           <div class="field">
-            <label>Forward to <span class="mono-tag">M16</span></label>
+            <label>Forward to</label>
             <input id="csForwardTo" placeholder="another-queue or topic">
             <div class="help">Matching messages skip this subscription's backing queue and route to the destination.</div>
           </div>
           <div class="field">
-            <label>Forward dead-lettered to <span class="mono-tag">M16</span></label>
+            <label>Forward dead-lettered to</label>
             <input id="csForwardDlq" placeholder="another-queue">
             <div class="help">Dead-letters land here instead of the sub's local DLQ.</div>
           </div>

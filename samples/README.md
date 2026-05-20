@@ -12,7 +12,7 @@ the compose file mounts in), and a `README.md` explaining what it shows and how 
 | **[TopicsAndFilters](OpenServiceBus.Samples.TopicsAndFilters)**         | Topic pub-sub with SQL + correlation filter rules                                               | Building fan-out / pub-sub                                    |
 | **[Sessions](OpenServiceBus.Samples.Sessions)**                         | Per-session FIFO with two parallel session-locked workers                                       | Tenant isolation, ordered per-key processing                  |
 | **[WorkerService](OpenServiceBus.Samples.WorkerService)**               | `BackgroundService` + `ServiceBusProcessor` with concurrency + auto-DLQ                         | Production-shaped consumer code                               |
-| **[Functions](OpenServiceBus.Samples.Functions)**                       | Minimal Azure Functions `ServiceBusTrigger`                                                     | Functions worker prerequisite check (and the M11 test target) |
+| **[Functions](OpenServiceBus.Samples.Functions)**                       | Minimal Azure Functions `ServiceBusTrigger`                                                     | Functions worker prerequisite check (and the integration test target) |
 | **[FunctionsTriggerDemo](OpenServiceBus.Samples.FunctionsTriggerDemo)** | 5-trigger Functions app: peek-lock, batch, manual disposition, DLQ trigger, HTTP output binding | Exploring the full Functions binding surface                  |
 
 ## Common pattern

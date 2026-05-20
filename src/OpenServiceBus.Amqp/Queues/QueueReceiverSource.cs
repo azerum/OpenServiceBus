@@ -18,10 +18,10 @@ namespace OpenServiceBus.Amqp.Queues;
 
 /// <summary>
 /// Implements the broker-side of a receive link: pulls the next available message from
-/// the store under peek-lock, stamps Service Bus system properties (M4), translates client
+/// the store under peek-lock, stamps Service Bus system properties, translates client
 /// dispositions back into store operations, moves messages to the DLQ when an explicit
-/// Rejected disposition arrives or when the delivery-count budget is exhausted (M5), and
-/// dead-letters / drops expired messages on dequeue (M6).
+/// Rejected disposition arrives or when the delivery-count budget is exhausted, and
+/// dead-letters / drops expired messages on dequeue.
 /// One instance per (queue, sub-resource) - multiple client receivers can share it safely.
 /// </summary>
 public sealed class QueueReceiverSource : IMessageSource
@@ -79,7 +79,7 @@ public sealed class QueueReceiverSource : IMessageSource
             var locked = await _store.TryDequeueAsync(_entityName, _descriptor.LockDuration, link.Name).ConfigureAwait(false);
             if (locked is null) return null!;
 
-            // M6: messages that crossed their TTL deadline while waiting in the queue get
+            // Messages that crossed their TTL deadline while waiting in the queue get
             // dropped (or moved to DLQ when DeadLetteringOnMessageExpiration is set on the queue).
             if (locked.Message.IsExpired(_timeProvider.GetUtcNow()))
             {
@@ -87,7 +87,7 @@ public sealed class QueueReceiverSource : IMessageSource
                 continue;
             }
 
-            // M5: if the wire delivery-count has reached MaxDeliveryCount, skip delivery and move to DLQ.
+            // If the wire delivery-count has reached MaxDeliveryCount, skip delivery and move to DLQ.
             // The DLQ itself never auto-dead-letters (MaxDeliveryCount = int.MaxValue and _isDlq guards anyway).
             if (!_isDlq && locked.Message.DeliveryCount >= _descriptor.MaxDeliveryCount)
             {
@@ -102,7 +102,7 @@ public sealed class QueueReceiverSource : IMessageSource
             var amqp = DecodeMessage(locked.Message.EncodedMessage);
             StampSystemProperties(amqp, locked);
 
-            // M20: emit a receive activity carrying the messaging conventions. Cheap when no
+            // Emit a receive activity carrying the messaging conventions. Cheap when no
             // listener is attached (StartActivity returns null and the SetTag block is skipped).
             using (var activity = OpenServiceBusDiagnostics.ActivitySource.StartActivity(
                 OpenServiceBusDiagnostics.SpanReceive, ActivityKind.Consumer))
@@ -145,7 +145,7 @@ public sealed class QueueReceiverSource : IMessageSource
             return;
         }
 
-        // M20: settle activity covers the whole disposition pipeline. We tag the outcome at the
+        // Settle activity covers the whole disposition pipeline. We tag the outcome at the
         // end (post-switch) so transactional and non-transactional paths both produce one span.
         using var activity = OpenServiceBusDiagnostics.ActivitySource.StartActivity(
             OpenServiceBusDiagnostics.SpanSettle, ActivityKind.Consumer);
@@ -159,7 +159,7 @@ public sealed class QueueReceiverSource : IMessageSource
 
         try
         {
-            // M17: a transactional disposition wraps the real outcome in TransactionalState.
+            // A transactional disposition wraps the real outcome in TransactionalState.
             // Buffer the store op under the txn and reply with a transactional Accepted;
             // commit/rollback happens via the coordinator's discharge.
             if (dispositionContext.DeliveryState is TransactionalState txnState && txnState.TxnId is { Length: > 0 } txnId)
@@ -186,7 +186,7 @@ public sealed class QueueReceiverSource : IMessageSource
                     disposition = "complete";
                     break;
 
-                // M8: Modified with UndeliverableHere=true is the SDK's DeferAsync wire signal -
+                // Modified with UndeliverableHere=true is the SDK's DeferAsync wire signal -
                 // park the message in Deferred state instead of returning it to the active pool.
                 case Modified modified when modified.UndeliverableHere:
                     _store.TryDeferAsync(_entityName, lockToken).GetAwaiter().GetResult();
@@ -292,14 +292,14 @@ public sealed class QueueReceiverSource : IMessageSource
         if (removed is null) return;
 
         var dlqBytes = DeadLetterEncoder.AppendDeadLetterHeaders(removed.EncodedMessage, _entityName, reason, description);
-        // M16: if the entity is configured to forward dead-lettered messages elsewhere, route there;
+        // If the entity is configured to forward dead-lettered messages elsewhere, route there;
         // otherwise the message lands on the local <entity>/$DeadLetterQueue as before.
         var dlqTarget = string.IsNullOrEmpty(_descriptor.ForwardDeadLetteredMessagesTo)
             ? _entityName + EntityNames.DeadLetterSuffix
             : _descriptor.ForwardDeadLetteredMessagesTo!;
         await _router.RouteAsync(dlqTarget, dlqBytes, expiresAt: null, cancellationToken: cancellationToken).ConfigureAwait(false);
 
-        // M20: dead-letter counter tagged with the source queue and reason - lets a dashboard
+        // Dead-letter counter tagged with the source queue and reason - lets a dashboard
         // group "DLQ rate per queue" and spot reason-specific spikes (MaxDeliveryCountExceeded vs TTL).
         OpenServiceBusDiagnostics.MessagesDeadLettered.Add(1,
             new KeyValuePair<string, object?>(OpenServiceBusDiagnostics.TagDeadLetterSource, _entityName),

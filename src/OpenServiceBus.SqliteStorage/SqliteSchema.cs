@@ -85,7 +85,7 @@ internal static class SqliteSchema
             FOREIGN KEY (queue_name) REFERENCES queues(name) ON DELETE CASCADE
         );
 
-        -- Dedup history: M15. We retain the original sequence number so a second send with
+        -- Dedup history. We retain the original sequence number so a second send with
         -- the same MessageId can return the *original* StoredMessage (matching Azure SB's
         -- semantics where the duplicate disposition is silently accepted).
         CREATE TABLE IF NOT EXISTS dedup_history (

@@ -4,7 +4,7 @@ using OpenServiceBus.Core.Entities;
 namespace OpenServiceBus.IntegrationTests;
 
 /// <summary>
-/// M16 SDK gate: auto-forwarding is invisible to clients. Sends to a forwarding source land
+/// SDK gate: auto-forwarding is invisible to clients. Sends to a forwarding source land
 /// at the configured destination; dead-letters on a forwarding source go to the configured
 /// DLQ target; the source entity itself never accumulates messages.
 /// </summary>

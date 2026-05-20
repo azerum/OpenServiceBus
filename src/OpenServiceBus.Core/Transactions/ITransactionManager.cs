@@ -1,7 +1,7 @@
 namespace OpenServiceBus.Core.Transactions;
 
 /// <summary>
-/// Buffers operations that are part of an AMQP transaction (M17). Senders and receivers
+/// Buffers operations that are part of an AMQP transaction. Senders and receivers
 /// detect <c>TransactionalState</c> on a delivery and call <see cref="Enlist"/> instead of
 /// executing immediately; the coordinator link processor calls <see cref="CommitAsync"/> or
 /// <see cref="Rollback"/> when the client discharges the txn.

@@ -59,18 +59,18 @@ public sealed class QueueProperties
     [JsonPropertyName("DeadLetteringOnMessageExpiration")]
     public bool? DeadLetteringOnMessageExpiration { get; set; }
 
-    /// <summary>Accepted for compatibility - sessions not yet supported (post-MVP, M14).</summary>
+    /// <summary>Accepted for compatibility - sessions not yet supported (post-MVP).</summary>
     [JsonPropertyName("RequiresSession")]
     public bool? RequiresSession { get; set; }
 
-    /// <summary>Accepted for compatibility - duplicate detection not yet supported (post-MVP, M15).</summary>
+    /// <summary>Accepted for compatibility - duplicate detection not yet supported (post-MVP).</summary>
     [JsonPropertyName("RequiresDuplicateDetection")]
     public bool? RequiresDuplicateDetection { get; set; }
 
     [JsonPropertyName("DuplicateDetectionHistoryTimeWindow")]
     public string? DuplicateDetectionHistoryTimeWindow { get; set; }
 
-    /// <summary>Accepted for compatibility - auto-forwarding not yet supported (post-MVP, M16).</summary>
+    /// <summary>Accepted for compatibility - auto-forwarding not yet supported (post-MVP).</summary>
     [JsonPropertyName("ForwardTo")]
     public string? ForwardTo { get; set; }
 

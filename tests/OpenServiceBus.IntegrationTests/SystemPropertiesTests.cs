@@ -6,7 +6,6 @@ namespace OpenServiceBus.IntegrationTests;
 /// <summary>
 /// Verifies that the Service Bus SDK reads the broker-stamped system properties
 /// (delivery count, enqueued time, sequence number, locked-until) back to non-default values.
-/// Before M4 these threw NRE or returned defaults.
 /// </summary>
 public class SystemPropertiesTests
 {

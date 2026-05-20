@@ -67,13 +67,13 @@ public sealed class TtlExpirationService : BackgroundService
                 var routeToDlq = !EntityNames.IsDeadLetterQueue(queue.Name)
                     && queue.DeadLetteringOnMessageExpiration;
 
-                // M20: count every message the sweeper dropped or routed to DLQ, tagged with the source queue.
+                // Count every message the sweeper dropped or routed to DLQ, tagged with the source queue.
                 OpenServiceBusDiagnostics.MessagesExpired.Add(expired.Count,
                     new KeyValuePair<string, object?>(OpenServiceBusDiagnostics.TagDestination, queue.Name));
 
                 if (routeToDlq)
                 {
-                    // M16: per-queue ForwardDeadLetteredMessagesTo overrides the local DLQ destination.
+                    // Per-queue ForwardDeadLetteredMessagesTo overrides the local DLQ destination.
                     var dlqTarget = string.IsNullOrEmpty(queue.ForwardDeadLetteredMessagesTo)
                         ? queue.Name + EntityNames.DeadLetterSuffix
                         : queue.ForwardDeadLetteredMessagesTo!;

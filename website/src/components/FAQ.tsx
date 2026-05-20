@@ -15,10 +15,10 @@ const FAQS: QA[] = [
     q: "Does it work with Azure Functions?",
     a: (
       <>
-        Yes. The repo ships an integration test (M11) that boots a real
-        isolated-worker Functions app with a <code>ServiceBusTrigger</code> pointed
-        at an OpenServiceBus instance, then asserts 100 messages flow trigger →
-        handler → complete.
+        Yes. The repo ships an integration test that boots a real isolated-worker
+        Functions app with a <code>ServiceBusTrigger</code> pointed at an
+        OpenServiceBus instance, then asserts 100 messages flow trigger → handler
+        → complete.
       </>
     ),
   },

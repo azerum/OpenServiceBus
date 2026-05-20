@@ -18,9 +18,9 @@ namespace OpenServiceBus.Amqp.Management;
 ///
 /// Operations implemented:
 /// <list type="bullet">
-///   <item><c>com.microsoft:renew-lock</c> (M5) - extends one or more peek-lock deadlines.</item>
-///   <item><c>com.microsoft:schedule-message</c> (M7) - enqueue messages for future delivery.</item>
-///   <item><c>com.microsoft:cancel-scheduled-message</c> (M7) - cancel scheduled messages by sequence number.</item>
+///   <item><c>com.microsoft:renew-lock</c> - extends one or more peek-lock deadlines.</item>
+///   <item><c>com.microsoft:schedule-message</c> - enqueue messages for future delivery.</item>
+///   <item><c>com.microsoft:cancel-scheduled-message</c> - cancel scheduled messages by sequence number.</item>
 /// </list>
 ///
 /// Wire contract verified against <c>Azure.Messaging.ServiceBus.Amqp.ManagementConstants</c>:
@@ -41,7 +41,7 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
     private const string ReceiveBySequenceNumberOperation = "com.microsoft:receive-by-sequence-number";
     private const string UpdateDispositionOperation = "com.microsoft:update-disposition";
 
-    // M13.5 - rule management ops, scoped to a subscription's $management endpoint.
+    // Rule management ops, scoped to a subscription's $management endpoint.
     private const string AddRuleOperation = "com.microsoft:add-rule";
     private const string RemoveRuleOperation = "com.microsoft:remove-rule";
     private const string EnumerateRulesOperation = "com.microsoft:enumerate-rules";
@@ -51,7 +51,7 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
     private const string EnumerateTopKey = "top";
     private const string EnumerateSkipKey = "skip";
 
-    // M14.3 - session ops, available on every queue/subscription $management endpoint.
+    // Session ops, available on every queue/subscription $management endpoint.
     private const string SetSessionStateOperation = "com.microsoft:set-session-state";
     private const string GetSessionStateOperation = "com.microsoft:get-session-state";
     private const string RenewSessionLockOperation = "com.microsoft:renew-session-lock";
@@ -119,7 +119,7 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
     }
 
     /// <summary>
-    /// Overload that adds subscription context - enables the M13.5 rule-management operations.
+    /// Overload that adds subscription context - enables the rule-management operations.
     /// <paramref name="entityName"/> is still the storage entity (the subscription's backing
     /// queue, e.g. <c>events/Subscriptions/eu</c>) so peek-lock and disposition ops continue to
     /// land on the right messages.
@@ -447,7 +447,7 @@ public sealed class ManagementRequestProcessor : IRequestProcessor
         if (removed is null) return;
 
         var dlqBytes = DeadLettering.DeadLetterEncoder.AppendDeadLetterHeaders(removed.EncodedMessage, _entityName, reason, description);
-        // M16: honor ForwardDeadLetteredMessagesTo when set, fallback to local DLQ.
+        // Honor ForwardDeadLetteredMessagesTo when set, fallback to local DLQ.
         var dlqTarget = string.IsNullOrEmpty(_descriptor.ForwardDeadLetteredMessagesTo)
             ? _entityName + EntityNames.DeadLetterSuffix
             : _descriptor.ForwardDeadLetteredMessagesTo!;

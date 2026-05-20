@@ -91,7 +91,7 @@ public sealed class TopicManager : ITopicRegistry
             throw new InvalidOperationException($"Cannot create subscription '{descriptor.Name}' - topic '{descriptor.TopicName}' does not exist.");
         }
 
-        // M16: self-forwarding rejection - also catches "forwards to my own backing queue" since
+        // Self-forwarding rejection - also catches "forwards to my own backing queue" since
         // that's the same entity from the router's point of view.
         if (!string.IsNullOrEmpty(descriptor.ForwardTo)
             && (string.Equals(descriptor.ForwardTo, descriptor.BackingQueueName, StringComparison.OrdinalIgnoreCase)
@@ -115,7 +115,7 @@ public sealed class TopicManager : ITopicRegistry
         }
 
         // The backing queue gives us all the queue-level machinery for free.
-        // M16: mirror ForwardDeadLetteredMessagesTo onto the backing queue so the receiver
+        // Mirror ForwardDeadLetteredMessagesTo onto the backing queue so the receiver
         // sources (which key off the queue descriptor) honor it. Subscription-level ForwardTo
         // is enforced one level up - in the topic fan-out - so it stays on the descriptor only.
         await _queues.CreateAsync(new QueueDescriptor

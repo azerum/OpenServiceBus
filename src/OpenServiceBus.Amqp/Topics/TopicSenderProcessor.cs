@@ -70,7 +70,7 @@ public sealed class TopicSenderProcessor : IMessageProcessor
             var scheduledFor = ReadScheduledEnqueueTime(msg);
             var filterContext = BuildFilterContext(msg, _timeProvider.GetUtcNow());
 
-            // M17: transactional fan-out - buffer the route-and-fanout under the txn so it
+            // Transactional fan-out - buffer the route-and-fanout under the txn so it
             // only happens on commit. Each enlist captures the same byte[] + filter context.
             if (messageContext.DeliveryState is TransactionalState txnState && txnState.TxnId is { Length: > 0 } txnId)
             {
@@ -86,7 +86,7 @@ public sealed class TopicSenderProcessor : IMessageProcessor
                 return;
             }
 
-            // Note: M14 doesn't yet thread session routing through topic fan-out; subscriptions
+            // Note: session routing isn't yet threaded through topic fan-out; subscriptions
             // with RequiresSession are accepted at creation time but messages pass via the
             // regular channel. Lifted when EvaluateSubscribers returns descriptors.
             _ = FanOutAndCompleteAsync(messageContext, encoded, expiresAt, scheduledFor, filterContext, sessionId: null);
@@ -123,7 +123,7 @@ public sealed class TopicSenderProcessor : IMessageProcessor
             }
 
             // Routing the topic name itself triggers the router's fan-out path, which also
-            // walks each subscription's ForwardTo (M16) before landing on a backing queue.
+            // walks each subscription's ForwardTo before landing on a backing queue.
             var landed = await _router.RouteAsync(_topic.Name, encoded, expiresAt, scheduledFor, sessionId, filterContext: filterContext).ConfigureAwait(false);
             activity?.SetTag("osb.fanout.subscribers", landed.Count);
             OpenServiceBusDiagnostics.MessagesSent.Add(1,

@@ -4,7 +4,7 @@ using System.Diagnostics.Metrics;
 namespace OpenServiceBus.Core.Diagnostics;
 
 /// <summary>
-/// Single source of truth for OpenServiceBus telemetry (M20). All instrumentation hangs off
+/// Single source of truth for OpenServiceBus telemetry. All instrumentation hangs off
 /// one <see cref="ActivitySource"/> and one <see cref="Meter"/> so consumers point their OTel
 /// pipeline at exactly one name each:
 ///

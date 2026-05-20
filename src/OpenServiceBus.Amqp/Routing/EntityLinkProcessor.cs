@@ -24,8 +24,8 @@ namespace OpenServiceBus.Amqp.Routing;
 ///   sender attach on <c>&lt;queue&gt;</c>                        → QueueSenderProcessor
 ///   receiver attach on <c>&lt;queue&gt;</c>                      → QueueReceiverSource
 ///   any attach on <c>&lt;queue&gt;/$DeadLetterQueue</c>          → routes to the DLQ backing queue
-///   sender attach on <c>&lt;topic&gt;</c>                        → TopicSenderProcessor (M13)
-///   receiver attach on <c>&lt;topic&gt;/Subscriptions/&lt;s&gt;</c> → QueueReceiverSource on the sub backing queue (M13)
+///   sender attach on <c>&lt;topic&gt;</c>                        → TopicSenderProcessor
+///   receiver attach on <c>&lt;topic&gt;/Subscriptions/&lt;s&gt;</c> → QueueReceiverSource on the sub backing queue
 ///   <c>$management</c> attaches                                  → per-entity IRequestProcessor (registered by AmqpListenerHost)
 ///   unknown entity                                               → refused with amqp:not-found
 /// </summary>
@@ -207,7 +207,7 @@ public sealed class EntityLinkProcessor : ILinkProcessor
         }
         else
         {
-            // M14: receivers carrying a session filter get an exclusive session-locked source.
+            // Receivers carrying a session filter get an exclusive session-locked source.
             var sessionFilter = SessionFilter.TryReadFromAttach(attachContext.Attach);
             if (sessionFilter.IsSet)
             {

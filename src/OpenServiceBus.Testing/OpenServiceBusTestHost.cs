@@ -124,7 +124,7 @@ public sealed class OpenServiceBusTestHost : IAsyncDisposable
             }
         }
 
-        // M18: callers can swap in a different backing store (e.g. SQLite) via opts.StoreFactory.
+        // Callers can swap in a different backing store (e.g. SQLite) via opts.StoreFactory.
         // The rest of the stack (registries, router, transactions, listener) is identical and
         // talks to whatever the factory hands back through the IMessageStore interface.
         IMessageStore storeAsIface = opts.StoreFactory is not null
@@ -158,7 +158,7 @@ public sealed class OpenServiceBusTestHost : IAsyncDisposable
             opts.TimeProvider,
             NullLogger<ScheduledMessageActivator>.Instance);
 
-        // M20: register the observable gauges for queue depth. No-op when no MeterListener
+        // Register the observable gauges for queue depth. No-op when no MeterListener
         // is attached, so this is essentially free for tests that don't care about telemetry.
         var diagnostics = new DiagnosticsHostedService(storeAsIface, queues);
 
@@ -170,7 +170,7 @@ public sealed class OpenServiceBusTestHost : IAsyncDisposable
         var connectionString =
             $"Endpoint=sb://{opts.Host}:{port};SharedAccessKeyName={opts.SasKeyName};SharedAccessKey={opts.SasKey};UseDevelopmentEmulator=true";
 
-        // M21: optionally start the AMQP-over-WebSocket bridge on a free port pointing at
+        // Optionally start the AMQP-over-WebSocket bridge on a free port pointing at
         // the listener we just started. The SDK connects to the bridge port instead of the
         // raw AMQP port when TransportType=AmqpWebSockets.
         WebSocketBridgeService? wsBridge = null;
