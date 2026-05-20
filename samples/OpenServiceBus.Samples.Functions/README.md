@@ -1,6 +1,6 @@
 # OpenServiceBus.Samples.Functions
 
-The minimal Azure Functions sample — a single isolated-worker function with one
+The minimal Azure Functions sample - a single isolated-worker function with one
 `ServiceBusTrigger` pointed at the queue `integration-queue`. This is also the project the
 **M11 integration test** spins up via `func` to prove OpenServiceBus is a drop-in
 replacement for Azure Service Bus.
@@ -31,14 +31,14 @@ Then send a test message via the Explorer at <http://localhost:5400> (point it a
 
 ## Files
 
-| File | Purpose |
-|------|---------|
-| `Program.cs` | Standard isolated-worker `HostBuilder` entry point |
-| `OrderProcessor.cs` | The trigger function — receives + logs + writes to sentinel |
-| `host.json` | Functions runtime config (default Service Bus extension settings) |
-| `local.settings.json` | `ServiceBusConnection` pointing at `sb://localhost:5672` |
-| `config.json` | OpenServiceBus declarative bootstrap — pre-declares `integration-queue` |
-| `docker-compose.yml` | Brings up the broker with this `config.json` mounted in |
+| File                  | Purpose                                                                 |
+| --------------------- | ----------------------------------------------------------------------- |
+| `Program.cs`          | Standard isolated-worker `HostBuilder` entry point                      |
+| `OrderProcessor.cs`   | The trigger function - receives + logs + writes to sentinel             |
+| `host.json`           | Functions runtime config (default Service Bus extension settings)       |
+| `local.settings.json` | `ServiceBusConnection` pointing at `sb://localhost:5672`                |
+| `config.json`         | OpenServiceBus declarative bootstrap - pre-declares `integration-queue` |
+| `docker-compose.yml`  | Brings up the broker with this `config.json` mounted in                 |
 
 ## Notes
 

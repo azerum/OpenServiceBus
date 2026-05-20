@@ -9,7 +9,7 @@ OpenServiceBus before.
 - Bringing up the broker via `docker compose`.
 - Declarative queue bootstrap from a mounted `config.json` (the `quickstart` queue is
   ready the moment the broker starts).
-- The plain `ServiceBusClient` + `Sender` + `Receiver` round-trip — identical to the
+- The plain `ServiceBusClient` + `Sender` + `Receiver` round-trip - identical to the
   shape you'd use against real Azure Service Bus.
 
 ## Run it
@@ -51,8 +51,8 @@ SERVICEBUS_CONNECTION='Endpoint=sb://...;UseDevelopmentEmulator=true' dotnet run
 
 ## Files
 
-| File | Purpose |
-|------|---------|
-| `Program.cs` | The send + receive loop |
-| `config.json` | Declares the `quickstart` queue at broker startup |
-| `docker-compose.yml` | Broker with `config.json` mounted in |
+| File                 | Purpose                                           |
+| -------------------- | ------------------------------------------------- |
+| `Program.cs`         | The send + receive loop                           |
+| `config.json`        | Declares the `quickstart` queue at broker startup |
+| `docker-compose.yml` | Broker with `config.json` mounted in              |

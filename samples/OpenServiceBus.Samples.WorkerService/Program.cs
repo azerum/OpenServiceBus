@@ -69,7 +69,7 @@ namespace OpenServiceBus.Samples.WorkerService
 
             if (body.StartsWith("fail", StringComparison.OrdinalIgnoreCase))
             {
-                // Throwing here makes the processor abandon — the message redelivers until
+                // Throwing here makes the processor abandon - the message redelivers until
                 // MaxDeliveryCount, at which point the broker auto-DLQs it.
                 throw new InvalidOperationException($"simulated failure for '{args.Message.MessageId}'");
             }

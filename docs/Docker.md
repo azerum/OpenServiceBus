@@ -17,14 +17,14 @@ default.
 
 ## Ports
 
-| Port   | Protocol       | Service           | When                                                              |
-| ------ | -------------- | ----------------- | ----------------------------------------------------------------- |
-| `5672` | AMQP           | Broker            | Always exposed — Service Bus SDK + AMQPNetLite clients            |
-| `5300` | HTTP           | Management API    | Always exposed — REST CRUD + `/health`                            |
-| `5400` | HTTP           | **Explorer UI**   | Always exposed — open <http://localhost:5400> in a browser        |
-| `5673` | HTTP/WebSocket | AMQP-over-WS      | Only when `OPENSERVICEBUS__WEBSOCKETS__ENABLED=true`              |
+| Port   | Protocol       | Service         | When                                                       |
+| ------ | -------------- | --------------- | ---------------------------------------------------------- |
+| `5672` | AMQP           | Broker          | Always exposed - Service Bus SDK + AMQPNetLite clients     |
+| `5300` | HTTP           | Management API  | Always exposed - REST CRUD + `/health`                     |
+| `5400` | HTTP           | **Explorer UI** | Always exposed - open <http://localhost:5400> in a browser |
+| `5673` | HTTP/WebSocket | AMQP-over-WS    | Only when `OPENSERVICEBUS__WEBSOCKETS__ENABLED=true`       |
 
-You must publish `5400` (or remap it to another host port — `-p 8080:5400` works) for the
+You must publish `5400` (or remap it to another host port - `-p 8080:5400` works) for the
 Explorer to be reachable. The internal port is always `5400`; the host port is up to you.
 
 ## One-shot run
@@ -58,9 +58,9 @@ services:
     image: mauritsarissen/openservicebus:latest
     container_name: openservicebus
     ports:
-      - "5672:5672"      # AMQP — Service Bus SDK connects here
-      - "5300:5300"      # REST management API + /health
-      - "5400:5400"      # Explorer UI — open http://localhost:5400
+      - "5672:5672" # AMQP - Service Bus SDK connects here
+      - "5300:5300" # REST management API + /health
+      - "5400:5400" # Explorer UI - open http://localhost:5400
     environment:
       OPENSERVICEBUS__STORAGE__MODE: Sqlite
       OPENSERVICEBUS__STORAGE__DATASOURCE: /data/broker.db
@@ -83,7 +83,7 @@ The mounted file the compose example points at. Declares the common Service Bus 
 plain queues, session-enabled queues, queues with duplicate detection, topics with
 subscriptions and SQL/correlation filter rules, and auto-forwarding chains.
 
-> **Note about DLQs.** You don't declare dead-letter queues here — every queue and every
+> **Note about DLQs.** You don't declare dead-letter queues here - every queue and every
 > subscription **automatically** gets a `<entity>/$DeadLetterQueue` sibling created by the
 > broker. Just receive from that address when you need to drain it.
 
@@ -191,13 +191,13 @@ subscriptions and SQL/correlation filter rules, and auto-forwarding chains.
 
 What this gives you on startup:
 
-- **5 queues** — `orders`, `tenant-events` (session-enabled), `deduped-ingress` (dedup
+- **5 queues** - `orders`, `tenant-events` (session-enabled), `deduped-ingress` (dedup
   on), `audit-archive`, `ingress-gateway` (every send to it auto-forwards to
   `audit-archive`).
-- **1 topic** `events` with **4 subscriptions** — `all` (`$Default` `TrueFilter` —
+- **1 topic** `events` with **4 subscriptions** - `all` (`$Default` `TrueFilter` -
   receives everything), `eu-orders` (SQL filter), `high-priority` (correlation filter),
   `archive-bridge` (forwards everything matching `$Default` to `audit-archive`).
-- **9 implicit DLQs** — one per queue, one per subscription — addressable as
+- **9 implicit DLQs** - one per queue, one per subscription - addressable as
   `<entity>/$DeadLetterQueue`. No declaration needed.
 
 Open the Explorer at <http://localhost:5400> to see the full topology, send test
@@ -205,17 +205,17 @@ messages, and watch them route through filters and forwarding chains in real tim
 
 ## Environment variables
 
-| Variable                               | Default in image  | Notes                                                                                       |
-| -------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------- |
-| `OPENSERVICEBUS__STORAGE__MODE`        | `Sqlite`          | Override to `InMemory` for ephemeral mode                                                   |
-| `OPENSERVICEBUS__STORAGE__DATASOURCE`  | `/data/broker.db` | Where the SQLite file lives — must be on a mounted volume for persistence                   |
-| `OPENSERVICEBUS__AMQP__PORT`           | `5672`            | AMQP listener                                                                               |
-| `OPENSERVICEBUS__AMQP__REQUIRESASAUTH` | `false`           | Flip to `true` and provide `__SASKEYS__<name>` to enforce SAS                               |
-| `OPENSERVICEBUS__WEBSOCKETS__ENABLED`  | `false`           | Start the AMQP-over-WebSocket bridge                                                        |
-| `OPENSERVICEBUS__WEBSOCKETS__PORT`     | `5673`            | WebSocket port                                                                              |
-| `OPENSERVICEBUS_CONFIG`                | —                 | Path to a mounted `config.json` for declarative bootstrap                                   |
-| `ASPNETCORE_URLS_HOST`                 | `http://+:5300`   | Bind URL for the broker's management Kestrel                                                |
-| `ASPNETCORE_URLS_EXPLORER`             | `http://+:5400`   | Bind URL for the Explorer's Kestrel                                                         |
+| Variable                               | Default in image  | Notes                                                                     |
+| -------------------------------------- | ----------------- | ------------------------------------------------------------------------- |
+| `OPENSERVICEBUS__STORAGE__MODE`        | `Sqlite`          | Override to `InMemory` for ephemeral mode                                 |
+| `OPENSERVICEBUS__STORAGE__DATASOURCE`  | `/data/broker.db` | Where the SQLite file lives - must be on a mounted volume for persistence |
+| `OPENSERVICEBUS__AMQP__PORT`           | `5672`            | AMQP listener                                                             |
+| `OPENSERVICEBUS__AMQP__REQUIRESASAUTH` | `false`           | Flip to `true` and provide `__SASKEYS__<name>` to enforce SAS             |
+| `OPENSERVICEBUS__WEBSOCKETS__ENABLED`  | `false`           | Start the AMQP-over-WebSocket bridge                                      |
+| `OPENSERVICEBUS__WEBSOCKETS__PORT`     | `5673`            | WebSocket port                                                            |
+| `OPENSERVICEBUS_CONFIG`                | -                 | Path to a mounted `config.json` for declarative bootstrap                 |
+| `ASPNETCORE_URLS_HOST`                 | `http://+:5300`   | Bind URL for the broker's management Kestrel                              |
+| `ASPNETCORE_URLS_EXPLORER`             | `http://+:5400`   | Bind URL for the Explorer's Kestrel                                       |
 
 Full reference: [Configuration](Configuration).
 
@@ -224,7 +224,7 @@ Full reference: [Configuration](Configuration).
 The container persists messages **only if** you mount `/data`. Without a volume the DB
 file is inside the container layer and disappears when the container is removed. With a
 named volume (`-v osb-data:/data` or compose `volumes:`), the same `broker.db` is reused
-across recreates — proven by an end-to-end test: send a message via the SDK, `docker stop
+across recreates - proven by an end-to-end test: send a message via the SDK, `docker stop
 && docker rm`, `docker run` from the same volume, the SDK receives the same message.
 
 > ⚠️ Queue **descriptors** (LockDuration, MaxDeliveryCount, RequiresSession, etc.) are
@@ -243,7 +243,7 @@ HEALTHCHECK --interval=15s --timeout=3s --start-period=5s --retries=3 \
   CMD wget -q -O /dev/null http://127.0.0.1:5300/health || exit 1
 ```
 
-`docker ps` reports `healthy` / `unhealthy` based on whether the broker can serve HTTP —
+`docker ps` reports `healthy` / `unhealthy` based on whether the broker can serve HTTP -
 useful for compose health gates and Kubernetes readiness probes.
 
 ## How the container runs two apps
@@ -254,7 +254,7 @@ same container lifecycle: SIGTERM from `docker stop` flows to both, and if eithe
 crashes the container exits non-zero so your orchestrator can restart it.
 
 The Explorer talks to the broker over loopback (`127.0.0.1:5300` for the management API,
-`127.0.0.1:5672` for AMQP), so they're tightly coupled by design — there's no benefit to
+`127.0.0.1:5672` for AMQP), so they're tightly coupled by design - there's no benefit to
 running them in separate containers.
 
 ## Building locally
@@ -267,5 +267,5 @@ docker build -t openservicebus:dev .
 docker run --rm -p 5672:5672 -p 5300:5300 -p 5400:5400 openservicebus:dev
 ```
 
-The build is layer-cache friendly — `.csproj` files copied first for restore, source
+The build is layer-cache friendly - `.csproj` files copied first for restore, source
 second for compile. Cold build: ~30s. Warm rebuild (source-only edit): a few seconds.

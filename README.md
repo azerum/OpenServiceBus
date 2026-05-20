@@ -16,7 +16,7 @@
 Microsoft ships an official Service Bus emulator, but it needs Docker + SQL Server and is
 EULA-gated. OpenServiceBus is the MIT-licensed alternative: a single-node Service Bus
 emulator that runs as a NuGet inside your test fixture, as a `docker run`, or as a
-standalone executable — no SQL Server, no licensing dance, no 5-minute container boot.
+standalone executable - no SQL Server, no licensing dance, no 5-minute container boot.
 
 It implements the full Service Bus feature surface that real client code uses: **queues,
 topics + subscriptions (SQL/correlation filters), sessions, duplicate detection,
@@ -60,15 +60,15 @@ docker run -d --name openservicebus \
   mauritsarissen/openservicebus:latest
 ```
 
-| Port   | What                                                                 |
-| ------ | -------------------------------------------------------------------- |
-| `5672` | AMQP (use this in the Azure SDK connection string)                   |
-| `5300` | REST management API + `/health`                                      |
-| `5400` | Explorer browser UI — open <http://localhost:5400>                   |
+| Port   | What                                                                  |
+| ------ | --------------------------------------------------------------------- |
+| `5672` | AMQP (use this in the Azure SDK connection string)                    |
+| `5300` | REST management API + `/health`                                       |
+| `5400` | Explorer browser UI - open <http://localhost:5400>                    |
 | `5673` | AMQP-over-WebSocket (when `OPENSERVICEBUS__WEBSOCKETS__ENABLED=true`) |
 
 The image runs the broker **and** the Explorer UI side-by-side. SQLite-backed at
-`/data/broker.db` — mount the named volume and queues + messages survive container
+`/data/broker.db` - mount the named volume and queues + messages survive container
 recreates. See [Docker](docs/Docker.md) for the compose recipe, every env var, and the
 WebSocket-transport setup.
 
@@ -89,7 +89,7 @@ var msg = await client.CreateReceiver("orders").ReceiveMessageAsync();
 ```
 
 `UseDevelopmentEmulator=true` tells the Azure SDK to skip TLS and accept the broker on
-plain TCP — the same trick the official Microsoft emulator uses.
+plain TCP - the same trick the official Microsoft emulator uses.
 
 ---
 
@@ -102,7 +102,7 @@ inside your test process:
 dotnet add package OpenServiceBus.Testing
 ```
 
-Published on [nuget.org](https://www.nuget.org/packages?q=OpenServiceBus) — no extra source
+Published on [nuget.org](https://www.nuget.org/packages?q=OpenServiceBus) - no extra source
 needed. (GitHub Packages also mirrors every release, see
 [Contributing](docs/Contributing.md#releasing).)
 
@@ -118,7 +118,7 @@ var msg = await receiver.ReceiveMessageAsync();
 await receiver.CompleteMessageAsync(msg);
 ```
 
-One disposable host, free ephemeral port, full AMQP semantics — run thousands of these in
+One disposable host, free ephemeral port, full AMQP semantics - run thousands of these in
 parallel. See [Testing](docs/Testing.md) for time-travel, parity testing, and the options
 surface.
 
@@ -180,7 +180,7 @@ using (var scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
 await host.Queues.CreateAsync(new QueueDescriptor { Name = "downstream" });
 await host.Queues.CreateAsync(new QueueDescriptor
     { Name = "ingress", ForwardTo = "downstream" });
-// Sends to "ingress" land on "downstream" — invisible to senders.
+// Sends to "ingress" land on "downstream" - invisible to senders.
 ```
 
 → [Auto-Forwarding](docs/Auto-Forwarding.md)
@@ -208,17 +208,22 @@ OpenServiceBus reads the same `config.json` format as the official Microsoft emu
 ```json
 {
   "UserConfig": {
-    "Namespaces": [{
-      "Name": "demo",
-      "Queues": [
-        { "Name": "orders", "Properties": {
-            "LockDuration": "PT1M",
-            "MaxDeliveryCount": 3,
-            "RequiresSession": false,
-            "DefaultMessageTimeToLive": "PT1H"
-        }}
-      ]
-    }]
+    "Namespaces": [
+      {
+        "Name": "demo",
+        "Queues": [
+          {
+            "Name": "orders",
+            "Properties": {
+              "LockDuration": "PT1M",
+              "MaxDeliveryCount": 3,
+              "RequiresSession": false,
+              "DefaultMessageTimeToLive": "PT1H"
+            }
+          }
+        ]
+      }
+    ]
   }
 }
 ```
@@ -275,7 +280,7 @@ The host honors these `appsettings.json` / environment variable keys:
 | `OpenServiceBus:Storage:DataSource`  | `:memory:` | Path to the SQLite `.db` file (use `/data/broker.db` in containers) |
 | `OpenServiceBus:WebSockets:Enabled`  | `false`    | Start the AMQP-over-WebSocket bridge                                |
 | `OpenServiceBus:WebSockets:Port`     | `5673`     | WebSocket bridge port                                               |
-| `OPENSERVICEBUS_CONFIG`              | —          | Path to a `config.json` for declarative bootstrap                   |
+| `OPENSERVICEBUS_CONFIG`              | -          | Path to a `config.json` for declarative bootstrap                   |
 
 Full reference: [Configuration](docs/Configuration.md).
 
@@ -286,12 +291,12 @@ Full reference: [Configuration](docs/Configuration.md).
 Each sample is self-contained: it ships a `docker-compose.yml`, a `config.json`, and a
 `README.md` that explains what it demonstrates and how to run it.
 
-- **[`samples/OpenServiceBus.Samples.QuickStart`](samples/OpenServiceBus.Samples.QuickStart)** — minimal console send/receive against an emulator container.
-- **[`samples/OpenServiceBus.Samples.TopicsAndFilters`](samples/OpenServiceBus.Samples.TopicsAndFilters)** — pub-sub with SQL + correlation filter rules.
-- **[`samples/OpenServiceBus.Samples.Sessions`](samples/OpenServiceBus.Samples.Sessions)** — session-locked workers with per-session FIFO ordering.
-- **[`samples/OpenServiceBus.Samples.WorkerService`](samples/OpenServiceBus.Samples.WorkerService)** — `Microsoft.Extensions.Hosting` background-worker pattern.
-- **[`samples/OpenServiceBus.Samples.Functions`](samples/OpenServiceBus.Samples.Functions)** — minimal Azure Functions `ServiceBusTrigger` app (the M11 integration-test target).
-- **[`samples/OpenServiceBus.Samples.FunctionsTriggerDemo`](samples/OpenServiceBus.Samples.FunctionsTriggerDemo)** — interactive multi-trigger Functions app driven via the Explorer or HTTP.
+- **[`samples/OpenServiceBus.Samples.QuickStart`](samples/OpenServiceBus.Samples.QuickStart)** - minimal console send/receive against an emulator container.
+- **[`samples/OpenServiceBus.Samples.TopicsAndFilters`](samples/OpenServiceBus.Samples.TopicsAndFilters)** - pub-sub with SQL + correlation filter rules.
+- **[`samples/OpenServiceBus.Samples.Sessions`](samples/OpenServiceBus.Samples.Sessions)** - session-locked workers with per-session FIFO ordering.
+- **[`samples/OpenServiceBus.Samples.WorkerService`](samples/OpenServiceBus.Samples.WorkerService)** - `Microsoft.Extensions.Hosting` background-worker pattern.
+- **[`samples/OpenServiceBus.Samples.Functions`](samples/OpenServiceBus.Samples.Functions)** - minimal Azure Functions `ServiceBusTrigger` app (the M11 integration-test target).
+- **[`samples/OpenServiceBus.Samples.FunctionsTriggerDemo`](samples/OpenServiceBus.Samples.FunctionsTriggerDemo)** - interactive multi-trigger Functions app driven via the Explorer or HTTP.
 
 See [`samples/README.md`](samples/README.md) for the full index and a quick chooser table.
 
@@ -299,24 +304,24 @@ See [`samples/README.md`](samples/README.md) for the full index and a quick choo
 
 ## Documentation
 
-Multi-page guides in [`docs/`](docs/) — also published to the [GitHub Wiki](https://github.com/mauritsarissen/OpenServiceBus/wiki):
+Multi-page guides in [`docs/`](docs/) - also published to the [GitHub Wiki](https://github.com/mauritsarissen/OpenServiceBus/wiki):
 
-- **[Getting Started](docs/Getting-Started.md)** — install + first send/receive
-- **[Configuration](docs/Configuration.md)** — `config.json`, env vars, every option
-- **[Architecture](docs/Architecture.md)** — assemblies, AMQP layer, store contracts
-- **[Docker](docs/Docker.md)** — image, compose, env vars, persistence
-- **[Persistence](docs/Persistence.md)** — SQLite store, schema, restart semantics
-- **[Topics and Subscriptions](docs/Topics-and-Subscriptions.md)** — filters, rules, fan-out
-- **[Sessions](docs/Sessions.md)** — session-locked receivers, state, ordering
-- **[Auto-Forwarding](docs/Auto-Forwarding.md)** — `ForwardTo`, DLQ forwarding, cycles
-- **[Transactions](docs/Transactions.md)** — coordinator, `TransactionScope`, semantics
-- **[Duplicate Detection](docs/Duplicate-Detection.md)** — window, observed behavior
-- **[WebSocket Transport](docs/WebSocket-Transport.md)** — bridge setup, ports, client config
-- **[OpenTelemetry](docs/OpenTelemetry.md)** — source names, attributes, gauges
-- **[Explorer UI](docs/Explorer.md)** — running the browser console
-- **[Testing](docs/Testing.md)** — `OpenServiceBusTestHost`, fake-time, parity tests
-- **[Contributing](docs/Contributing.md)** — repo layout, conventions, releasing
-- **[Roadmap](docs/ROADMAP.md)** — what's next
+- **[Getting Started](docs/Getting-Started.md)** - install + first send/receive
+- **[Configuration](docs/Configuration.md)** - `config.json`, env vars, every option
+- **[Architecture](docs/Architecture.md)** - assemblies, AMQP layer, store contracts
+- **[Docker](docs/Docker.md)** - image, compose, env vars, persistence
+- **[Persistence](docs/Persistence.md)** - SQLite store, schema, restart semantics
+- **[Topics and Subscriptions](docs/Topics-and-Subscriptions.md)** - filters, rules, fan-out
+- **[Sessions](docs/Sessions.md)** - session-locked receivers, state, ordering
+- **[Auto-Forwarding](docs/Auto-Forwarding.md)** - `ForwardTo`, DLQ forwarding, cycles
+- **[Transactions](docs/Transactions.md)** - coordinator, `TransactionScope`, semantics
+- **[Duplicate Detection](docs/Duplicate-Detection.md)** - window, observed behavior
+- **[WebSocket Transport](docs/WebSocket-Transport.md)** - bridge setup, ports, client config
+- **[OpenTelemetry](docs/OpenTelemetry.md)** - source names, attributes, gauges
+- **[Explorer UI](docs/Explorer.md)** - running the browser console
+- **[Testing](docs/Testing.md)** - `OpenServiceBusTestHost`, fake-time, parity tests
+- **[Contributing](docs/Contributing.md)** - repo layout, conventions, releasing
+- **[Roadmap](docs/ROADMAP.md)** - what's next
 
 ---
 

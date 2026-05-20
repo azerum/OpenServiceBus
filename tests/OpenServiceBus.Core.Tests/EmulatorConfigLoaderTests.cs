@@ -114,7 +114,7 @@ public class EmulatorConfigLoaderTests
   [Fact]
   public void LoadFromJson_TopicsDeclared_AreProjectedOntoTopicDescriptors()
   {
-    // Arrange — topics + nested subscriptions + a SQL rule.
+    // Arrange - topics + nested subscriptions + a SQL rule.
     const string json = """
                             {
                               "UserConfig": {
@@ -156,7 +156,7 @@ public class EmulatorConfigLoaderTests
     // Act
     var result = EmulatorConfigLoader.LoadFromJson(json);
 
-    // Assert — topic, subscriptions, and rules all surface; no warnings.
+    // Assert - topic, subscriptions, and rules all surface; no warnings.
     result.Topics.Count.ShouldBe(1);
     result.Topics[0].Name.ShouldBe("events");
     result.Topics[0].DefaultMessageTimeToLive.ShouldBe(TimeSpan.FromHours(1));

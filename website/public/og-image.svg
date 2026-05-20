@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="15%" r="55%">
+      <stop offset="0%" stop-color="#7C3AED" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#7C3AED" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="brand" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#e879f9"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="#0a0a0a"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+
+  <!-- subtle grid -->
+  <g stroke="#ffffff" stroke-opacity="0.04" stroke-width="1">
+    <path d="M0 100 H1200 M0 200 H1200 M0 300 H1200 M0 400 H1200 M0 500 H1200"/>
+    <path d="M100 0 V630 M200 0 V630 M300 0 V630 M400 0 V630 M500 0 V630 M600 0 V630 M700 0 V630 M800 0 V630 M900 0 V630 M1000 0 V630 M1100 0 V630"/>
+  </g>
+
+  <!-- logo (matches favicon.svg) -->
+  <g transform="translate(80, 230)">
+    <rect width="120" height="120" rx="26" fill="#7C3AED"/>
+    <path d="M30 41 H90 M30 60 H90 M30 79 H90" stroke="white" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="37.5" cy="41" r="5.5" fill="#7C3AED" stroke="white" stroke-width="3.5"/>
+    <circle cx="82.5" cy="60" r="5.5" fill="#7C3AED" stroke="white" stroke-width="3.5"/>
+    <circle cx="37.5" cy="79" r="5.5" fill="#7C3AED" stroke="white" stroke-width="3.5"/>
+  </g>
+
+  <!-- wordmark -->
+  <text x="240" y="315" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif" font-size="96" font-weight="800">
+    <tspan fill="white">Open</tspan><tspan fill="url(#brand)">ServiceBus</tspan>
+  </text>
+
+  <!-- tagline -->
+  <text x="240" y="378" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif" font-size="30" fill="#a3a3a3">
+    Lightweight Azure Service Bus emulator · MIT-licensed
+  </text>
+
+  <!-- badges -->
+  <g font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif" font-size="20" font-weight="600">
+    <g transform="translate(240, 420)">
+      <rect width="92" height="40" rx="20" fill="#171717" stroke="#262626"/>
+      <text x="46" y="27" text-anchor="middle" fill="#d4d4d4">MIT</text>
+    </g>
+    <g transform="translate(348, 420)">
+      <rect width="148" height="40" rx="20" fill="#171717" stroke="#262626"/>
+      <text x="74" y="27" text-anchor="middle" fill="#d4d4d4">.NET 8 &amp; 10</text>
+    </g>
+    <g transform="translate(512, 420)">
+      <rect width="116" height="40" rx="20" fill="#171717" stroke="#262626"/>
+      <text x="58" y="27" text-anchor="middle" fill="#d4d4d4">AMQP 1.0</text>
+    </g>
+  </g>
+
+  <!-- url -->
+  <text x="240" y="540" font-family="ui-monospace, SFMono-Regular, monospace" font-size="22" fill="#737373">openservicebus.net</text>
+</svg>

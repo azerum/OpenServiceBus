@@ -3,7 +3,7 @@ using Azure.Messaging.ServiceBus;
 // Sessions: per-session FIFO + exclusive session ownership.
 //
 // We send 2 tenants × 3 messages = 6 total, interleaved on the wire. Then we spin up two
-// "workers" that each call AcceptNextSessionAsync — the broker hands one tenant to each
+// "workers" that each call AcceptNextSessionAsync - the broker hands one tenant to each
 // worker, FIFO-ordered within each session. Cross-tenant order is independent.
 
 var connectionString = Environment.GetEnvironmentVariable("SERVICEBUS_CONNECTION")
@@ -23,7 +23,7 @@ for (var i = 1; i <= 3; i++)
 }
 
 Console.WriteLine();
-Console.WriteLine("Starting two workers — each will grab one available session…");
+Console.WriteLine("Starting two workers - each will grab one available session…");
 var workerA = WorkerLoop("worker-1", client);
 var workerB = WorkerLoop("worker-2", client);
 await Task.WhenAll(workerA, workerB);
@@ -41,5 +41,5 @@ static async Task WorkerLoop(string name, ServiceBusClient client)
         await session.CompleteMessageAsync(msg);
     }
 
-    Console.WriteLine($"[{name}] no more messages — releasing session.");
+    Console.WriteLine($"[{name}] no more messages - releasing session.");
 }

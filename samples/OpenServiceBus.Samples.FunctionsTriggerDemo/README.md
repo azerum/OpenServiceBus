@@ -2,17 +2,17 @@
 
 Interactive Azure Functions app that exercises the full Service Bus trigger surface
 against a running OpenServiceBus broker. Start it with `func start` and drive it from
-the Explorer or `curl` — every function is annotated with what it shows off.
+the Explorer or `curl` - every function is annotated with what it shows off.
 
 ## Functions in this app
 
-| Function | Trigger | Demonstrates |
-|----------|---------|--------------|
-| `OrderProcessor.OnOrder` | `ServiceBusTrigger("orders")` | Plain peek-lock with auto-complete on success and auto-abandon on throw. Send body `fail-...` to force a retry-to-DLQ loop; send `slow` to exercise lock renewal. |
-| `BatchProcessor.OnBatch` | `ServiceBusTrigger("batch-queue", IsBatched=true)` | Batched receive (`IList<ServiceBusReceivedMessage>` in one invocation). |
-| `ManualDisposition.OnManual` | `ServiceBusTrigger("manual-queue", AutoCompleteMessages=false)` | Manual complete/abandon/dead-letter from inside the function, driven by message body. |
-| `DeadLetterWatcher.OnDeadLetter` | `ServiceBusTrigger("orders/$DeadLetterQueue")` | Trigger on the DLQ as a first-class sub-entity. |
-| `HttpEnqueue.Enqueue*` | `HttpTrigger` + `[ServiceBusOutput]` | HTTP-driven send via Functions output bindings — proves OpenServiceBus handles the sending side of the binding pipeline too. |
+| Function                         | Trigger                                                         | Demonstrates                                                                                                                                                      |
+| -------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OrderProcessor.OnOrder`         | `ServiceBusTrigger("orders")`                                   | Plain peek-lock with auto-complete on success and auto-abandon on throw. Send body `fail-...` to force a retry-to-DLQ loop; send `slow` to exercise lock renewal. |
+| `BatchProcessor.OnBatch`         | `ServiceBusTrigger("batch-queue", IsBatched=true)`              | Batched receive (`IList<ServiceBusReceivedMessage>` in one invocation).                                                                                           |
+| `ManualDisposition.OnManual`     | `ServiceBusTrigger("manual-queue", AutoCompleteMessages=false)` | Manual complete/abandon/dead-letter from inside the function, driven by message body.                                                                             |
+| `DeadLetterWatcher.OnDeadLetter` | `ServiceBusTrigger("orders/$DeadLetterQueue")`                  | Trigger on the DLQ as a first-class sub-entity.                                                                                                                   |
+| `HttpEnqueue.Enqueue*`           | `HttpTrigger` + `[ServiceBusOutput]`                            | HTTP-driven send via Functions output bindings - proves OpenServiceBus handles the sending side of the binding pipeline too.                                      |
 
 ## Run it
 
@@ -24,7 +24,7 @@ of that up:
 # Terminal 1: broker (with the right queues pre-declared)
 docker compose up
 
-# Terminal 2: Explorer UI (optional — easier to drive than curl)
+# Terminal 2: Explorer UI (optional - easier to drive than curl)
 dotnet run --project ../../src/OpenServiceBus.Explorer
 
 # Terminal 3: Functions worker
@@ -57,11 +57,11 @@ automatically when retries exhaust on `orders`.
 
 ## Files
 
-| File | Purpose |
-|------|---------|
-| `Program.cs` | Isolated-worker `HostBuilder` entry point |
-| `Functions/*.cs` | The five trigger functions described above |
-| `host.json` | Service Bus extension config (max-concurrent, batch sizes, etc.) |
-| `local.settings.json` | `ServiceBusConnection` pointing at `sb://localhost:5672` |
-| `config.json` | OpenServiceBus declarative bootstrap |
-| `docker-compose.yml` | Broker with `config.json` mounted in |
+| File                  | Purpose                                                          |
+| --------------------- | ---------------------------------------------------------------- |
+| `Program.cs`          | Isolated-worker `HostBuilder` entry point                        |
+| `Functions/*.cs`      | The five trigger functions described above                       |
+| `host.json`           | Service Bus extension config (max-concurrent, batch sizes, etc.) |
+| `local.settings.json` | `ServiceBusConnection` pointing at `sb://localhost:5672`         |
+| `config.json`         | OpenServiceBus declarative bootstrap                             |
+| `docker-compose.yml`  | Broker with `config.json` mounted in                             |

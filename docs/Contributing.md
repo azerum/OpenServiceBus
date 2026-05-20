@@ -87,7 +87,7 @@ with a version input) and the pipeline:
 
 1. Runs `dotnet test` (must be green).
 2. Packs the six library NuGets with the tag's version.
-3. Pushes them to **[nuget.org](https://www.nuget.org)** — the public, primary registry.
+3. Pushes them to **[nuget.org](https://www.nuget.org)** - the public, primary registry.
 4. Mirrors the same NuGets to **GitHub Packages** (`https://nuget.pkg.github.com/mauritsarissen`)
    as a secondary so private/preview installs work without a nuget.org account.
 5. Builds the **multi-arch Docker image** (linux/amd64 + linux/arm64).
@@ -96,13 +96,13 @@ with a version input) and the pipeline:
 
 Required secrets (set in repo settings → Secrets and variables → Actions):
 
-| Secret | Where to get it |
-|--------|-----------------|
-| `NUGET_API_KEY` | <https://www.nuget.org/account/apikeys> — scope `Push new packages and package versions`, glob `OpenServiceBus.*` |
-| `DOCKERHUB_USERNAME` | Your Docker Hub login |
-| `DOCKERHUB_TOKEN` | <https://hub.docker.com/settings/security> — PAT with `Read & Write`, **not** your password |
+| Secret               | Where to get it                                                                                                   |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `NUGET_API_KEY`      | <https://www.nuget.org/account/apikeys> - scope `Push new packages and package versions`, glob `OpenServiceBus.*` |
+| `DOCKERHUB_USERNAME` | Your Docker Hub login                                                                                             |
+| `DOCKERHUB_TOKEN`    | <https://hub.docker.com/settings/security> - PAT with `Read & Write`, **not** your password                       |
 
-GHCR uses the built-in `GITHUB_TOKEN` — no setup needed. If `NUGET_API_KEY` isn't set the
+GHCR uses the built-in `GITHUB_TOKEN` - no setup needed. If `NUGET_API_KEY` isn't set the
 nuget.org push step skips itself gracefully; everything else still runs.
 
 ## Wiki sync

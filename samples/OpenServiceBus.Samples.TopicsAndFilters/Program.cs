@@ -2,12 +2,12 @@ using Azure.Messaging.ServiceBus;
 
 // Topic pub-sub with three subscriptions, each filtering messages differently:
 //
-//   all            — TrueFilter (auto-installed $Default rule). Sees every message.
-//   eu-orders      — SQL filter:        region = 'eu' AND priority >= 5
-//   high-priority  — Correlation filter: priority = 9
+//   all            - TrueFilter (auto-installed $Default rule). Sees every message.
+//   eu-orders      - SQL filter:        region = 'eu' AND priority >= 5
+//   high-priority  - Correlation filter: priority = 9
 //
 // The topic + subscriptions + rules are pre-declared by config.json so the SDK doesn't
-// have to manage entities — it just sends and receives.
+// have to manage entities - it just sends and receives.
 
 var connectionString = Environment.GetEnvironmentVariable("SERVICEBUS_CONNECTION")
     ?? "Endpoint=sb://localhost:5672;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true";

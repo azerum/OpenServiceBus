@@ -5,9 +5,9 @@
 # Mount /data as a volume for durability.
 #
 # Exposed ports:
-#   5672 — AMQP listener (Service Bus SDK + AMQPNetLite clients)
-#   5300 — REST management API + /health
-#   5400 — Explorer browser UI (proxies to the management API + drives AMQP via the SDK)
+#   5672 - AMQP listener (Service Bus SDK + AMQPNetLite clients)
+#   5300 - REST management API + /health
+#   5400 - Explorer browser UI (proxies to the management API + drives AMQP via the SDK)
 #
 # Optional environment variables:
 #   OPENSERVICEBUS__STORAGE__MODE        InMemory | Sqlite (default: Sqlite in this image)
@@ -31,23 +31,23 @@ COPY src/OpenServiceBus.Host/OpenServiceBus.Host.csproj                       sr
 COPY src/OpenServiceBus.Explorer/OpenServiceBus.Explorer.csproj               src/OpenServiceBus.Explorer/
 
 RUN dotnet restore src/OpenServiceBus.Host/OpenServiceBus.Host.csproj \
- && dotnet restore src/OpenServiceBus.Explorer/OpenServiceBus.Explorer.csproj
+    && dotnet restore src/OpenServiceBus.Explorer/OpenServiceBus.Explorer.csproj
 
 # Copy the rest of the source and publish both apps side-by-side.
 COPY src/ src/
 RUN dotnet publish src/OpenServiceBus.Host/OpenServiceBus.Host.csproj \
-        --configuration Release \
-        --no-restore \
-        --output /app/host \
- && dotnet publish src/OpenServiceBus.Explorer/OpenServiceBus.Explorer.csproj \
-        --configuration Release \
-        --no-restore \
-        --output /app/explorer
+    --configuration Release \
+    --no-restore \
+    --output /app/host \
+    && dotnet publish src/OpenServiceBus.Explorer/OpenServiceBus.Explorer.csproj \
+    --configuration Release \
+    --no-restore \
+    --output /app/explorer
 
 # ─── Runtime stage ────────────────────────────────────────────────────────────
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
 
-# Run as a non-root user — the broker doesn't need root and OCI scanners flag images that do.
+# Run as a non-root user - the broker doesn't need root and OCI scanners flag images that do.
 RUN addgroup -S osb && adduser -S osb -G osb \
     && mkdir -p /data \
     && chown -R osb:osb /data

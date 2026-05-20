@@ -2,7 +2,7 @@ using Azure.Messaging.ServiceBus;
 
 // Minimal QuickStart: send a message, receive it back, complete it. Talks to an
 // OpenServiceBus broker reachable at the configured endpoint (sb://localhost:5672 by
-// default — bring it up via `docker compose up` in this folder).
+// default - bring it up via `docker compose up` in this folder).
 
 var connectionString = Environment.GetEnvironmentVariable("SERVICEBUS_CONNECTION")
     ?? "Endpoint=sb://localhost:5672;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true";

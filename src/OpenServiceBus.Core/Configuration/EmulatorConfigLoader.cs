@@ -169,7 +169,7 @@ public static class EmulatorConfigLoader
                 var expr = props.SqlFilter?.SqlExpression;
                 if (string.IsNullOrWhiteSpace(expr))
                 {
-                    warnings.Add($"{label}: FilterType=Sql but SqlFilter.SqlExpression is empty — skipping.");
+                    warnings.Add($"{label}: FilterType=Sql but SqlFilter.SqlExpression is empty - skipping.");
                     return null;
                 }
                 filter = new SqlFilter(expr);
@@ -178,7 +178,7 @@ public static class EmulatorConfigLoader
                 var cf = props.CorrelationFilter;
                 if (cf is null)
                 {
-                    warnings.Add($"{label}: FilterType=Correlation but no CorrelationFilter payload — skipping.");
+                    warnings.Add($"{label}: FilterType=Correlation but no CorrelationFilter payload - skipping.");
                     return null;
                 }
                 filter = new CorrelationFilter
@@ -199,7 +199,7 @@ public static class EmulatorConfigLoader
                 };
                 break;
             default:
-                warnings.Add($"{label}: unknown FilterType '{props.FilterType}' — skipping.");
+                warnings.Add($"{label}: unknown FilterType '{props.FilterType}' - skipping.");
                 return null;
         }
 

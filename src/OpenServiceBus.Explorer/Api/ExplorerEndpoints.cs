@@ -88,7 +88,7 @@ public static class ExplorerEndpoints
             }
             else
             {
-                // ATONCE: a single SendMessagesAsync(IEnumerable<>) — the SDK packs them into one
+                // ATONCE: a single SendMessagesAsync(IEnumerable<>) - the SDK packs them into one
                 // AMQP transfer with one settlement, the real bulk path.
                 var msgs = Enumerable.Range(0, count).Select(BuildOne).ToList();
                 firstId = msgs[0].MessageId;
@@ -354,7 +354,7 @@ public static class ExplorerEndpoints
         return idx > 0 ? stripped[..idx] : stripped;
     }
 
-    // When peekOnly is true, lockToken and lockedUntil are nulled out — the client uses null
+    // When peekOnly is true, lockToken and lockedUntil are nulled out - the client uses null
     // lockToken as the signal that no dispositions are available for this message.
     private static object ToDto(ServiceBusReceivedMessage msg, bool peekOnly = false) => new
     {

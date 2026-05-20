@@ -1732,7 +1732,7 @@
       } else if (visibleQs.length === 0) {
         qList.innerHTML = '<div class="row-meta" style="padding:6px 10px">No matches</div>';
       } else {
-        // DLQ rows are no longer surfaced here — they show as a tab inside the parent entity.
+        // DLQ rows are no longer surfaced here - they show as a tab inside the parent entity.
         for (const q of visibleQs) qList.appendChild(queueRow(q, false));
       }
 
@@ -1975,7 +1975,7 @@
     }
 
     // Aggregates the dead-letter count for any selected entity. For a topic this sums DLQs across
-    // every subscription, since topics themselves don't carry messages — their DLQ pressure lives
+    // every subscription, since topics themselves don't carry messages - their DLQ pressure lives
     // on the children. Returns null when the broker hasn't reported a count yet.
     function dlqCountForSelected(sel) {
       if (!sel) return null;
@@ -2307,8 +2307,8 @@
       if (count <= 1) { hint.hidden = true; return; }
       hint.hidden = false;
       const desc = strategy === "PARALLEL"
-        ? `<strong>${count} parallel sends</strong> — fires <code>SendMessageAsync</code> ${count}× concurrently. Each is its own AMQP transfer.`
-        : `<strong>${count} in one batch</strong> — packs all messages into a single <code>SendMessagesAsync</code> call (one AMQP transfer, one settlement).`;
+        ? `<strong>${count} parallel sends</strong> - fires <code>SendMessageAsync</code> ${count}× concurrently. Each is its own AMQP transfer.`
+        : `<strong>${count} in one batch</strong> - packs all messages into a single <code>SendMessagesAsync</code> call (one AMQP transfer, one settlement).`;
       const idNote = $("#msgId").value
         ? ` MessageId will be suffixed <code>-0</code>…<code>-${count - 1}</code> to keep ids unique.`
         : "";
@@ -2399,7 +2399,7 @@
         if (mode === 'peek') await peekMany(which, target, count);
         else await receiveLocked(which, target, count);
       } finally {
-        // Reset directly — renderTabs only knows about #btnReceive, so #btnReceiveDlq would
+        // Reset directly - renderTabs only knows about #btnReceive, so #btnReceiveDlq would
         // otherwise stay disabled after the first click.
         btn.disabled = false;
         renderTabs();
@@ -2603,7 +2603,7 @@
         document.querySelectorAll('.msg-menu').forEach(m => m.hidden = true);
       }
     });
-    // Scrolling or resizing detaches the menu from its trigger — easier to just close.
+    // Scrolling or resizing detaches the menu from its trigger - easier to just close.
     window.addEventListener('scroll', () => {
       document.querySelectorAll('.msg-menu').forEach(m => m.hidden = true);
     }, true);

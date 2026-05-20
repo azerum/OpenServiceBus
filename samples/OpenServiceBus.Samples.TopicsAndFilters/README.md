@@ -1,7 +1,7 @@
 # OpenServiceBus.Samples.TopicsAndFilters
 
 Topic pub-sub with **three subscriptions**, each filtering the same incoming stream
-differently. Drives home that filters run server-side — the sender publishes one message
+differently. Drives home that filters run server-side - the sender publishes one message
 and the broker fans out to whichever subscriptions match.
 
 ## What it demonstrates
@@ -10,7 +10,7 @@ and the broker fans out to whichever subscriptions match.
 - A **SQL filter** (`region = 'eu' AND priority >= 5`).
 - A **correlation filter** (matches `priority = 9` via application properties).
 - A trivial subscription with the auto-installed `$Default` `TrueFilter` that catches everything.
-- Server-side rule evaluation — the SDK sees a normal `ServiceBusSender.SendMessageAsync`,
+- Server-side rule evaluation - the SDK sees a normal `ServiceBusSender.SendMessageAsync`,
   filtering happens inside the broker.
 
 ## Run it
@@ -51,12 +51,12 @@ Expected distribution:
 
 ## Files
 
-| File | Purpose |
-|------|---------|
-| `Program.cs` | Sends three messages, drains each subscription, prints results |
-| `config.json` | Declares the topic, the three subscriptions, and their rules |
-| `docker-compose.yml` | Broker with `config.json` mounted in |
+| File                 | Purpose                                                        |
+| -------------------- | -------------------------------------------------------------- |
+| `Program.cs`         | Sends three messages, drains each subscription, prints results |
+| `config.json`        | Declares the topic, the three subscriptions, and their rules   |
+| `docker-compose.yml` | Broker with `config.json` mounted in                           |
 
 ## See also
 
-- [Topics and Subscriptions](../../docs/Topics-and-Subscriptions.md) — full SQL filter grammar reference.
+- [Topics and Subscriptions](../../docs/Topics-and-Subscriptions.md) - full SQL filter grammar reference.

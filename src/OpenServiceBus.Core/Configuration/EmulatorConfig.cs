@@ -92,7 +92,7 @@ public sealed class TopicConfig
 
 public sealed class TopicProperties
 {
-    /// <summary>ISO 8601 duration — null means messages never expire.</summary>
+    /// <summary>ISO 8601 duration - null means messages never expire.</summary>
     [JsonPropertyName("DefaultMessageTimeToLive")]
     public string? DefaultMessageTimeToLive { get; set; }
 }
