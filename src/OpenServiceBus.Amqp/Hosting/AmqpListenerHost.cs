@@ -1,4 +1,5 @@
 using Amqp;
+using Amqp.Framing;
 using Amqp.Listener;
 using Amqp.Transactions;
 using Microsoft.Extensions.Hosting;
@@ -76,11 +77,40 @@ public sealed class AmqpListenerHost : IHostedService, IAsyncDisposable
 
         host.RegisterRequestProcessor("$cbs", new CbsRequestProcessor(_options, _loggerFactory.CreateLogger<CbsRequestProcessor>()));
 
-        // AMQP transaction coordinator. Coordinator-targeted attaches have no Address,
-        // and the framework's default address lookup would throw on the (Target)attach.Target
-        // cast. The AddressResolver hook lets us redirect those attaches to a synthetic
-        // "$coordinator" address where our IMessageProcessor lives.
-        host.AddressResolver = (_, attach) => attach.Target is Coordinator ? CoordinatorProcessor.Address : null;
+        host.AddressResolver = (_, attach) =>
+        {
+            // AMQP transaction coordinator. Coordinator-targeted attaches have no Address,
+            // and the framework's default address lookup would throw on the (Target)attach.Target
+            // cast. The AddressResolver hook lets us redirect those attaches to a synthetic
+            // "$coordinator" address where our IMessageProcessor lives.
+            if (attach.Target is Coordinator)
+            {
+                return CoordinatorProcessor.Address;
+            }
+
+            // NOTE(azerum):
+            //
+            // Node.js SDK sends frame like this during put-token request:
+            // [amqp] RECV (ch=0) attach(name:cbs-fdc7de40-5bdd-6848-b295-1f963f2bfe53,handle:1,role:True,source:source(address:$cbs),target:target())
+            //
+            // Apparently SDK then expects to receive response on link `name:`. I am not sure if it makes sense from AMQP spec
+            // point of view, but note how the SDK does work with real Azure Service Bus
+            if (
+                attach.Role &&
+                attach.Source is Source source &&
+                string.Equals(source.Address, "$cbs", StringComparison.OrdinalIgnoreCase) &&
+                attach.Target is Target target &&
+                string.IsNullOrEmpty(target.Address) &&
+                !string.IsNullOrEmpty(attach.LinkName)
+            )
+            {
+                target.Address = attach.LinkName;
+                return "$cbs";
+            }
+
+            return null;
+        };
+
         host.RegisterMessageProcessor(CoordinatorProcessor.Address,
             new CoordinatorProcessor(_transactions, _loggerFactory.CreateLogger<CoordinatorProcessor>()));
 
