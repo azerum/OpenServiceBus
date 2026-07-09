@@ -1,5 +1,11 @@
 name: Release
 
+# EDIT: temporary edits:
+# #1 is kept
+# #2 is skipped
+# #3 does only GHCR, Docker is skipped
+# #4 is skipped
+
 # Tag-driven release pipeline. Push a `v1.2.3` tag (or trigger manually with a version
 # input) and this workflow:
 #   1. Runs the full test suite (build must be green to ship).
@@ -75,84 +81,8 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Resolved version: $VERSION"
 
-  nuget:
-    name: Pack & publish NuGets
-    runs-on: ubuntu-latest
-    needs: resolve-version
-    env:
-      VERSION: ${{ needs.resolve-version.outputs.version }}
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: |
-            8.0.x
-            10.0.x
-        # NOTE: deliberately no `source-url:` here. That option injects an extra source into
-        # the global nuget.config which trips NU1507 under Central Package Management
-        # (multiple sources without explicit mapping = restore error). Auth for nuget push
-        # happens inline below with --source + --api-key.
-
-      - run: dotnet restore
-
-      - name: Pack
-        # Pack the solution - IsPackable=false on Host + Explorer means we get exactly the
-        # six library nupkgs. -p:Version stamps the assembly + package version from the tag.
-        run: |
-          dotnet pack OpenServiceBus.slnx \
-            --configuration Release \
-            --no-restore \
-            "-p:Version=${VERSION}" \
-            "-p:AssemblyVersion=${VERSION%.*.*}.0.0" \
-            "-p:FileVersion=${VERSION}.0" \
-            --output ./nupkgs
-
-      - name: List packed artifacts
-        run: ls -la ./nupkgs
-
-      - name: Push to nuget.org
-        # Primary public registry. Requires repo secret NUGET_API_KEY (generated at
-        # https://www.nuget.org/account/apikeys with scope "Push new packages and package
-        # versions" and glob "OpenServiceBus.*"). The step skips itself when the secret
-        # isn't configured, so the workflow still succeeds on repos that only want GHCR.
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
-        run: |
-          if [ -z "$NUGET_API_KEY" ]; then
-            echo "::notice::NUGET_API_KEY not set - skipping nuget.org push."
-            exit 0
-          fi
-          dotnet nuget push './nupkgs/*.nupkg' \
-            --source https://api.nuget.org/v3/index.json \
-            --api-key "$NUGET_API_KEY" \
-            --skip-duplicate
-          dotnet nuget push './nupkgs/*.snupkg' \
-            --source https://api.nuget.org/v3/index.json \
-            --api-key "$NUGET_API_KEY" \
-            --skip-duplicate || true
-
-      - name: Push to GitHub Packages
-        # Secondary mirror so `dotnet add package --source ghcr...` also works (useful for
-        # private preview builds before a public push). Authenticates with the built-in
-        # GITHUB_TOKEN; no extra secret needed.
-        run: |
-          dotnet nuget push './nupkgs/*.nupkg' \
-            --source https://nuget.pkg.github.com/mauritsarissen/index.json \
-            --api-key ${{ secrets.GITHUB_TOKEN }} \
-            --skip-duplicate
-          dotnet nuget push './nupkgs/*.snupkg' \
-            --source https://nuget.pkg.github.com/mauritsarissen/index.json \
-            --api-key ${{ secrets.GITHUB_TOKEN }} \
-            --skip-duplicate || true
-
-      - name: Upload nupkg artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: nupkgs
-          path: ./nupkgs/*.*nupkg
-
   docker:
-    name: Build & push image (GHCR + Docker Hub)
+    name: Build & push image (GHCR)
     runs-on: ubuntu-latest
     needs: resolve-version
     env:
@@ -170,11 +100,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v4
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # - name: Login to Docker Hub
+      #   uses: docker/login-action@v4
+      #   with:
+      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
+      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build & push
         uses: docker/build-push-action@v7
@@ -183,10 +113,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/mauritsarissen/openservicebus:${{ env.VERSION }}
-            ghcr.io/mauritsarissen/openservicebus:latest
-            mauritsarissen/openservicebus:${{ env.VERSION }}
-            mauritsarissen/openservicebus:latest
+            ghcr.io/azerum/openservicebus:${{ env.VERSION }}
+            ghcr.io/azerum/openservicebus:latest
           labels: |
             org.opencontainers.image.title=OpenServiceBus
             org.opencontainers.image.description=Zero-dependency, embeddable Azure Service Bus emulator
@@ -196,49 +124,3 @@ jobs:
             org.opencontainers.image.licenses=MIT
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-  release:
-    name: GitHub Release
-    runs-on: ubuntu-latest
-    needs: [nuget, docker, resolve-version]
-    if: github.event_name == 'push' # only auto-create a Release on tag push; manual runs skip it
-    env:
-      VERSION: ${{ needs.resolve-version.outputs.version }}
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0 # full history for auto-generated notes
-
-      - uses: actions/download-artifact@v8
-        with:
-          name: nupkgs
-          path: ./nupkgs
-
-      - name: Create release
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: v${{ env.VERSION }}
-          name: v${{ env.VERSION }}
-          generate_release_notes: true
-          files: ./nupkgs/*.*nupkg
-          body: |
-            ## Install
-
-            ### NuGet (nuget.org)
-
-            ```bash
-            dotnet add package OpenServiceBus.Testing --version ${{ env.VERSION }}
-            ```
-
-            Browse the package pages on [nuget.org/packages?q=OpenServiceBus](https://www.nuget.org/packages?q=OpenServiceBus).
-
-            ### Docker
-
-            ```bash
-            docker pull ghcr.io/mauritsarissen/openservicebus:${{ env.VERSION }}
-            # or
-            docker pull mauritsarissen/openservicebus:${{ env.VERSION }}
-            ```
-
-            See the [Wiki](https://github.com/${{ github.repository }}/wiki) for full
-            documentation.
